@@ -1,0 +1,6 @@
+# Reusable: start the app from a clean state
+appId: ${APP_ID}
+---
+- launchApp:
+    clearState: true
+    clearKeychain: true

@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.env.local
+reports/*
+!reports/.gitkeep
+test-results/
+playwright-report/
+maestro-output/
+*.apk
+*.ipa
+*.aab
+skills/*.zip

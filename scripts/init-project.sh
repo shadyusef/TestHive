@@ -1,0 +1,10 @@
+#!/usr/bin/env bash
+# Usage: bash scripts/init-project.sh "<PROJECT_NAME>"
+set -e
+NAME="${1:?Usage: init-project.sh \"<PROJECT_NAME>\"}"
+mkdir -p workflow test-cases reports reviews
+[ -f PROJECT_BRIEF.md ] || sed "s/<PROJECT_NAME>/$NAME/" templates/PROJECT_BRIEF.md > PROJECT_BRIEF.md
+[ -f workflow/BOARD.md ] || cp templates/BOARD.md workflow/BOARD.md
+[ -f test-cases/TestCases.csv ] || cp templates/TestCases.csv test-cases/TestCases.csv
+[ -f .env ] || cp templates/env.example .env
+echo "Project '$NAME' initialised. Next: edit PROJECT_BRIEF.md and .env, then run scripts/check-devices.sh"

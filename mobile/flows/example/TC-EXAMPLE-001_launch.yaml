@@ -1,0 +1,12 @@
+appId: ${APP_ID}
+tags:
+  - smoke
+---
+- runFlow: ../../subflows/launch-clean.yaml
+- extendedWaitUntil:
+    visible: ".*"
+    timeout: 10000
+# Replace with real steps and assertions, e.g.:
+# - tapOn:
+#     id: "submit_button"
+# - assertVisible: "Success"
