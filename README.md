@@ -26,6 +26,10 @@ Plan -> cases -> automate P0/P1 first -> run -> triage failures -> review -> fix
 - Defect Triage runs only on failures.
 - Interim reviews use Sonnet; Opus is used for module sign-off.
 - Each agent has only the tools it needs; runs print failures only; screen hierarchy is read only when a step fails.
+- `CONTEXT.md` (30 lines) is read by agents instead of the full brief.
+- Mobile screen ids are cached once in `mobile/screens/` and reused.
+- `scripts/digest-failures.sh` trims run output to failures only before triage.
+- `scripts/gate.sh` is a hard definition-of-done check; `scripts/selftest.sh` (also run in CI) proves the template works.
 - Short briefs by case ID, one CSV for all cases, shared subflows and data.
 
 ## Requirements
@@ -41,11 +45,11 @@ See [QUICKSTART.md](QUICKSTART.md).
 ```
 skills/testhive/  the /testhive recall skill (copy to your Claude skills to use it)
 .claude/agents/   the 8 agent definitions
-templates/        project brief, board, test case sheet, env example
+templates/        project brief, CONTEXT, board, test case sheet, env example
 mobile/           Maestro flows, subflows, data, android/ios notes
 api/              Postman collections and environments
 web/              Playwright (when needed)
-scripts/          init, device check, reset, run helpers
+scripts/          init, device check, reset, run, digest-failures, gate, selftest
 workflow/         BOARD.md (created by init)
 test-cases/       TestCases.csv and exploration notes (created by init)
 reviews/ reports/ review files and run output

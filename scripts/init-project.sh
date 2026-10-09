@@ -7,4 +7,5 @@ mkdir -p workflow test-cases reports reviews
 [ -f workflow/BOARD.md ] || cp templates/BOARD.md workflow/BOARD.md
 [ -f test-cases/TestCases.csv ] || cp templates/TestCases.csv test-cases/TestCases.csv
 [ -f .env ] || cp templates/env.example .env
-echo "Project '$NAME' initialised. Next: edit PROJECT_BRIEF.md and .env, then run scripts/check-devices.sh"
+[ -f CONTEXT.md ] || cp templates/CONTEXT.md CONTEXT.md
+echo "Project '$NAME' initialised. Next: edit PROJECT_BRIEF.md, CONTEXT.md and .env, then run scripts/check-devices.sh"

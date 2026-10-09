@@ -1,2 +1,2 @@
 ID,Module,Platform,Title,Priority,Type,Preconditions,Steps,Expected Result,Test Data,Automation,Automation Spec,Status
-TC-EXAMPLE-001,EXAMPLE,Both,Example: valid input is accepted,P0,Functional,App installed and cleared,"1. Launch the app; 2. Enter valid data; 3. Tap Submit",Success screen is shown,unique user from mobile/data,Yes,mobile/flows/example/TC-EXAMPLE-001_valid-input.yaml,Draft
+TC-EXAMPLE-001,EXAMPLE,Both,Example: valid input is accepted,P0,Functional,App installed and cleared,"1. Launch the app; 2. Enter valid data; 3. Tap Submit",Success screen is shown,unique user from mobile/data,Yes,mobile/flows/example/TC-EXAMPLE-001_launch.yaml,Draft
