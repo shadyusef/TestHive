@@ -3,10 +3,12 @@ tags:
   - smoke
 ---
 - runFlow: ../../subflows/launch-clean.yaml
+# PLACEHOLDER: ".*" matches anything, so this proves only that the app opened.
+# gate.sh rejects a "Done" case whose flow still has it.
 - extendedWaitUntil:
     visible: ".*"
     timeout: 10000
-# Replace with real steps and assertions, e.g.:
+# Replace with real steps and a real assertion on the expected result, e.g.:
 # - tapOn:
 #     id: "submit_button"
 # - assertVisible: "Success"

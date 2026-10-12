@@ -3,6 +3,9 @@ node_modules/
 *.env.local
 reports/*
 !reports/.gitkeep
+!reports/stable-*.txt
+!reports/BUG_REPORT.md
+!reports/TEST_REPORT.md
 test-results/
 playwright-report/
 maestro-output/
@@ -10,3 +13,5 @@ maestro-output/
 *.ipa
 *.aab
 skills/*.zip
+.testhive-ready
+HANDOVER.md

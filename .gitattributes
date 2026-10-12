@@ -1,2 +1,11 @@
-# Auto detect text files and perform LF normalization
+# Keep line endings stable on every OS. Bash breaks on CRLF, and a CRLF .env corrupts values.
 * text=auto
+*.sh text eol=lf
+*.yaml text eol=lf
+*.yml text eol=lf
+*.md text eol=lf
+*.csv text eol=lf
+*.json text eol=lf
+*.ts text eol=lf
+*.example text eol=lf
+*.png binary

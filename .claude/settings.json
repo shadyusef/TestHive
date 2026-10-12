@@ -1,0 +1,17 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(bash scripts/*)",
+      "Bash(maestro *)",
+      "Bash(adb *)",
+      "Bash(newman *)",
+      "Bash(npx playwright *)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Bash(git push)",
+      "Bash(git push *)"
+    ]
+  }
+}
