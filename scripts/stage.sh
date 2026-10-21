@@ -17,7 +17,8 @@ sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 SF = os.environ.get("TH_STATE", "workflow/state.json")
 LOG = os.path.join(os.path.dirname(SF) or ".", "APPROVALS.md")
-USAGE = "Usage: bash scripts/stage.sh init|status|start|submit|approve|reject|check ...  (see the top of scripts/stage.sh)"
+RUN = os.environ["TH_CMD"] + " stage" if os.environ.get("TH_CMD") else "bash scripts/stage.sh"  # how the user types it
+USAGE = f"Usage: {RUN} init|status|start|submit|approve|reject|check ...  (see the top of scripts/stage.sh)"
 
 def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 def die(msg, code=1): print(msg); sys.exit(code)
@@ -46,7 +47,7 @@ s = load()
 
 def module(name):
     m = s["modules"].get(name.upper())
-    if m is None: die(f"Unknown module {name}. Run: bash scripts/stage.sh init {name}")
+    if m is None: die(f"Unknown module {name}. Run: {RUN} init {name}")
     return m
 def stage(name):
     if name not in STAGES: die(f"Unknown stage {name}. Stages in order: {' '.join(STAGES)}")
@@ -78,10 +79,10 @@ if cmd == "init":
     if not re.fullmatch(r"[A-Z0-9]+", name): die("Module code: letters and digits only, e.g. SIGNUP")
     if name in s["modules"]: die(f"{name} already exists", 0)
     s["modules"][name] = {"created": now(), "stages": {st: {"status": "pending", "history": []} for st in STAGES}}
-    save(s); print(f"Module {name} added. Next: bash scripts/stage.sh start {name} analysis")
+    save(s); print(f"Module {name} added. Next: {RUN} start {name} analysis")
 elif cmd == "status":
     if pos: show(pos[0].upper(), module(pos[0]))
-    elif not s["modules"]: print("No modules yet. Run: bash scripts/stage.sh init <MODULE>")
+    elif not s["modules"]: print(f"No modules yet. Run: {RUN} init <MODULE>")
     else:
         for n, m in s["modules"].items(): show(n, m)
 elif cmd in ("start", "check"):

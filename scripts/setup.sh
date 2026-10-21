@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# TestHive prerequisites. macOS / Linux.   Windows: scripts/setup.ps1
+# Checks and installs the tools TestHive needs (macOS/Linux; on Windows hive runs setup.ps1).
 # Usage: bash scripts/setup.sh [--check | --install] [--web]
 #   --check    (default) report what is missing, install nothing; writes .testhive-ready when all required tools are present
 #   --install  install what is missing (asks nothing more: run it only after the user agreed)
@@ -19,7 +19,7 @@ report() { # name, ok(0/1), detail
 java_ok() { have java && [ "$(java -version 2>&1 | sed -n '1s/[^"]*"\([0-9]*\).*/\1/p')" -ge 17 ] 2>/dev/null; }
 # A python that really runs (on Windows `python3` can be a Store stub that exists but does nothing).
 py_ok() { for c in python3 python "py -3"; do $c -c "import sys; sys.exit(sys.version_info[0] != 3)" >/dev/null 2>&1 && { PYC="$c"; PYV="$($c --version 2>&1 | head -1)"; return 0; }; done; return 1; }
-PYPKGS="openpyxl pypdf python-docx pillow pytesseract"
+PYPKGS="see requirements.txt"
 pypkgs_ok() { [ -n "$PYC" ] && $PYC -c "import openpyxl, pypdf, docx, PIL, pytesseract" >/dev/null 2>&1; }
 TESS=tesseract; have tesseract || { [ -x "/c/Program Files/Tesseract-OCR/tesseract.exe" ] && TESS="/c/Program Files/Tesseract-OCR/tesseract.exe"; }
 ocr_ok() { "$TESS" --list-langs 2>/dev/null | tr -d '\r' | grep -qx ara; }
@@ -52,7 +52,7 @@ install_one() {
     git) pm_install git git ;;
     node) pm_install node nodejs && { have npm || pm_install npm npm; } ;;
     python3) pm_install python3 python3 ;;
-    python-pkgs) py_ok && $PYC -m pip install --user $PYPKGS ;;
+    python-pkgs) py_ok && $PYC -m pip install --user -r requirements.txt ;;
     tesseract) [ "$PM" = brew ] && brew install tesseract tesseract-lang || pm_install x "tesseract-ocr tesseract-ocr-ara" ;;
     java17) pm_install openjdk@17 openjdk-17-jdk && { [ "$PM" != brew ] || echo "  If java is still not found: sudo ln -sfn \"\$(brew --prefix)/opt/openjdk@17/libexec/openjdk.jdk\" /Library/Java/JavaVirtualMachines/openjdk-17.jdk"; } ;;
     maestro) curl -fsSL "https://get.maestro.mobile.dev" | bash && echo "  Add to PATH: export PATH=\"\$PATH:\$HOME/.maestro/bin\"" ;;

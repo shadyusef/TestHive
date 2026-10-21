@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Runs a module's Postman collection with Newman and stores the run.
 # Usage: bash scripts/run-api.sh <module>   (reads .env; needs: npm i -g newman)
 # Writes reports/api-<module>.xml, then stores the run in runs/ (scripts/collect-run.sh). NO_COLLECT=1 skips that.
 [ -f .env ] && { set -a; eval "$(tr -d '\r' < .env)"; set +a; }

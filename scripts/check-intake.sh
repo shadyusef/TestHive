@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Checks a module intake file for empty sections and business rules no test case covers.
 # Usage: bash scripts/check-intake.sh <intake.md> [TestCases.csv]
 # Fails if required sections are unfilled; with a CSV, lists business rules no test case references as [R<n>].
 . "$(dirname "$0")/_py.sh"

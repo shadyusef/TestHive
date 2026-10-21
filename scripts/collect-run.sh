@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Turns one test run into a stored run with a common format, whatever the tool (Maestro, Postman/Newman, Playwright).
+# Stores one test run in runs/ in a common format, whatever the tool (Maestro, Newman, Playwright).
 # Usage: bash scripts/collect-run.sh <mobile|api|web> <module> [--env <env>] [--platform <android|ios|web|api>]
 #                                     [--junit <file>] [--evidence <dir>]
 #   --junit     default: reports/<kind>-<module>.xml (what the run-*.sh scripts write)

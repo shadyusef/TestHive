@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Clears an app's data on a device so the next test starts clean.
 # Usage: bash scripts/reset-app.sh android <package> [device-id]
 #        bash scripts/reset-app.sh ios <bundle-id>
 set -e

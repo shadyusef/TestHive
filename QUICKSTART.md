@@ -1,52 +1,75 @@
 # TestHive quickstart
 
-## 1. Get the template
-Click **Use this template** on GitHub (or clone/download), then rename the folder for your project.
+Step by step, from nothing to the team working on your first module. Commands are for **Windows PowerShell**; on macOS/Linux type `bash scripts/hive.sh` where you see `.\hive`.
 
-## 2. Install the tools (one step)
-`bash scripts/setup.sh --check` shows what is missing; `bash scripts/setup.sh --install` installs it. On Windows use `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Check` (or `-Install`). Add `--web` (`-Web`) for Playwright and `--ocr` (`-Ocr`) for image masking with Arabic. TestHive also runs this check itself the first time you call it in a project. Manual steps (phone USB debugging, Xcode on Mac) are printed at the end.
+## 1. Get your copy
+- Install Git if you do not have it (Windows: `winget install --id Git.Git -e`), then open a new terminal.
+- On GitHub open the TestHive repository, click **Use this template**, and create a **private** repository for your project. Clone it and `cd` into the folder (the one containing `hive.cmd`).
 
-**Windows (PowerShell or cmd):** every `bash scripts/<name>.sh ...` command in these docs can be typed as `.\hive <name> ...`, for example `.\hive stage status SIGNUP` or `.\hive demo/phase0/run.sh`. `hive.cmd` finds Git Bash by itself. To type `bash` directly instead, run `setup.ps1 -AddBashToPath` once.
-
-What it covers, if you prefer to install by hand:
-- Maestro CLI, Java 17+, Android platform-tools (`adb`), Python 3, Node.js, and `npm i -g newman`.
-- Claude Code installed, or the Claude desktop app.
-
-## 3. Initialise the project
+## 2. Install the tools
 ```
-bash scripts/init-project.sh "My Project"
+.\hive setup --check
 ```
-Windows PowerShell: `powershell -ExecutionPolicy Bypass -File scripts/init-project.ps1 "My Project"`
+Each line says `OK`, `MISSING` or `OPTIONAL`. Install what is missing:
+```
+.\hive setup --install            add --ocr for screenshot masking, --web for web tests
+```
+Then **open a new terminal** (so the new tools are found) and run `.\hive setup --check` again until it says `All prerequisites present.`
 
-Then edit `CONTEXT.md`, `PROJECT_BRIEF.md` and `.env` (app id, URLs; never commit `.env`).
+What it installs: Python 3 and its packages (`requirements.txt`), Node.js, Java 17+, Maestro, Android platform-tools (`adb`), Newman, Claude Code; optionally Tesseract OCR with Arabic and Playwright. Some installers need **administrator rights** on Windows; see [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md) if one is cancelled.
 
-## 4. Connect a device
-- Android: enable USB debugging, plug in, then `bash scripts/check-devices.sh` must show the device as `device`. Or start an emulator.
-- iOS: needs a Mac or a device farm. See `mobile/ios/README.md`.
+## 3. Verify
+```
+.\hive selftest
+```
+Must end with `SELFTEST PASS`. Optional, to see the foundations at work in a temporary folder: `.\hive demo/phase0/run.sh`.
 
-## 5. Start the team
-- Claude Code: open the folder and run `claude --agent testhive-lead`
-- Claude desktop app: connect the folder and ask Claude to act as the TestHive Lead using the agents in `.claude/agents/`.
+## 4. Create your project files
+```
+.\hive init-project "My Project"
+```
+This creates `PROJECT_BRIEF.md`, `CONTEXT.md`, `.env`, `workflow/BOARD.md`, `test-cases/TestCases.csv`, `analysis/requirements.csv`, `analysis/gaps.csv` and the working folders. Existing files are never overwritten.
 
-Optional: install the `/testhive` skill from `skills/testhive/SKILL.md` so you can recall the team anywhere by typing `/testhive`.
+## 5. Describe your app
+- `CONTEXT.md` (max 30 lines; agents read it instead of long documents): app name, package/bundle id, platforms, environment, how test users are made, known quirks.
+- `.env` (stays on your PC, never committed, agents cannot read it): `APP_ID`, `TEST_ENV`, URLs, device ids.
+- Put requirement documents in `requirements/sources/`. If they contain personal data, mask them first (section 8).
 
-Give the Lead your first module and its business rules. Example:
-> Module: Signup. Platform: Android. Rules: <paste>. Explore the app, write the cases, automate the P0/P1 flows, review, and report.
+## 6. Connect a device
+- Android: enable Developer options and USB debugging, plug in, accept the prompt on the phone, then `.\hive check-devices` must list it as `device`. An emulator also works.
+- iOS: needs a Mac or a device farm; see `mobile/ios/README.md`.
 
-## Call one agent
-`/th-mobile <task>` in Claude Code, or `bash scripts/th.sh mobile "<task>"`. Agents: lead, manual, mobile, api, web, data, triage, review.
+## 7. Start the team
+```
+claude --agent testhive-lead
+```
+The first start asks you to sign in to Claude. Copy `templates/MODULE_INTAKE.md` to `workflow/intake/<module>.md`, fill in the business rules, then tell the Lead for example:
+> Module: Signup. Platform: Android. The intake is in workflow/intake/signup.md.
 
-## 6. Add more later
-Send the Lead a new module and rules. It creates `mobile/flows/<module>/`, new case IDs and board rows. Existing flows are not touched.
+The Lead shows a plan and waits for your approval. Follow the stages with `.\hive stage status SIGNUP`; approve with `.\hive stage approve SIGNUP <stage> --by "<your name>"`.
+
+To call one agent only, type in Claude Code `/th-mobile <task>` (also `/th-manual`, `/th-api`, `/th-web`, `/th-data`, `/th-triage`, `/th-review`, `/th-lead`), or from a terminal `.\hive th mobile "<task>"`.
+
+## 8. Mask personal data (when documents contain it)
+```
+.\hive mask suggest requirements/sources/prd.txt     lists likely names; put the real ones in .mask-terms
+.\hive mask review  requirements/sources/prd.txt     shows every match in context; wrong ones go in .mask-allow
+.\hive mask mask    requirements/sources/prd.txt requirements/sources/prd.masked.txt
+```
+Screenshots work the same way (`.png`, `.jpg`) once Tesseract is installed. `.mask-terms`, `.mask-allow` and `.mask-map.json` stay on your PC.
+
+## 9. Add more modules later
+Repeat step 7 with a new intake file. Each module gets its own stages, case IDs and test folder; existing work is not touched.
 
 ## Handy commands
 ```
-bash scripts/check-devices.sh
-bash scripts/reset-app.sh android <package>
-bash scripts/run-mobile.sh <module>          # PLATFORM=ios, INCLUDE_TAGS=smoke, EXCLUDE_TAGS=known-bug
-bash scripts/run-api.sh <module>
-bash scripts/run-web.sh <module>
-bash scripts/digest-failures.sh              # failures only -> reports/digest.md
-bash scripts/stable.sh mobile <module>       # 3 runs in a row -> reports/stable-<ID>.txt
-bash scripts/gate.sh                         # definition of done
+.\hive                                list all scripts with a one-line description
+.\hive check-devices
+.\hive reset-app android <package>
+.\hive run-mobile <module>            env: PLATFORM=ios, INCLUDE_TAGS=smoke, EXCLUDE_TAGS=known-bug
+.\hive run-api <module>
+.\hive run-web <module>
+.\hive digest-failures                failures only -> reports/digest.md
+.\hive stable mobile <module>         3 runs in a row -> reports/stable-<ID>.txt
+.\hive gate                           definition of done
 ```

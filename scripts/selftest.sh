@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Proves TestHive itself works on this machine (run it after setup and after every change).
 # Usage: bash scripts/selftest.sh   Proves the template itself is healthy.
 set -e
 . scripts/_py.sh
@@ -74,7 +75,7 @@ cmp -s "$M/in.txt" "$M/back.txt" || { echo "mask.sh round trip changed the text"
 printf 'Contact Mr. John Smith or المهندس خالد العتيبي about it.\n' > "$M/s.txt"
 bash scripts/mask.sh suggest "$M/s.txt" | grep -q 'John Smith' && bash scripts/mask.sh suggest "$M/s.txt" | grep -q 'خالد العتيبي' || { echo "mask.sh suggest missed a name"; exit 1; }
 bash scripts/mask.sh check "$M/in.txt" | grep -q '^Would mask' || { echo "mask.sh check failed"; exit 1; }
-if $PY -c "import PIL, pytesseract; pytesseract.get_tesseract_version()" >/dev/null 2>&1 || [ -x "/c/Program Files/Tesseract-OCR/tesseract.exe" ]; then
+if $PY -c "import PIL, pytesseract" >/dev/null 2>&1 && { command -v tesseract >/dev/null || [ -x "/c/Program Files/Tesseract-OCR/tesseract.exe" ]; }; then
   $PY -c "from PIL import Image,ImageDraw,ImageFont;import sys;i=Image.new('RGB',(900,120),'white');d=ImageDraw.Draw(i);f=ImageFont.load_default(size=32) if hasattr(ImageFont,'load_default') else None;d.text((20,40),'Contact: ahmed.h@example.com',fill='black',font=f);i.save(sys.argv[1])" "$M/shot.png"
   bash scripts/mask.sh mask "$M/shot.png" "$M/shot-masked.png" | grep -q 'EMAIL 1' || { echo "mask.sh image masking missed the email"; exit 1; }
 else echo "(image masking test skipped: Tesseract not installed)"; fi
@@ -85,4 +86,18 @@ bash scripts/hive.sh >/dev/null 2>&1 && { echo "hive.sh with no arguments should
 bash scripts/hive.sh | grep -q "stage" || { echo "hive.sh does not list the scripts"; exit 1; }
 bash scripts/hive.sh gen-user | grep -q "@example.com" || { echo "hive.sh did not run gen-user"; exit 1; }
 bash scripts/hive.sh nope >/dev/null 2>&1 && { echo "hive.sh accepted an unknown script"; exit 1; }
+# docs: every local link points to a file that exists; every script has a one-line description on line 2
+$PY - <<'PY' || exit 1
+import re, os, glob, sys
+bad = []
+for doc in ["README.md", "QUICKSTART.md", "CHANGELOG.md"] + glob.glob("docs/*.md"):
+    for link in re.findall(r"\]\(([^)#]+)\)", open(doc, encoding="utf-8").read()):
+        if "://" in link: continue
+        if not os.path.exists(os.path.join(os.path.dirname(doc), link)): bad.append(f"{doc}: broken link {link}")
+for s in glob.glob("scripts/*.sh"):
+    l2 = open(s, encoding="utf-8").read().split("\n")[1]
+    if not l2.startswith("# ") or l2.startswith("# Usage"): bad.append(f"{s}: line 2 must be a one-line description")
+if bad: print("\n".join(bad)); sys.exit(1)
+PY
+[ -s VERSION ] && grep -q "## $(cat VERSION)" CHANGELOG.md || { echo "VERSION has no CHANGELOG.md entry"; exit 1; }
 echo "SELFTEST PASS"

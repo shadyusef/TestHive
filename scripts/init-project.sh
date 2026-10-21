@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Creates the project files (brief, CONTEXT, board, case sheet, registers, .env) from templates.
 # Usage: bash scripts/init-project.sh "<PROJECT_NAME>"
 set -e
 NAME="${1:?Usage: init-project.sh \"<PROJECT_NAME>\"}"
@@ -11,4 +12,5 @@ mkdir -p workflow/intake test-cases reports reviews mobile/data requirements/sou
 [ -f CONTEXT.md ] || cp templates/CONTEXT.md CONTEXT.md
 [ -f analysis/requirements.csv ] || head -1 templates/requirements.csv > analysis/requirements.csv
 [ -f analysis/gaps.csv ] || head -1 templates/gaps.csv > analysis/gaps.csv
-echo "Project '$NAME' initialised. Next: edit PROJECT_BRIEF.md, CONTEXT.md and .env, then run scripts/setup.sh --check (first time) and scripts/check-devices.sh"
+H="${TH_CMD:-bash scripts/hive.sh}"
+echo "Project '$NAME' initialised. Next: fill in CONTEXT.md and .env, then run: $H setup --check   and   $H check-devices"

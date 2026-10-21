@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Runs a module's Playwright tests and stores the run with screenshots, videos and traces.
 # Usage: bash scripts/run-web.sh <module>   (reads .env; needs: bash scripts/setup.sh --install --web)
 # Runs web/tests/<module>/, writes reports/web-<module>.xml, then stores the run in runs/ with
 # Playwright's screenshots, videos and traces as evidence. NO_COLLECT=1 skips storing.

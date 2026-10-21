@@ -1,0 +1,6 @@
+# Python packages TestHive scripts use (installed by: hive setup --install)
+openpyxl     # Excel workbooks (analysis and test case exports)
+pypdf        # reading PDF requirements
+python-docx  # reading Word requirements
+pillow       # images (screenshot masking)
+pytesseract  # OCR bridge to Tesseract (screenshot masking)

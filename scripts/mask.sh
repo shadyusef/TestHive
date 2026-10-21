@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Anonymise documents before they are sent to Claude, and restore them afterwards. Arabic and English.
+# Hides personal data in documents and screenshots before Claude sees them; restores it after. Arabic + English.
 # Usage: bash scripts/mask.sh mask    <in> <out>   text: personal data -> tokens like [EMAIL_001]; image: blacked out (OCR)
 #        bash scripts/mask.sh unmask  <in> <out>   put the real values back (reports kept on this PC)
 #        bash scripts/mask.sh check   <in>         counts only, prints no values (safe for agents)

@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Runs a module's Maestro flows on a device and stores the run.
 # Usage: bash scripts/run-mobile.sh <module> [device-id]   (reads .env; every .env variable is passed to the flows)
 #   PLATFORM=ios             use IOS_APP_ID / IOS_DEVICE_ID instead of APP_ID / ANDROID_DEVICE_ID
 #   INCLUDE_TAGS=smoke       run only flows with these tags

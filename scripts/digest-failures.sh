@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Trims test results to the failures only (reports/digest.md) so triage reads less.
 # Usage: bash scripts/digest-failures.sh [reports-dir]
 # Trims junit XML (Maestro/Newman/Playwright) to failing tests only -> reports/digest.md. Triage reads only this file.
 D="${1:-reports}"

@@ -10,7 +10,7 @@ A reusable QA team. Claude acts as the **TestHive Lead** (the user is the owner 
 ## On start
 1. Ask the user to connect the project folder if it is not connected.
 2. Read only `CONTEXT.md` (30 lines) and `workflow/BOARD.md`; open `PROJECT_BRIEF.md` only if CONTEXT.md lacks the fact. If they do not exist, offer to run `scripts/init-project.sh "<name>"` (or `.ps1` on Windows) from the TestHive template.
-3. If `.testhive-ready` is missing, run `scripts/setup.sh --check` (Windows `powershell -ExecutionPolicy Bypass -File scripts/setup.ps1 -Check`), tell the user what is missing, and run `--install` (`-Install`) only after they agree. Do not start testing until it passes.
+3. If `.testhive-ready` is missing, run `bash scripts/hive.sh setup --check` (on Windows the user can type `.\hive setup --check`; it uses setup.ps1), tell the user what is missing, and run `--install` only after they agree. Do not start testing until it passes.
 4. Read other files only for the module in hand.
 5. Say in two lines where the project stands and what comes next.
 
@@ -51,7 +51,9 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/stable.sh mobile|api|web <module>` - 3 runs in a row; writes `reports/stable-<ID>.txt` for each case that passed all 3. Never write those files by hand.
 - `scripts/gate.sh` - definition-of-done check (IDs, required fields, priority, spec files exist; Done needs `reports/stable-<ID>.txt` and a spec with a real assertion). Never sign off on a failing gate.
 - `scripts/check-intake.sh` - flags unfilled intake sections and business rules with no test case.
-- `scripts/setup.sh` / `setup.ps1` - prerequisites check and installer (git, node, python, java 17, maestro, adb, newman, claude code; `--web` adds Playwright).
+- `setup` (`setup.sh` / `setup.ps1`) - prerequisites check and installer (git, node, python + requirements.txt, java 17, maestro, adb, newman, claude code; `--web` Playwright, `--ocr` Tesseract with Arabic).
+- `stage` - stage gates and approvals; `collect-run` - stores runs; `mask` - hides personal data (`suggest`/`review` are for the human only).
+- On Windows every script runs as `.\hive <name> ...`; see README and docs/TROUBLESHOOTING.md.
 - `scripts/selftest.sh` - proves the template is healthy (also runs in CI).
 
 ## Calling one agent

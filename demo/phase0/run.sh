@@ -22,9 +22,9 @@ show bash scripts/stage.sh submit SIGNUP analysis
 
 step "4. Approval needs a named person; a rejection needs a reason"
 show bash scripts/stage.sh approve SIGNUP analysis
-show bash scripts/stage.sh reject SIGNUP analysis --by Shady --comment "Ask about OTP expiry and Arabic error messages"
+show bash scripts/stage.sh reject SIGNUP analysis --by "Sara (QA lead)" --comment "Ask about OTP expiry and Arabic error messages"
 show bash scripts/stage.sh submit SIGNUP analysis
-show bash scripts/stage.sh approve SIGNUP analysis --by Shady --comment "All High gaps answered"
+show bash scripts/stage.sh approve SIGNUP analysis --by "Sara (QA lead)" --comment "All High gaps answered"
 
 step "5. Now test design may start"
 show bash scripts/stage.sh start SIGNUP design

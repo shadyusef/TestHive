@@ -16,7 +16,6 @@ function PyCmd {
   }
   return $null
 }
-$pyPkgs = 'openpyxl','pypdf','python-docx','pillow','pytesseract'
 function PyPkgsOk { $p = PyCmd; if (-not $p) { return $false }; & $p -c 'import openpyxl, pypdf, docx, PIL, pytesseract' 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) }
 function TessExe { if (Have tesseract) { return 'tesseract' }; $p = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'; if (Test-Path $p) { return $p }; return $null }
 function OcrOk { $t = TessExe; if (-not $t) { return $false }; return [bool]((& $t --list-langs 2>$null) -match '^ara$') }
@@ -83,7 +82,7 @@ elseif ($mode -eq 'install') {
     try {
       if ($t.n -eq 'maestro') { Install-Maestro }
       elseif ($t.n -eq 'playwright') { Push-Location web; try { npm install; npx playwright install chromium } finally { Pop-Location } }
-      elseif ($t.pip) { $p = PyCmd; if ($p) { & $p -m pip install --user @pyPkgs } else { Write-Host '  Install python first' } }
+      elseif ($t.pip) { $p = PyCmd; if ($p) { & $p -m pip install --user -r requirements.txt } else { Write-Host '  Install python first' } }
       elseif ($t.npm) { npm install -g $t.npm }
       else {
         if (-not (TessExe) -or $t.n -ne 'tesseract') {

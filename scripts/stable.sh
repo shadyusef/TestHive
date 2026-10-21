@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Runs a module 3 times; cases that pass every time get their stability proof.
 # Usage: bash scripts/stable.sh mobile|api|web <module> [runs=3]
 #        bash scripts/stable.sh --from <dir-with-one-junit-xml-per-run> [out-dir]
 # Runs the module N times in a row. Every case ID that passed in ALL runs gets reports/stable-<ID>.txt

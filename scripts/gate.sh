@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Usage: bash scripts/gate.sh [csv]   Definition-of-done check. Exit 1 on any problem.
+# Definition-of-done check on the test case sheet. Exit 1 on any problem.
+# Usage: bash scripts/gate.sh [csv]   (default: test-cases/TestCases.csv)
 # Checks: ID format and uniqueness, required fields, priority P0-P3, automation spec exists.
 # A "Done" case also needs reports/stable-<ID>.txt (written by scripts/stable.sh) and a spec with a real assertion.
 CSV="${1:-test-cases/TestCases.csv}"

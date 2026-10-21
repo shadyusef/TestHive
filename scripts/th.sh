@@ -1,4 +1,5 @@
 #!/usr/bin/env bash
+# Starts one TestHive agent from the terminal, interactive or one-shot.
 # Usage: bash scripts/th.sh <agent> ["task"]
 #   With a task: runs that agent once (headless) and exits.  Without: opens an interactive session with it.
 # Agents: lead manual mobile api web data triage review (or a full agent name)
