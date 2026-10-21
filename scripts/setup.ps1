@@ -86,7 +86,8 @@ elseif ($mode -eq 'install') {
     Write-Host "Installing $($t.n) ..."
     try {
       if ($t.n -eq 'maestro') { Install-Maestro }
-      elseif ($t.n -eq 'playwright') { Push-Location web; try { $env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1'; npm install } finally { Pop-Location } # uses the installed Microsoft Edge: no browser download }
+      # web tests use the installed Microsoft Edge, so no browser is downloaded
+      elseif ($t.n -eq 'playwright') { Push-Location web; try { $env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1'; npm install } finally { Pop-Location } }
       elseif ($t.pip) { $p = PyCmd; if ($p) { & $p -m pip install --user -r requirements.txt } else { Write-Host '  Install python first' } }
       elseif ($t.npm) { npm install -g $t.npm }
       else {
@@ -98,8 +99,8 @@ elseif ($mode -eq 'install') {
       }
     } catch { Write-Host "  FAILED $($t.n): $_" }
   }
-  Write-Host '--- open a NEW terminal, then run: powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Check ---'
-} else { Write-Host ('Missing: ' + (($missing | ForEach-Object { $_.n }) -join ', ')); Write-Host 'Run: powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Install' }
+  Write-Host '--- open a NEW terminal, then run: .\hive setup --check ---'
+} else { Write-Host ('Missing: ' + (($missing | ForEach-Object { $_.n }) -join ', ')); Write-Host 'Run: .\hive setup --install   (add --web for web tests, --ocr for screenshot masking)' }
 Write-Host @'
 
 Manual steps no script can do:

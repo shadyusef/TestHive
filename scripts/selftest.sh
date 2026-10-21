@@ -134,6 +134,13 @@ unset TH_ANALYSIS TH_STATE
 $PY scripts/lib/uiscreen.py find demo/phase1/samples/android-signup.xml sign_up | grep -q "540 960" || { echo "uiscreen.py could not find the button"; exit 1; }
 $PY scripts/lib/uiscreen.py summary demo/phase1/samples/android-signup.xml s | grep -q "input (password)" || { echo "uiscreen.py summary is wrong"; exit 1; }
 $PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py
+# Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
+if command -v powershell.exe >/dev/null 2>&1; then
+  for f in scripts/*.ps1; do
+    r=$(powershell.exe -NoProfile -Command "\$e=\$null; [void][System.Management.Automation.Language.Parser]::ParseFile('$(cygpath -w "$PWD/$f")',[ref]\$null,[ref]\$e); if(\$e){\$e[0].Extent.StartLineNumber.ToString() + ': ' + \$e[0].Message}else{'ok'}" | tr -d '')
+    [ "$r" = ok ] || { echo "$f does not parse: line $r"; exit 1; }
+  done
+fi
 # docs: every local link points to a file that exists; every script has a one-line description on line 2
 $PY - <<'PY' || exit 1
 import re, os, glob, sys
