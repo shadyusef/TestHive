@@ -86,7 +86,10 @@ elseif ($mode -eq 'install') {
       elseif ($t.pip) { $p = PyCmd; if ($p) { & $p -m pip install --user @pyPkgs } else { Write-Host '  Install python first' } }
       elseif ($t.npm) { npm install -g $t.npm }
       else {
-        if (-not (TessExe) -or $t.n -ne 'tesseract') { winget install --id $t.id -e --source winget --accept-source-agreements --accept-package-agreements }
+        if (-not (TessExe) -or $t.n -ne 'tesseract') {
+          winget install --id $t.id -e --source winget --accept-source-agreements --accept-package-agreements
+          if ($LASTEXITCODE -ne 0) { Write-Host "  FAILED $($t.n): this installer needs administrator rights. Accept the Windows admin prompt, or ask IT to install winget package $($t.id)."; continue }
+        }
         if ($t.n -eq 'tesseract') { Install-ArabicOcr }
       }
     } catch { Write-Host "  FAILED $($t.n): $_" }
