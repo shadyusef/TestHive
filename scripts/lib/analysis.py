@@ -79,12 +79,14 @@ def problems(module=None, for_approval=False):
         if r["Status"] == "Observed" and not any(r["ID"] in refs(g["Requirement"]) and g["Kind"] == "To confirm" for g in gaps):
             err.append(f"{r['ID']}: Observed requirement needs a 'To confirm' gap so a human confirms it")
     if for_approval:
+        carried = []
         for g in gaps:
             if g["Severity"] == "High" and g["Status"] != "Closed": err.append(f"{g['ID']}: High gap is {g['Status']}; it must be Closed before approval")
             elif g["Status"] == "Answered": err.append(f"{g['ID']}: answered but not reviewed; the analyst must close it or ask again")
-            elif g["Status"] == "Open": warn.append(f"{g['ID']}: {g['Severity']} gap still open (allowed, carried into design)")
+            elif g["Status"] == "Open": carried.append(g["ID"])
         for r in reqs:
             if r["Status"] == "Observed": err.append(f"{r['ID']}: still Observed; confirm or remove it before approval")
+        if carried: warn.append(f"{len(carried)} Medium/Low gaps still open (allowed, carried into test design): {', '.join(carried)}")
         if not reqs: err.append(f"no requirements for module {module}")
     return err, warn, reqs, gaps
 
