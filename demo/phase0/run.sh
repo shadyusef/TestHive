@@ -72,7 +72,18 @@ if $PY -c "import PIL, pytesseract" 2>/dev/null && { command -v tesseract >/dev/
   $PY "$D/make-screenshot.py" shot.png
   show bash scripts/mask.sh mask shot.png shot-masked.png
   mkdir -p "$SRC/demo/phase0/output"; cp shot.png shot-masked.png "$SRC/demo/phase0/output/"
-  echo "Before and after images: demo/phase0/output/shot.png and shot-masked.png"
+  EDGE="/c/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
+  if [ -x "$EDGE" ]; then
+    echo "--- the same on an Arabic screen (drawn by Edge from demo/phase0/arabic-screen.html)"
+    timeout 60 "$EDGE" --headless --disable-gpu --no-first-run --user-data-dir="$(cygpath -w "$W/edge")" --window-size=760,460 \
+      --screenshot="$(cygpath -w "$W/arabic-shot.png")" "file:///$(cygpath -m "$D/arabic-screen.html")" >/dev/null 2>&1 || true
+    for i in $(seq 1 15); do [ -s arabic-shot.png ] && break; sleep 1; done   # Edge writes the file after it returns
+    if [ -s arabic-shot.png ]; then
+      show bash scripts/mask.sh mask arabic-shot.png arabic-shot-masked.png
+      cp arabic-shot.png arabic-shot-masked.png "$SRC/demo/phase0/output/"
+    fi
+  fi
+  echo "Before and after images are in demo/phase0/output/"
 else
   echo "Skipped: Tesseract is not installed (setup -Install -Ocr)."
 fi
