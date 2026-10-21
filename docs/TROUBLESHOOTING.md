@@ -25,6 +25,7 @@ First run these two; most problems show up in them:
 | Device not listed by `check-devices` | USB debugging off, prompt not accepted, cable is charge-only | Enable Developer options + USB debugging, accept the "Allow USB debugging" prompt, try another cable; `adb devices` must show `device`. |
 | Shell scripts fail with `$'\r': command not found` | The files were checked out with Windows line endings | `.gitattributes` prevents this for fresh clones; for an old clone run `git rm --cached -r . && git reset --hard`. |
 | An agent asks for permission for every command | Normal for commands outside `.claude/settings.json` | Approve once, or add the command to `allow` in `.claude/settings.json` (keep the `deny` list). |
+| A one-shot agent run (`.\hive th <agent> "..."`) says every `bash scripts/...` command "requires approval", or `Ignoring ... permissions.allow entries ... workspace has not been trusted` | Claude Code only uses the project's allowed-commands list after you trust the folder once | Open the folder once interactively: run `claude` in it, accept the trust question, type `/exit`. Then one-shot runs work. |
 | `claude: command not found` | Claude Code CLI not installed | `.\hive setup --install`, or `npm install -g @anthropic-ai/claude-code`; first start asks you to sign in. |
 
 Still stuck: run `.\hive selftest`, copy the last 20 lines and the command you ran into an issue on the repo.

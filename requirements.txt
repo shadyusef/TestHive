@@ -4,3 +4,4 @@ pypdf        # reading PDF requirements
 python-docx  # reading Word requirements
 pillow       # images (screenshot masking)
 pytesseract  # OCR bridge to Tesseract (screenshot masking)
+pyyaml       # reading Swagger / OpenAPI YAML

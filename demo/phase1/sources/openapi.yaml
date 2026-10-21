@@ -1,0 +1,85 @@
+# Fictional API for the TestHive phase 1 demo (Nakhla Rewards). Contains planted gaps on purpose.
+openapi: 3.0.3
+info:
+  title: Nakhla Rewards Accounts API
+  version: 1.2.0
+  description: Customer sign-up and mobile verification.
+paths:
+  /v1/signup:
+    post:
+      summary: Create a pending account and send an OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: Pending account created; OTP sent
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  signupId: { type: string }
+        '400':
+          description: Validation error
+        '409':
+          description: Mobile number already registered
+  /v1/otp/verify:
+    post:
+      summary: Verify the OTP and activate the account
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signupId, code]
+              properties:
+                signupId: { type: string }
+                code: { type: string, minLength: 4, maxLength: 4, pattern: '^[0-9]{4}$' }
+      responses:
+        '200':
+          description: Account active; returns tokens and the welcome points balance
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  accessToken: { type: string }
+                  points: { type: integer }
+        '400':
+          description: Wrong code
+        '410':
+          description: Code expired
+  /v1/otp/resend:
+    post:
+      summary: Send a new OTP
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [signupId]
+              properties:
+                signupId: { type: string }
+      responses:
+        '202':
+          description: New code sent
+        '429':
+          description: Too many requests
+components:
+  schemas:
+    SignupRequest:
+      type: object
+      required: [fullName, mobile, password, birthDate, language]
+      properties:
+        fullName: { type: string, maxLength: 50 }
+        mobile: { type: string, pattern: '^05[0-9]{8}$' }
+        email: { type: string, format: email }
+        password: { type: string, minLength: 6 }
+        birthDate: { type: string, format: date }
+        language: { type: string, enum: [ar, en] }

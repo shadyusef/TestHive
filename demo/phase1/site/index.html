@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en" dir="ltr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nakhla Rewards - Sign up</title>
+<!-- Fictional demo product for the TestHive phase 1 exploration demo. Not a real service. -->
+<style>
+  body { font-family: Segoe UI, Tahoma, Arial, sans-serif; background: #f6f3ee; margin: 0; }
+  header { background: #2f5d3a; color: #fff; padding: 14px 24px; font-size: 20px; }
+  main { max-width: 460px; margin: 24px auto; background: #fff; padding: 24px; border-radius: 8px; }
+  label { display: block; margin-top: 14px; font-weight: 600; }
+  input, select { width: 100%; padding: 8px; margin-top: 4px; box-sizing: border-box; }
+  .row { display: flex; gap: 8px; align-items: center; margin-top: 14px; }
+  .row input { width: auto; }
+  .error { color: #b00020; font-size: 13px; margin-top: 4px; }
+  button { margin-top: 20px; width: 100%; padding: 10px; background: #2f5d3a; color: #fff; border: 0; border-radius: 6px; font-size: 16px; }
+</style>
+</head>
+<body>
+<header>Nakhla Rewards</header>
+<main>
+  <h1>Create your account</h1>
+  <form id="signup" novalidate>
+    <label for="fullName">Full name</label>
+    <input id="fullName" name="fullName" required maxlength="40">
+    <div class="error" id="fullName-error" hidden></div>
+
+    <label for="mobile">Mobile number</label>
+    <input id="mobile" name="mobile" type="tel" required pattern="^05[0-9]{8}$" placeholder="05XXXXXXXX">
+    <div class="error" id="mobile-error" hidden></div>
+
+    <label for="password">Password</label>
+    <input id="password" name="password" type="password" required minlength="6">
+    <div class="error" id="password-error" hidden></div>
+
+    <label for="birthDate">Date of birth</label>
+    <input id="birthDate" name="birthDate" type="date" required>
+    <div class="error" id="birthDate-error" hidden></div>
+
+    <label for="language">Language</label>
+    <select id="language" name="language"><option value="ar">العربية</option><option value="en" selected>English</option></select>
+
+    <div class="row"><input id="terms" name="terms" type="checkbox" required><label for="terms" style="margin:0">I accept the terms and conditions</label></div>
+    <div class="error" id="terms-error" hidden></div>
+
+    <button type="submit">Sign up</button>
+  </form>
+</main>
+<script>
+  const msg = {
+    fullName: 'Please enter your full name',
+    mobile: 'Enter a Saudi mobile number starting with 05',
+    password: 'Password must be at least 6 characters',
+    birthDate: 'You must be 18 or older',
+    terms: 'Please accept the terms and conditions',
+  };
+  function age(d) { const b = new Date(d), n = new Date(); let a = n.getFullYear() - b.getFullYear(); if (n < new Date(n.getFullYear(), b.getMonth(), b.getDate())) a--; return a; }
+  document.getElementById('signup').addEventListener('submit', e => {
+    e.preventDefault();
+    let ok = true;
+    for (const id of Object.keys(msg)) {
+      const el = document.getElementById(id), err = document.getElementById(id + '-error');
+      let bad = id === 'terms' ? !el.checked : !el.checkValidity();
+      if (id === 'birthDate' && el.value && age(el.value) < 18) bad = true;
+      err.hidden = !bad; err.textContent = bad ? msg[id] : ''; if (bad) ok = false;
+    }
+    if (ok) location.href = 'otp.html';
+  });
+</script>
+</body>
+</html>

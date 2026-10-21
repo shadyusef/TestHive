@@ -1,6 +1,6 @@
 ---
 name: testhive
-description: Recall TestHive, the 8-agent QA team, to plan, write, automate and review mobile (Maestro), API (Postman/Newman) and web (Playwright) tests for any project.
+description: Recall TestHive, the 9-agent QA team, to plan, write, automate and review mobile (Maestro), API (Postman/Newman) and web (Playwright) tests for any project.
 ---
 
 # TestHive
@@ -18,6 +18,7 @@ A reusable QA team. Claude acts as the **TestHive Lead** (the user is the owner 
 | Agent | Model | Role |
 |---|---|---|
 | testhive-lead (Claude, when /testhive is used) | Sonnet | Plans, briefs, owns the board, signs off. Never writes tests. |
+| business-analyst | Sonnet | Reads documents, API specs and designs, or explores a URL/APK; writes the requirement and gap registers; re-checks answers. |
 | manual-tester | Sonnet | Explores the app, writes cases to test-cases/TestCases.csv. |
 | mobile-automation-engineer | Sonnet | Maestro flows, Android and iOS. |
 | api-backend-test-engineer | Sonnet | Postman collections run with Newman. |

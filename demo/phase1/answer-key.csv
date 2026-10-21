@@ -1,0 +1,24 @@
+Key,Gap,Where,Keywords
+K01,Full name has no length limit or allowed characters (Arabic? digits?),PRD R1,name|fullname|full name;length|character|max|50|40|arabic|allowed|special|digit|limit
+K02,"Full name limit differs: API allows 50 characters, the built app 40",API + exploration,name|fullname|full name;50;40
+K03,Saudi mobile format not defined (05XXXXXXXX only? +966? 00966?),PRD R2 + API,mobile|phone|+966|05x;format|+966|966|country code|international|pattern|05|accepted
+K04,"Password minimum conflicts: PRD 8 characters, API and app 6",PRD R4 + API + exploration,password;8;6
+K05,"Password complexity not defined (letters, digits, symbols?)",PRD R4,password;complex|special|upper|digit|number|letter|strength|symbol|rules|composition
+K06,"Minimum age conflicts: PRD 18, user story 16",PRD R5 + US-1,age|older|16|18;16
+K07,Sign-up with email instead of mobile (US-2) conflicts with mobile as the required login identifier,PRD R2 + US-2,email;instead|without|alternative|identifier|us-2
+K08,Email handling not defined: verification link (US-2) or only a welcome email (R3)? format check?,PRD R3 + US-2,email;verif|welcome email|link|format|confirm|valid
+K09,Email field (optional in PRD) is missing from the design mock-up,PRD R3 + mock-up,email;mock|design|figma|field
+K10,Terms and Conditions acceptance (R7) is missing from the design mock-up,PRD R7 + mock-up,terms|t&c|conditions
+K11,Behaviour for an already registered mobile number not defined (message? offer login? 409),PRD R8 + API,duplicate|already registered|already exist|409|registered|existing
+K12,"OTP length conflicts: API 4 digits, mock-up and app 6 boxes",API + mock-up + exploration,otp|code|digit;4;6
+K13,OTP expiry time not defined (API returns 410 Code expired),PRD R9 + API,otp|code;expir|valid|minute|410|lifetime|timeout|time limit
+K14,"Resend OTP limits not defined (cooldown, maximum, 429; app shows 30 seconds)",PRD R11 + US-3 + API,resend|new code|new otp|another code|request a new;limit|cooldown|wait|how many|times|429|second|frequency|rate|maximum
+K15,Wrong OTP: exact message and maximum attempts not defined,PRD R10,otp|code;wrong|incorrect|attempt|retr
+K16,Welcome points: when are they credited and under which conditions (once per person? before or after verification?),PRD R13 + US-4,point;when|credit|time|verif|condition|once|eligib|after|before
+K17,"Language: error messages localisation, default language and RTL layout not defined (app shows an Arabic error on an English screen)",PRD R6 + US-5 + exploration,arabic|language|locali|rtl|translat|bilingual;message|default|error|layout|rtl|direction|translat|text|screen
+K18,Account lock: number of failed attempts and lock duration not defined,PRD R15,lock;several|how many|number|attempt|duration|unlock|threshold|period
+K19,Stored securely is not testable as written (encryption? masking? retention?),PRD R16,secur|encrypt|personal data|privacy|protect|hash
+K20,Fast registration is not measurable (target time?),PRD R17,fast|performance|response time|speed|quick|latency
+K21,User-friendly is not testable as written,PRD R18,user-friendly|user friendly|usab|easy to use|ux|friendly
+K22,Error messages and error response format not defined (400 has no body; content team later),API + stories notes,error;message|format|body|schema|response|text|content|wording
+K23,Date of birth: empty value shows the age message; date format and future dates not defined,PRD R5 + exploration,birth|dob;empty|missing|blank|format|future|verif|message|proof|invalid

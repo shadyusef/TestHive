@@ -1,0 +1,33 @@
+ID,Module,Source,Section,Text,Type,Priority,Version,Status,Notes
+REQ-SIGNUP-001,SIGNUP,prd.pdf R1; openapi.yaml POST /v1/signup,3 Sign-up form,Full name is required.,Functional,P1,1,Draft,
+REQ-SIGNUP-002,SIGNUP,openapi.yaml POST /v1/signup,fullName,fullName is a string with maxLength 50.,API,P2,1,Draft,
+REQ-SIGNUP-003,SIGNUP,prd.pdf R2; openapi.yaml POST /v1/signup,3 Sign-up form,Mobile number is required and must be a valid Saudi mobile number; it is the login identifier. API pattern ^05[0-9]{8}$.,Business rule,P0,1,Draft,
+REQ-SIGNUP-004,SIGNUP,prd.pdf R3; openapi.yaml POST /v1/signup,3 Sign-up form,Email is optional. If given the customer receives a welcome email. API: email is optional with format email.,Functional,P2,1,Draft,
+REQ-SIGNUP-005,SIGNUP,prd.pdf R4,3 Sign-up form,Password must be at least 8 characters.,Business rule,P0,1,Draft,
+REQ-SIGNUP-006,SIGNUP,openapi.yaml POST /v1/signup,password,password is required with minLength 6.,API,P0,1,Draft,
+REQ-SIGNUP-007,SIGNUP,prd.pdf R5,3 Sign-up form,Date of birth is required; customers must be 18 or older.,Business rule,P0,1,Draft,
+REQ-SIGNUP-008,SIGNUP,user-stories.docx US-1,Stories,As a visitor aged 16 or older I can create an account; the account is created after the mobile number is verified.,Business rule,P0,1,Draft,
+REQ-SIGNUP-009,SIGNUP,prd.pdf R6; user-stories.docx US-5; openapi.yaml POST /v1/signup,3 Sign-up form,The customer chooses Arabic or English (language ar/en required in API); the app supports both and all screens appear in the chosen language.,Functional,P1,1,Draft,
+REQ-SIGNUP-010,SIGNUP,prd.pdf R7,3 Sign-up form,The customer must accept the Terms and Conditions before signing up.,Business rule,P0,1,Draft,Not in API request or mock-up
+REQ-SIGNUP-011,SIGNUP,prd.pdf R8; openapi.yaml POST /v1/signup 409,3 Sign-up form,A mobile number that is already registered cannot be used to sign up again (API returns 409).,Business rule,P0,1,Draft,
+REQ-SIGNUP-012,SIGNUP,user-stories.docx US-2,Stories,A visitor without a Saudi mobile number can sign up with email instead; a verification link is sent to the email.,Functional,P1,1,Draft,Contradicts PRD R2 and API
+REQ-SIGNUP-013,SIGNUP,prd.pdf R9; openapi.yaml POST /v1/signup 201,4 Mobile verification,After the form is submitted a pending account is created and an OTP is sent by SMS.,Functional,P0,1,Draft,
+REQ-SIGNUP-014,SIGNUP,prd.pdf R10; openapi.yaml POST /v1/otp/verify 400,4 Mobile verification,A wrong OTP shows an error (API 400 Wrong code).,Functional,P0,1,Draft,
+REQ-SIGNUP-015,SIGNUP,openapi.yaml POST /v1/otp/verify; user-stories.docx notes; signup-mockup.png,OTP,API code is exactly 4 digits (^[0-9]{4}$). Story notes and mock-up show six digit boxes.,API,P0,1,Draft,Conflict 4 vs 6
+REQ-SIGNUP-016,SIGNUP,openapi.yaml POST /v1/otp/verify 410,OTP,An expired code returns 410 Code expired.,API,P0,1,Draft,Expiry time not given
+REQ-SIGNUP-017,SIGNUP,prd.pdf R11; user-stories.docx US-3; openapi.yaml POST /v1/otp/resend,4 Mobile verification,The customer can request a new OTP (202 New code sent); a new code is sent. Too many requests returns 429.,Functional,P1,1,Draft,
+REQ-SIGNUP-018,SIGNUP,prd.pdf R12; openapi.yaml POST /v1/otp/verify 200,4 Mobile verification,When the number is verified the account is created/active and the customer is logged in (API returns accessToken and points).,Functional,P0,1,Draft,
+REQ-SIGNUP-019,SIGNUP,prd.pdf R13; user-stories.docx US-4; openapi.yaml POST /v1/otp/verify 200,5 Welcome points,Every new member receives 50 welcome points; balance shows 50.,Business rule,P0,1,Draft,
+REQ-SIGNUP-020,SIGNUP,prd.pdf R14,6 Login,Customers log in with mobile number and password.,Functional,P0,1,Draft,No login API or screen provided
+REQ-SIGNUP-021,SIGNUP,prd.pdf R15,6 Security,The account is locked after several failed login attempts.,Business rule,P0,1,Draft,
+REQ-SIGNUP-022,SIGNUP,prd.pdf R16,6 Security,Personal data is stored securely.,Non-functional,P0,1,Draft,
+REQ-SIGNUP-023,SIGNUP,prd.pdf R17,7 Quality,Registration must be fast.,Non-functional,P2,1,Draft,
+REQ-SIGNUP-024,SIGNUP,prd.pdf R18,7 Quality,The sign-up screens must be user-friendly.,Non-functional,P3,1,Draft,
+REQ-SIGNUP-025,SIGNUP,prd.pdf 2 Users,2 Users,Users are new customers in Saudi Arabia who are 18 or older.,Business rule,P1,1,Draft,
+REQ-SIGNUP-026,SIGNUP,user-stories.docx notes,Notes from refinement,Error messages will be provided by the content team later.,Functional,P1,1,Draft,Message catalogue missing
+REQ-SIGNUP-027,SIGNUP,signup-mockup.png,Sign-up screen,Sign-up screen fields: Full name; Mobile number (05XXXXXXXX); Password; Date of birth; Language buttons Arabic/English; Sign up button. No terms checkbox and no email field.,UI,P1,1,Draft,
+REQ-SIGNUP-028,SIGNUP,signup-mockup.png,Verify screen,Verify screen: 'Verify your number' with six code boxes; text 'Enter the code we sent by SMS.'; Verify button; Resend code link.,UI,P1,1,Draft,
+REQ-SIGNUP-029,SIGNUP,observed: web page 01,Sign-up form,Web form: full name maxlength 40; mobile pattern ^05[0-9]{8}$; password minlength 6; date of birth required; language select with العربية and English; terms checkbox required. Empty submit shows five English messages (name; mobile starting with 05; password at least 6 characters; 18 or older; accept terms).,UI,P1,1,Observed,
+REQ-SIGNUP-030,SIGNUP,observed: web page 01,Sign-up form,Web form has no email field. A valid submission goes to the OTP page with no message.,UI,P1,1,Observed,
+REQ-SIGNUP-031,SIGNUP,observed: web page 02,Verify page,Web verify page has six digit boxes (one digit each) and shows 'Resend code (30)'; heading 'Verify your mobile number' and text 'We sent a code by SMS. Enter it below.'.,UI,P1,1,Observed,Mock-up wording differs
+REQ-SIGNUP-032,SIGNUP,observed: web page 02,Verify page,"Verify page shows the Arabic message 'الرمز غير صحيح' for empty, invalid and the tried 'valid' codes while the rest of the page is English.",UI,P1,1,Observed,

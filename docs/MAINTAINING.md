@@ -21,7 +21,10 @@ You do not need the original author or any chat history; everything is in this r
 | `hive.cmd`, `scripts/hive.sh` | Launcher: `.\hive <name>` runs `scripts/<name>.sh` | Rarely |
 | `scripts/*.sh` | One script per job. Line 2 is its one-line description (shown by `.\hive`); then `# Usage:` lines | Behaviour changes |
 | `scripts/_py.sh` | Finds a Python 3 that really runs (Windows `python3` is often a Store stub) | Never, unless Python lookup breaks |
-| `scripts/lib/*.py` | Python code too big for a heredoc (`mask.py`) | Behaviour changes |
+| `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps) | Behaviour changes |
+| `web/explore.mjs` | Web exploration with Playwright (Edge on Windows) | Exploration behaviour changes |
+| `.claude/agents/business-analyst.md` | The analyst's procedure and checklist; the quality of the gaps depends on it | After a benchmark shows misses; re-run `demo/phase1/run.sh --live` and `score-analysis` |
+| `demo/phase1/` | Fictional sources with planted gaps (`sources/`, generators in `make/`), the answer key, a local demo site, a recorded agent run (`recorded/`) | When the analyst or formats change: re-record (see below) |
 | `scripts/setup.sh`, `setup.ps1` | Prerequisite check/installer for macOS/Linux and Windows | A tool is added or its install changes; keep both in step |
 | `scripts/selftest.sh` | Tests TestHive itself; also run by CI | Every change: add a test for it |
 | `templates/` | Files `init-project` copies into a new project | Formats change; update `docs/FORMATS.md` too |
@@ -53,6 +56,10 @@ You do not need the original author or any chat history; everything is in this r
 | `TESSERACT_CMD`, `TESSDATA_PREFIX` | `mask` | Tesseract program and language data |
 | `TH_PERMISSION_MODE`, `TH_CLAUDE_ARGS` | `th` | Claude Code options for one-shot agent runs |
 | `NO_COLLECT` | `run-*` | `1` = do not store the run in `runs/` |
+| `TH_ANALYSIS` | `ingest`, analysis scripts, `stage` | Analysis folder (default `analysis`) |
+| `TH_SCORE_TARGET` | `score-analysis` | Pass mark in percent (default 80) |
+| `TH_BROWSER_CHANNEL` | `explore-web`, web tests | `msedge` (Windows default), `chrome` or `chromium` |
+| `TH_SCRIPTS` | `stage` (set by itself) | Where the scripts are, to call `lib/analysis.py` |
 | `PLATFORM`, `INCLUDE_TAGS`, `EXCLUDE_TAGS` | `run-mobile` | iOS instead of Android; tag filters |
 | `TEST_ENV` and every other `.env` key | `run-*` | Environment name recorded with each run; all keys are passed to Maestro flows |
 
@@ -64,6 +71,11 @@ You do not need the original author or any chat history; everything is in this r
 **Change a file format:** update the template, `docs/FORMATS.md`, every script that reads it, and the selftest. Keep old files readable or explain the migration in `CHANGELOG.md`.
 
 **Add a prerequisite:** add the check and install in both `setup.sh` and `setup.ps1`; if it needs admin rights on Windows, say so in the README "What you need" table and `docs/TROUBLESHOOTING.md`.
+
+## The analyst benchmark
+`demo/phase1/answer-key.csv` lists 23 gaps planted in the fictional Nakhla Rewards documents. `score-analysis` matches the analyst's questions against keywords (word-start matching, one gap per key) and prints every pairing so a human can verify it. Keyword matching is an approximation: always read the pairings, and add keywords or keys when a real finding is not recognised. After changing the analyst's instructions, run `.\hive demo/phase1/run.sh --live` and compare the score.
+
+**Re-recording the demo:** run the analyst live on a copy of the demo project (see `demo/phase1/run.sh --live`), check the pairings, then copy `analysis/requirements.csv` and `gaps.csv` after the first pass to `demo/phase1/recorded/first-pass/`, after the first re-check to `recorded/recheck-1/` and after the second to `recorded/recheck-2/`. The human's answers are `recorded/sample-answers.csv` (round 1) and `sample-answers-2.csv` (round 2): if the new run asks different questions, rewrite them so their IDs match.
 
 ## Testing
 - `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped.
@@ -82,5 +94,7 @@ You do not need the original author or any chat history; everything is in this r
 - Masking finds people's names only when they follow a title or are listed in `.mask-terms`; `suggest` helps, a human must confirm. Long numbers that pass a checksum by chance are masked.
 - Screenshot masking needs Tesseract, which needs admin rights to install on Windows.
 - iOS needs a Mac or a device farm.
-- `scripts/th.sh` one-shot runs cannot answer permission prompts; they accept file edits and run only allowed commands.
+- `scripts/th.sh` one-shot runs cannot answer permission prompts; they accept file edits and run only allowed commands, and only after the folder was trusted once in an interactive `claude` session.
+- Exploration records what it can reach: the web explorer does not know real passwords or OTP codes, and `adb` cannot type Arabic. The analyst must treat explored behaviour as Observed and ask.
+- The analyst is an AI: its registers are a draft for a human, not a final answer. The approval gate and the benchmark exist for that reason.
 - macOS and Linux are verified by CI only.

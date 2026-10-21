@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.2.0).** The agent team, the scripts and the phase 0 foundations (stage gates, approval log, run storage, masking) work today. The guided pipeline (analysis workbook, Excel test cases, tool advice, HTML reports, a UI) is being built phase by phase: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.3.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking) and phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines). Still being built phase by phase: Excel test cases, tool advice, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -54,6 +54,7 @@ Each module goes through six stages. A stage cannot start until a named person a
 | Agent | Model | Role |
 |---|---|---|
 | `testhive-lead` | Sonnet | Runs the pipeline, briefs the others, keeps the board, stops at every approval. Never writes tests. |
+| `business-analyst` | Sonnet | Reads documents, API specs and designs, or explores a built web/Android app; writes the requirement and gap registers; re-checks your answers. |
 | `manual-tester` | Sonnet | Explores the app, writes test cases with exact expected results. |
 | `mobile-automation-engineer` | Sonnet | Maestro flows for Android and iOS. |
 | `api-backend-test-engineer` | Sonnet | Postman collections run with Newman. |
@@ -62,7 +63,16 @@ Each module goes through six stages. A stage cannot start until a named person a
 | `defect-triage` | Sonnet | Runs on failures only: test defect, environment or real bug; writes bug reports. |
 | `qa-reviewer` | Opus | Independent audit and module sign-off. |
 
-Call one agent directly inside Claude Code with `/th-lead`, `/th-manual`, `/th-mobile`, `/th-api`, `/th-web`, `/th-data`, `/th-triage`, `/th-review` followed by the task, or from a terminal with `.\hive th mobile "automate TC-SIGNUP-001"`. `/th-lead` makes the current session act as the Lead (a subagent cannot start other agents); for a full module `claude --agent testhive-lead` is the better start.
+Call one agent directly inside Claude Code with `/th-lead`, `/th-analyst`, `/th-manual`, `/th-mobile`, `/th-api`, `/th-web`, `/th-data`, `/th-triage`, `/th-review` followed by the task, or from a terminal with `.\hive th mobile "automate TC-SIGNUP-001"`. `/th-lead` makes the current session act as the Lead (a subagent cannot start other agents); for a full module `claude --agent testhive-lead` is the better start.
+
+## Analyse a module (stage 1)
+1. Put the module's documents in `requirements/sources/<MODULE>/` (PDF, Word, Excel, text, OpenAPI/Swagger, design images). No documents? Give the analyst a URL or an APK instead: it explores the built product and drafts the requirements as **observed** behaviour for you to confirm.
+2. In Claude Code: `/th-analyst SIGNUP` (add e.g. `url=https://staging.example.com, test environment`), or ask the Lead.
+3. Open `analysis/SIGNUP-analysis.xlsx`, sheet **Gaps**: answer the questions in the yellow columns (you may add your own questions in a new row). Save.
+4. Ask the analyst to re-check (`/th-analyst re-check SIGNUP`). Repeat 3-4 until no High question is open.
+5. Approve: `.\hive stage approve SIGNUP analysis --by "<your name>"`. The requirements are frozen as `analysis/baseline/SIGNUP/v1/`.
+
+See it end to end with a fictional app: `.\hive demo/phase1/run.sh` (recorded agent, free) or `--live` (real agent, uses your Claude plan).
 
 ## Scripts
 Run `.\hive` with no arguments for the full list with one-line descriptions. The main ones:
@@ -73,6 +83,11 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `selftest` | Proves TestHive works on this machine |
 | `init-project` | Creates the project files from `templates/` |
 | `stage` | Stage gates and approvals |
+| `ingest` | Turns a module's documents (text, PDF, Word, Excel, OpenAPI, images) into text for the analyst; `--mask` hides personal data first |
+| `explore-web` / `explore-android` | Record what a built web app (URL) or Android app (APK) actually does, as observed behaviour |
+| `check-analysis` | Checks the requirement and gap registers; `--for-approval` checks they are ready to approve |
+| `analysis-workbook` / `import-answers` | Excel workbook of questions for the business, and reading the answers back |
+| `score-analysis` | Benchmark: how many planted gaps the analyst found |
 | `run-mobile` / `run-api` / `run-web` | Run a module's tests; each run is stored in `runs/` |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |
 | `gate` | Definition-of-done check on the case sheet |
@@ -96,7 +111,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 ```
 hive.cmd             Windows launcher: .\hive <script> ...
 CLAUDE.md            rules every Claude session in this folder follows
-.claude/agents/      the 8 agent definitions        .claude/commands/  /th-* slash commands
+.claude/agents/      the 9 agent definitions        .claude/commands/  /th-* slash commands
 .claude/settings.json  allowed and blocked commands for agents
 scripts/             all scripts (lib/ holds their Python code)
 templates/           files init-project copies: brief, CONTEXT, intake, board, case sheet, registers, reports, env

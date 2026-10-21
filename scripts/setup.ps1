@@ -16,7 +16,7 @@ function PyCmd {
   }
   return $null
 }
-function PyPkgsOk { $p = PyCmd; if (-not $p) { return $false }; & $p -c 'import openpyxl, pypdf, docx, PIL, pytesseract' 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) }
+function PyPkgsOk { $p = PyCmd; if (-not $p) { return $false }; & $p -c 'import openpyxl, pypdf, docx, PIL, pytesseract, yaml' 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) }
 function TessExe { if (Have tesseract) { return 'tesseract' }; $p = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'; if (Test-Path $p) { return $p }; return $null }
 function OcrOk {
   $t = TessExe; if (-not $t) { return $false }
@@ -86,7 +86,7 @@ elseif ($mode -eq 'install') {
     Write-Host "Installing $($t.n) ..."
     try {
       if ($t.n -eq 'maestro') { Install-Maestro }
-      elseif ($t.n -eq 'playwright') { Push-Location web; try { npm install; npx playwright install chromium } finally { Pop-Location } }
+      elseif ($t.n -eq 'playwright') { Push-Location web; try { $env:PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD = '1'; npm install } finally { Pop-Location } # uses the installed Microsoft Edge: no browser download }
       elseif ($t.pip) { $p = PyCmd; if ($p) { & $p -m pip install --user -r requirements.txt } else { Write-Host '  Install python first' } }
       elseif ($t.npm) { npm install -g $t.npm }
       else {

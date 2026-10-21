@@ -1,5 +1,5 @@
 # TestHive
-A team of 8 QA agents in `.claude/agents/`. Start the Lead with `claude --agent testhive-lead`, or call one agent with `/th-<name>`.
+A team of 9 QA agents in `.claude/agents/`. Start the Lead with `claude --agent testhive-lead`, or call one agent with `/th-<name>`.
 
 - Read `CONTEXT.md` and `workflow/BOARD.md` first; open other files only for the module in hand.
 - Explain the plan and get approval before implementing. Never push, delete or install without a clear yes.

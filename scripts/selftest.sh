@@ -86,6 +86,54 @@ bash scripts/hive.sh >/dev/null 2>&1 && { echo "hive.sh with no arguments should
 bash scripts/hive.sh | grep -q "stage" || { echo "hive.sh does not list the scripts"; exit 1; }
 bash scripts/hive.sh gen-user | grep -q "@example.com" || { echo "hive.sh did not run gen-user"; exit 1; }
 bash scripts/hive.sh nope >/dev/null 2>&1 && { echo "hive.sh accepted an unknown script"; exit 1; }
+# phase 1: ingest, analysis registers, workbook round trip, approval gate + baseline, score, Android screen parser
+A=$(mktemp -d); export TH_ANALYSIS="$A/analysis" TH_STATE="$A/state.json"
+mkdir -p "$A/src"; cp demo/phase1/sources/openapi.yaml demo/phase1/sources/user-stories.docx "$A/src/"; printf 'R1 Full name is required.\n' > "$A/src/notes.txt"
+(cd "$A" && mkdir -p requirements/sources && mv src requirements/sources/SIGNUP && TH_ANALYSIS="$A/analysis" bash "$OLDPWD/scripts/ingest.sh" SIGNUP) | grep -q "INGESTED 3 sources" || { echo "ingest.sh did not convert the sources"; exit 1; }
+grep -q "minLength=6" "$A/analysis/sources-text/SIGNUP/openapi.yaml.md" && grep -q "US-2" "$A/analysis/sources-text/SIGNUP/user-stories.docx.md" || { echo "ingest.sh output is wrong"; exit 1; }
+cat > "$TH_ANALYSIS/requirements.csv" <<'X'
+ID,Module,Source,Section,Text,Type,Priority,Version,Status,Notes
+REQ-DEMO-001,DEMO,prd R4,3,Password must be at least 8 characters,Business rule,P0,1,Draft,
+REQ-DEMO-002,DEMO,openapi.yaml,signup,Password minLength 6,API,P0,1,Draft,
+REQ-DEMO-003,DEMO,observed: web page 01,form,Resend is disabled for 30 seconds,UI,P2,1,Observed,
+X
+cat > "$TH_ANALYSIS/gaps.csv" <<'X'
+ID,Module,Requirement,Kind,Severity,Question,Answer,Answered By,Status
+GAP-DEMO-001,DEMO,REQ-DEMO-001;REQ-DEMO-002,Conflict,High,PRD says the password needs 8 characters and the API 6. Which is correct: 8 or 6?,,,Open
+GAP-DEMO-002,DEMO,REQ-DEMO-003,To confirm,Low,The app waits 30 seconds before Resend. Is that intended?,,,Open
+X
+bash scripts/check-analysis.sh DEMO >/dev/null || { echo "check-analysis rejected valid registers"; exit 1; }
+bash scripts/check-analysis.sh DEMO --for-approval >/dev/null && { echo "check-analysis allowed approval with a High gap open"; exit 1; }
+sed 's/,Draft,$/,Ready,/' "$TH_ANALYSIS/requirements.csv" > "$A/bad.csv"; cp "$TH_ANALYSIS/requirements.csv" "$A/good.csv"; cp "$A/bad.csv" "$TH_ANALYSIS/requirements.csv"
+bash scripts/check-analysis.sh DEMO >/dev/null && { echo "check-analysis accepted a bad Status"; exit 1; }; cp "$A/good.csv" "$TH_ANALYSIS/requirements.csv"
+bash scripts/analysis-workbook.sh DEMO | grep -q "WORKBOOK" || { echo "analysis-workbook failed"; exit 1; }
+$PY - "$TH_ANALYSIS/DEMO-analysis.xlsx" <<'PY'
+import sys, openpyxl
+wb = openpyxl.load_workbook(sys.argv[1]); ws = wb["Gaps"]
+head = [c.value for c in ws[1]]; col = lambda h: head.index(h) + 1
+ws.cell(2, col("Answer")).value = "8 characters"; ws.cell(2, col("Answered By")).value = "Product owner"
+ws.cell(3, col("Answer")).value = "Yes, 30 seconds"; ws.cell(3, col("Answered By")).value = "Product owner"
+r = ws.max_row + 1; ws.cell(r, col("Question")).value = "Is the password case-sensitive?"; ws.cell(r, col("Severity")).value = "Medium"; ws.cell(r, col("Kind")).value = "Missing"
+wb.save(sys.argv[1])
+PY
+bash scripts/import-answers.sh DEMO | grep -q "2 gaps updated, 1 new" || { echo "import-answers did not read the workbook"; exit 1; }
+grep -q "GAP-DEMO-003,DEMO,,Missing,Medium,Is the password case-sensitive" "$TH_ANALYSIS/gaps.csv" || { echo "import-answers did not add the new question"; exit 1; }
+bash scripts/check-analysis.sh DEMO --for-approval >/dev/null && { echo "approval allowed with answered-but-unreviewed gaps"; exit 1; }
+sed -i 's/,Answered$/,Closed/; s/,Observed,$/,Confirmed,/' "$TH_ANALYSIS/gaps.csv" "$TH_ANALYSIS/requirements.csv"
+bash scripts/stage.sh init DEMO >/dev/null; bash scripts/stage.sh start DEMO analysis >/dev/null; bash scripts/stage.sh submit DEMO analysis >/dev/null
+S_OUT=$(bash scripts/stage.sh approve DEMO analysis --by tester); echo "$S_OUT" | grep -q "BASELINE DEMO v1" || { echo "approving analysis did not create the baseline: $S_OUT"; exit 1; }
+[ -s "$TH_ANALYSIS/baseline/DEMO/v1/requirements.csv" ] && [ -s "$TH_ANALYSIS/baseline/DEMO/v1/meta.json" ] || { echo "baseline files missing"; exit 1; }
+printf 'Key,Gap,Where,Keywords\nK1,Password conflict,x,password;8;6\nK2,Lockout,x,lock\n' > "$A/key.csv"
+S_OUT=$(TH_SCORE_TARGET=50 bash scripts/score-analysis.sh DEMO "$A/key.csv"); echo "$S_OUT" | grep -q "found 1 of 2" || { echo "score-analysis counted wrong: $S_OUT"; exit 1; }
+printf 'Key,Gap,Where,Keywords
+K1,Lockout,x,lock
+' > "$A/key2.csv"; printf 'GAP-DEMO-009,DEMO,,Missing,Low,Is the user blocked after 3 tries?,,,Open
+' >> "$TH_ANALYSIS/gaps.csv"
+S_OUT=$(TH_SCORE_TARGET=0 bash scripts/score-analysis.sh DEMO "$A/key2.csv"); echo "$S_OUT" | grep -q "found 0 of 1" || { echo "score-analysis matched inside a word (lock in blocked)"; exit 1; }
+unset TH_ANALYSIS TH_STATE
+$PY scripts/lib/uiscreen.py find demo/phase1/samples/android-signup.xml sign_up | grep -q "540 960" || { echo "uiscreen.py could not find the button"; exit 1; }
+$PY scripts/lib/uiscreen.py summary demo/phase1/samples/android-signup.xml s | grep -q "input (password)" || { echo "uiscreen.py summary is wrong"; exit 1; }
+$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py
 # docs: every local link points to a file that exists; every script has a one-line description on line 2
 $PY - <<'PY' || exit 1
 import re, os, glob, sys

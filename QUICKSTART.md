@@ -43,14 +43,17 @@ This creates `PROJECT_BRIEF.md`, `CONTEXT.md`, `.env`, `workflow/BOARD.md`, `tes
 ```
 claude --agent testhive-lead
 ```
-The first start asks you to sign in to Claude. Copy `templates/MODULE_INTAKE.md` to `workflow/intake/<module>.md`, fill in the business rules, then tell the Lead for example:
+The first start asks you to sign in to Claude and whether you **trust this folder**: answer yes (TestHive's allowed-commands list only works in a trusted folder). Copy `templates/MODULE_INTAKE.md` to `workflow/intake/<module>.md`, fill in the business rules, then tell the Lead for example:
 > Module: Signup. Platform: Android. The intake is in workflow/intake/signup.md.
 
 The Lead shows a plan and waits for your approval. Follow the stages with `.\hive stage status SIGNUP`; approve with `.\hive stage approve SIGNUP <stage> --by "<your name>"`.
 
 To call one agent only, type in Claude Code `/th-mobile <task>` (also `/th-manual`, `/th-api`, `/th-web`, `/th-data`, `/th-triage`, `/th-review`, `/th-lead`), or from a terminal `.\hive th mobile "<task>"`.
 
-## 8. Mask personal data (when documents contain it)
+## 8. Analyse your first module
+Put the module's documents in `requirements/sources/<MODULE>/`, or have a URL / APK of the built app ready. Then follow **Analyse a module** in the README: the analyst writes the requirements and its questions, you answer them in `analysis/<MODULE>-analysis.xlsx`, it re-checks, and you approve. To see the whole loop first: `.\hive demo/phase1/run.sh`.
+
+## 9. Mask personal data (when documents contain it)
 ```
 .\hive mask suggest requirements/sources/prd.txt     lists likely names; put the real ones in .mask-terms
 .\hive mask review  requirements/sources/prd.txt     shows every match in context; wrong ones go in .mask-allow
@@ -58,7 +61,7 @@ To call one agent only, type in Claude Code `/th-mobile <task>` (also `/th-manua
 ```
 Screenshots work the same way (`.png`, `.jpg`) once Tesseract is installed. `.mask-terms`, `.mask-allow` and `.mask-map.json` stay on your PC.
 
-## 9. Add more modules later
+## 10. Add more modules later
 Repeat step 7 with a new intake file. Each module gets its own stages, case IDs and test folder; existing work is not touched.
 
 ## Handy commands

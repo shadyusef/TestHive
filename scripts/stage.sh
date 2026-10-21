@@ -10,9 +10,12 @@
 #   check   <MODULE> <stage>             exit 0 if the stage may start, 2 if not
 # Stages, in order: analysis design tools automation execution reporting
 # State lives in workflow/state.json; every decision is appended to workflow/APPROVALS.md.
+# Submitting or approving "analysis" first runs check-analysis --for-approval (when analysis/requirements.csv exists) and then
+# freezes the module's registers as a baseline in analysis/baseline/<MODULE>/v<n>/.
 . "$(dirname "$0")/_py.sh"
+export TH_SCRIPTS="$(dirname "$0")"
 $PY - "$@" <<'PY'
-import sys, json, os, re, time
+import sys, json, os, re, time, subprocess
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 SF = os.environ.get("TH_STATE", "workflow/state.json")
@@ -98,6 +101,10 @@ elif cmd == "submit":
     if len(pos) != 2: die("Usage: stage.sh submit <MODULE> <stage>")
     m, st = module(pos[0]), stage(pos[1])
     if m["stages"][st]["status"] != "in_progress": die(f"{st} must be in progress to submit (it is {m['stages'][st]['status']})", 2)
+    lib = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", "analysis.py")
+    if st == "analysis" and os.path.exists(os.path.join(os.environ.get("TH_ANALYSIS", "analysis"), "requirements.csv")):
+        if subprocess.run([sys.executable, lib, "check", pos[0].upper(), "--for-approval"]).returncode != 0:
+            die("BLOCKED: not ready to submit. Give the workbook to the human, import the answers, re-check, then submit.", 2)
     mark(m, st, "awaiting_approval"); save(s); print(f"{pos[0].upper()} {st}: waiting for human approval")
 elif cmd in ("approve", "reject"):
     if len(pos) != 2: die(f"Usage: stage.sh {cmd} <MODULE> <stage> --by <name> [--comment ...]")
@@ -105,10 +112,18 @@ elif cmd in ("approve", "reject"):
     if "by" not in opt: die(f"{cmd} needs --by <name>: decisions are made by a named human")
     if cmd == "reject" and "comment" not in opt: die("reject needs --comment saying what to change")
     if m["stages"][st]["status"] != "awaiting_approval": die(f"{st} is not waiting for approval (it is {m['stages'][st]['status']})", 2)
+    lib = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", "analysis.py")
+    has_registers = os.path.exists(os.path.join(os.environ.get("TH_ANALYSIS", "analysis"), "requirements.csv"))
+    if cmd == "approve" and st == "analysis" and has_registers:
+        sys.stdout.flush(); r = subprocess.run([sys.executable, lib, "check", pos[0].upper(), "--for-approval"])
+        if r.returncode != 0: die("BLOCKED: the analysis is not ready for approval (see above)", 2)
     status = "approved" if cmd == "approve" else "in_progress"
     mark(m, st, status, opt["by"], opt.get("comment")); save(s)
     log(pos[0].upper(), st, "Approved" if cmd == "approve" else "Rejected", opt["by"], opt.get("comment"))
     print(f"{pos[0].upper()} {st}: {'approved' if cmd == 'approve' else 'rejected, back to in progress'} by {opt['by']}")
+    if cmd == "approve" and st == "analysis" and has_registers:
+        sys.stdout.flush()
+        subprocess.run([sys.executable, lib, "baseline", pos[0].upper(), opt["by"]])
 else:
     die(USAGE)
 PY

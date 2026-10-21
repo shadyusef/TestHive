@@ -1,0 +1,4 @@
+ID,Answer,Answered By
+GAP-SIGNUP-036,"The code is incorrect = الرمز غير صحيح. Enter the 6-digit code = أدخل الرمز المكون من 6 أرقام. Please enter your date of birth = يرجى إدخال تاريخ الميلاد. The code has expired. Request a new code. = انتهت صلاحية الرمز. اطلب رمزاً جديداً.",Sara (product owner)
+GAP-SIGNUP-037,"English: Too many wrong attempts. Request a new code. Arabic: محاولات خاطئة كثيرة. اطلب رمزاً جديداً.",Sara (product owner)
+GAP-SIGNUP-038,"English: You have requested too many codes. Try again in one hour. Arabic: طلبت رموزاً كثيرة. حاول مرة أخرى بعد ساعة.",Sara (product owner)

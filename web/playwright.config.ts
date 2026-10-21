@@ -11,5 +11,6 @@ export default defineConfig({
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
-  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+  // Windows uses the installed Microsoft Edge (no browser download); elsewhere Playwright's Chromium. TH_BROWSER_CHANNEL overrides.
+  projects: [{ name: 'browser', use: { ...devices['Desktop Chrome'], channel: process.env.TH_BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined) } }],
 });

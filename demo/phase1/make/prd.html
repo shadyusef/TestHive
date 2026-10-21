@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><title>Nakhla Rewards - Sign-up PRD</title>
+<style>
+  body { font-family: Segoe UI, Arial, sans-serif; font-size: 11pt; line-height: 1.45; margin: 28px 40px; color: #222; }
+  h1 { color: #2f5d3a; font-size: 20pt; margin-bottom: 0; } h2 { color: #2f5d3a; font-size: 14pt; margin-top: 22px; }
+  .meta { color: #666; margin-bottom: 18px; } table { border-collapse: collapse; width: 100%; } td, th { border: 1px solid #bbb; padding: 5px 8px; vertical-align: top; text-align: left; }
+  th { background: #eef3ee; }
+</style></head>
+<body>
+<!-- Fictional product written for the TestHive phase 1 demo. It contains planted gaps on purpose (see demo/phase1/answer-key.csv). -->
+<h1>Nakhla Rewards: Sign-up and Account</h1>
+<div class="meta">Product Requirements Document, version 0.9 (draft). Owner: Product team. Fictional demo document.</div>
+
+<h2>1. Purpose</h2>
+<p>Nakhla Rewards is the loyalty app of the Nakhla coffee chain in Saudi Arabia. Customers collect points on every purchase and redeem them for drinks. This document covers creating an account, verifying the mobile number and the first login.</p>
+
+<h2>2. Users</h2>
+<p>New customers in Saudi Arabia who are 18 years or older. Staff accounts are created by admins in the back office and are out of scope for the customer app.</p>
+
+<h2>3. Sign-up form</h2>
+<table>
+<tr><th>ID</th><th>Rule</th></tr>
+<tr><td>R1</td><td>Full name is required.</td></tr>
+<tr><td>R2</td><td>Mobile number is required and must be a valid Saudi mobile number. It is the login identifier.</td></tr>
+<tr><td>R3</td><td>Email is optional. If given, the customer receives a welcome email.</td></tr>
+<tr><td>R4</td><td>Password must be at least 8 characters.</td></tr>
+<tr><td>R5</td><td>Date of birth is required; customers must be 18 or older.</td></tr>
+<tr><td>R6</td><td>The customer chooses Arabic or English. The app supports both languages.</td></tr>
+<tr><td>R7</td><td>The customer must accept the Terms and Conditions before signing up.</td></tr>
+<tr><td>R8</td><td>A mobile number that is already registered cannot be used to sign up again.</td></tr>
+</table>
+
+<h2>4. Mobile verification</h2>
+<table>
+<tr><th>ID</th><th>Rule</th></tr>
+<tr><td>R9</td><td>After the form is submitted, a one-time password (OTP) is sent to the mobile number by SMS.</td></tr>
+<tr><td>R10</td><td>If the customer enters a wrong OTP, an error is shown.</td></tr>
+<tr><td>R11</td><td>The customer can ask for a new OTP.</td></tr>
+<tr><td>R12</td><td>When the number is verified, the account is created and the customer is logged in.</td></tr>
+</table>
+
+<h2>5. Welcome points</h2>
+<p>R13. Every new member receives 50 welcome points.</p>
+
+<h2>6. Login and security</h2>
+<p>R14. Customers log in with mobile number and password.</p>
+<p>R15. The account is locked after several failed login attempts.</p>
+<p>R16. Personal data is stored securely.</p>
+
+<h2>7. Quality</h2>
+<p>R17. Registration must be fast.</p>
+<p>R18. The sign-up screens must be user-friendly.</p>
+
+<h2>8. Out of scope</h2>
+<p>Payments, redeeming points, and the staff back office.</p>
+</body></html>

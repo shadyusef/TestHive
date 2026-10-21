@@ -93,15 +93,22 @@ def write(path, s):
     with open(path, "w", encoding="utf-8", newline="") as f: f.write(s)
 
 
-def mask_text(src, dst):
-    text, mp = read(src), load_map()
+def mask_string(text):
+    """Masks text and records new tokens in the map. Returns (masked_text, spans)."""
+    mp = load_map()
     spans, out, last = find(text), [], 0
     for s, e, kind, v in spans:
         if v not in mp["forward"]:
             n = mp["counters"].get(kind, 0) + 1; mp["counters"][kind] = n
             mp["forward"][v] = f"[{kind}_{n:03d}]"
         out += [text[last:s], mp["forward"][v]]; last = e
-    write(dst, "".join(out) + text[last:]); save_map(mp)
+    save_map(mp)
+    return "".join(out) + text[last:], spans
+
+
+def mask_text(src, dst):
+    masked, spans = mask_string(read(src))
+    write(dst, masked)
     print(f"Masked {len(spans)} values ({summary(spans)}) -> {dst}")
 
 
@@ -173,18 +180,25 @@ def mask_image(src, dst, check_only=False):
 
 
 IMG = (".png", ".jpg", ".jpeg", ".bmp", ".webp", ".tif", ".tiff")
-a = sys.argv[1:]
-need = {"mask": 3, "unmask": 3, "check": 2, "review": 2, "suggest": 2}
-if not a or a[0] not in need or len(a) != need[a[0]]:
-    die("Usage: mask.sh mask|unmask <in> <out>  |  mask.sh check|review|suggest <in>")
-cmd, src = a[0], a[1]
-if not os.path.isfile(src): die(f"File not found: {src}")
-is_img = src.lower().endswith(IMG)
-if cmd == "mask": mask_image(src, a[2]) if is_img else mask_text(src, a[2])
-elif cmd == "check":
-    if is_img: mask_image(src, None, check_only=True)
-    else: print(f"Would mask: {summary(find(read(src)))}")
-elif is_img: die(f"{cmd} works on text files only")
-elif cmd == "unmask": unmask_text(src, a[2])
-elif cmd == "review": review(src)
-else: suggest(src)
+
+
+def main():
+    a = sys.argv[1:]
+    need = {"mask": 3, "unmask": 3, "check": 2, "review": 2, "suggest": 2}
+    if not a or a[0] not in need or len(a) != need[a[0]]:
+        die("Usage: mask.sh mask|unmask <in> <out>  |  mask.sh check|review|suggest <in>")
+    cmd, src = a[0], a[1]
+    if not os.path.isfile(src): die(f"File not found: {src}")
+    is_img = src.lower().endswith(IMG)
+    if cmd == "mask": mask_image(src, a[2]) if is_img else mask_text(src, a[2])
+    elif cmd == "check":
+        if is_img: mask_image(src, None, check_only=True)
+        else: print(f"Would mask: {summary(find(read(src)))}")
+    elif is_img: die(f"{cmd} works on text files only")
+    elif cmd == "unmask": unmask_text(src, a[2])
+    elif cmd == "review": review(src)
+    else: suggest(src)
+
+
+if __name__ == "__main__":
+    main()
