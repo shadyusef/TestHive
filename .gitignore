@@ -15,3 +15,10 @@ maestro-output/
 skills/*.zip
 .testhive-ready
 HANDOVER.md
+.mask-map.json
+.mask-map.json.tmp
+.mask-terms
+runs/*/evidence/
+workflow/state.json.tmp
+demo/*/output/
+__pycache__/

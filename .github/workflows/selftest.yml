@@ -11,6 +11,12 @@ jobs:
       - uses: actions/checkout@v4
       - run: bash scripts/selftest.sh
         shell: bash
+      - name: Windows launcher
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          .\hive.cmd gen-user
+          if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: PowerShell scripts parse
         if: runner.os == 'Windows'
         shell: pwsh

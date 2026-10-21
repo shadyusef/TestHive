@@ -6,4 +6,5 @@ A team of 8 QA agents in `.claude/agents/`. Start the Lead with `claude --agent 
 - Verify on the real app; never assume behaviour. Never weaken an assertion: report the bug and keep the test.
 - Use the scripts in `scripts/` for runs, digests, stability and the gate instead of doing that work by hand.
 - Never read or print `.env`. No secrets or project data in files that get committed.
+- On Windows the user runs scripts with `.\hive <name> ...` (PowerShell); in the Bash tool use `bash scripts/<name>.sh`.
 - Keep answers short.

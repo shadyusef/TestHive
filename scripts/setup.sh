@@ -4,8 +4,9 @@
 #   --check    (default) report what is missing, install nothing; writes .testhive-ready when all required tools are present
 #   --install  install what is missing (asks nothing more: run it only after the user agreed)
 #   --web      also check/install Playwright (web tests, in web/)
-MODE=check; WEB=0
-for a in "$@"; do case "$a" in --check) MODE=check;; --install) MODE=install;; --web) WEB=1;; -h|--help) sed -n 2,7p "$0"; exit 0;; esac; done
+#   --ocr      also check/install Tesseract OCR with Arabic (image masking); otherwise it is reported as optional
+MODE=check; WEB=0; OCR=0
+for a in "$@"; do case "$a" in --check) MODE=check;; --install) MODE=install;; --web) WEB=1;; --ocr) OCR=1;; -h|--help) sed -n 2,8p "$0"; exit 0;; esac; done
 OS=$(uname -s); PM=""
 if [ "$OS" = Darwin ]; then command -v brew >/dev/null && PM=brew; elif command -v apt-get >/dev/null; then PM=apt; fi
 SUDO=""; [ "$(id -u)" != 0 ] && command -v sudo >/dev/null && SUDO=sudo
@@ -17,25 +18,31 @@ report() { # name, ok(0/1), detail
 
 java_ok() { have java && [ "$(java -version 2>&1 | sed -n '1s/[^"]*"\([0-9]*\).*/\1/p')" -ge 17 ] 2>/dev/null; }
 # A python that really runs (on Windows `python3` can be a Store stub that exists but does nothing).
-py_ok() { for c in python3 python "py -3"; do $c -c "import sys; sys.exit(sys.version_info[0] != 3)" >/dev/null 2>&1 && { PYV="$($c --version 2>&1 | head -1)"; return 0; }; done; return 1; }
+py_ok() { for c in python3 python "py -3"; do $c -c "import sys; sys.exit(sys.version_info[0] != 3)" >/dev/null 2>&1 && { PYC="$c"; PYV="$($c --version 2>&1 | head -1)"; return 0; }; done; return 1; }
+PYPKGS="openpyxl pypdf python-docx pillow pytesseract"
+pypkgs_ok() { [ -n "$PYC" ] && $PYC -c "import openpyxl, pypdf, docx, PIL, pytesseract" >/dev/null 2>&1; }
+TESS=tesseract; have tesseract || { [ -x "/c/Program Files/Tesseract-OCR/tesseract.exe" ] && TESS="/c/Program Files/Tesseract-OCR/tesseract.exe"; }
+ocr_ok() { "$TESS" --list-langs 2>/dev/null | tr -d '\r' | grep -qx ara; }
 
 check_all() {
   MISSING=()
   have git     && report git 0 "$(ver git --version)"          || report git 1
   have node    && report node 0 "$(ver node -v)"               || report node 1
   py_ok        && report python3 0 "$PYV"                      || report python3 1
+  pypkgs_ok    && report python-pkgs 0 "$PYPKGS"              || report python-pkgs 1
   java_ok      && report java17 0 "$(ver java -version)"       || report java17 1
   have maestro && report maestro 0 "$(ver maestro --version)"  || report maestro 1
   have adb     && report adb 0 "$(ver adb version)"            || report adb 1
   have newman  && report newman 0 "$(ver newman -v)"           || report newman 1
   have claude  && report claude-code 0 "$(ver claude --version)" || report claude-code 1
+  if ocr_ok; then report tesseract 0 "with Arabic"; elif [ "$OCR" = 1 ]; then report tesseract 1; else echo "OPTIONAL tesseract + Arabic (image masking): bash scripts/setup.sh --install --ocr"; fi
   if [ "$WEB" = 1 ]; then [ -d web/node_modules/@playwright/test ] && report playwright 0 "web/node_modules" || report playwright 1; fi
 }
 
 pm_install() { # pkg names per manager: brew_name apt_name
   case "$PM" in
     brew) brew install "$1" ;;
-    apt)  $SUDO apt-get install -y "$2" ;;
+    apt)  $SUDO apt-get install -y $2 ;;
     *)    echo "  No package manager found (need Homebrew on macOS or apt on Linux; on Windows use scripts/setup.ps1). Install $1 manually."; return 1 ;;
   esac
 }
@@ -45,6 +52,8 @@ install_one() {
     git) pm_install git git ;;
     node) pm_install node nodejs && { have npm || pm_install npm npm; } ;;
     python3) pm_install python3 python3 ;;
+    python-pkgs) py_ok && $PYC -m pip install --user $PYPKGS ;;
+    tesseract) [ "$PM" = brew ] && brew install tesseract tesseract-lang || pm_install x "tesseract-ocr tesseract-ocr-ara" ;;
     java17) pm_install openjdk@17 openjdk-17-jdk && { [ "$PM" != brew ] || echo "  If java is still not found: sudo ln -sfn \"\$(brew --prefix)/opt/openjdk@17/libexec/openjdk.jdk\" /Library/Java/JavaVirtualMachines/openjdk-17.jdk"; } ;;
     maestro) curl -fsSL "https://get.maestro.mobile.dev" | bash && echo "  Add to PATH: export PATH=\"\$PATH:\$HOME/.maestro/bin\"" ;;
     adb) [ "$PM" = brew ] && brew install --cask android-platform-tools || pm_install x android-tools-adb ;;

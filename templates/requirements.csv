@@ -1,0 +1,2 @@
+ID,Module,Source,Section,Text,Type,Priority,Version,Status,Notes
+REQ-EXAMPLE-001,EXAMPLE,docs/example-prd.pdf,2.1,Valid input is accepted and a success screen is shown,Functional,P0,1,Draft,

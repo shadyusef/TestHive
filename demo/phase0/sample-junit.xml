@@ -1,0 +1,7 @@
+<testsuites>
+  <testsuite name="signup">
+    <testcase name="TC-SIGNUP-001_valid_signup" time="12.4"/>
+    <testcase name="TC-SIGNUP-002_duplicate_email" time="9.8"><failure message="Expected 'Email already registered' but saw 'Something went wrong'"/></testcase>
+    <testcase name="TC-SIGNUP-003_arabic_success_message" time="11.1"/>
+  </testsuite>
+</testsuites>

@@ -37,7 +37,9 @@ Plan -> cases -> automate P0/P1 first -> run -> triage failures -> review -> fix
 ## One-step setup
 `bash scripts/setup.sh --check` lists missing tools; `--install` installs them after you agree. TestHive runs the check automatically on first use in a project.
 
-Windows: `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Check` (or `-Install`). Windows blocks `.ps1` files by default, so the `-ExecutionPolicy Bypass` part is needed. All other scripts are bash: run them from Git Bash, which is installed with Git.
+Windows: `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Check` (or `-Install`). Windows blocks `.ps1` files by default, so the `-ExecutionPolicy Bypass` part is needed. All other scripts are bash.
+
+**Windows (PowerShell or cmd):** every `bash scripts/<name>.sh ...` command in these docs can be typed as `.\hive <name> ...`, for example `.\hive stage status SIGNUP` or `.\hive demo/phase0/run.sh`. `hive.cmd` finds Git Bash by itself. To type `bash` directly instead, run `setup.ps1 -AddBashToPath` once.
 
 ## Use it for your own project
 1. On GitHub click **Use this template** (or clone), and open the folder.
@@ -48,6 +50,18 @@ Windows: `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Check` (or
 6. Start the Lead: `claude --agent testhive-lead`, and give it the module name.
 
 Handing it to a colleague: send them the repo link and these 6 steps. Nothing else is needed; `.env` stays on each machine.
+
+## Stages and approvals
+Each module moves through six stages: analysis, design, tools, automation, execution, reporting. A stage cannot start until a named person approves the one before it, and every decision is logged in `workflow/APPROVALS.md`.
+```
+bash scripts/stage.sh init SIGNUP
+bash scripts/stage.sh status SIGNUP
+bash scripts/stage.sh approve SIGNUP analysis --by "<your name>" --comment "..."
+```
+- `scripts/collect-run.sh` stores each test run in `runs/<RUN-ID>/` in one format for every tool, with its evidence.
+- `scripts/mask.sh` hides names, emails, phones, national IDs, IBANs and card numbers (Arabic and English) before documents are sent to Claude, and restores them afterwards. Numbers are checked (Luhn, mod-97, ID check digit) so order numbers are not hidden by mistake. `suggest` proposes names to hide, `review` shows every match in context, `.mask-allow` lists values never to hide, and images (screenshots, Figma exports) are blacked out with OCR once Tesseract is installed (`setup -Ocr`).
+- Every `run-mobile.sh`, `run-api.sh` and `run-web.sh` run is stored automatically in `runs/`.
+- Formats: [docs/FORMATS.md](docs/FORMATS.md). Demo: `bash demo/phase0/run.sh` (Windows: `.\hive demo/phase0/run.sh`).
 
 ## Requirements
 - [Claude Code](https://claude.com/claude-code) (or Claude desktop app with the project folder connected)

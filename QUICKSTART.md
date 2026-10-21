@@ -4,7 +4,9 @@
 Click **Use this template** on GitHub (or clone/download), then rename the folder for your project.
 
 ## 2. Install the tools (one step)
-`bash scripts/setup.sh --check` shows what is missing; `bash scripts/setup.sh --install` installs it. On Windows use `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Check` (or `-Install`); run every other script from Git Bash. Add `--web` (`-Web`) for Playwright. TestHive also runs this check itself the first time you call it in a project. Manual steps (phone USB debugging, Xcode on Mac) are printed at the end.
+`bash scripts/setup.sh --check` shows what is missing; `bash scripts/setup.sh --install` installs it. On Windows use `powershell -ExecutionPolicy Bypass -File scripts\setup.ps1 -Check` (or `-Install`). Add `--web` (`-Web`) for Playwright and `--ocr` (`-Ocr`) for image masking with Arabic. TestHive also runs this check itself the first time you call it in a project. Manual steps (phone USB debugging, Xcode on Mac) are printed at the end.
+
+**Windows (PowerShell or cmd):** every `bash scripts/<name>.sh ...` command in these docs can be typed as `.\hive <name> ...`, for example `.\hive stage status SIGNUP` or `.\hive demo/phase0/run.sh`. `hive.cmd` finds Git Bash by itself. To type `bash` directly instead, run `setup.ps1 -AddBashToPath` once.
 
 What it covers, if you prefer to install by hand:
 - Maestro CLI, Java 17+, Android platform-tools (`adb`), Python 3, Node.js, and `npm i -g newman`.

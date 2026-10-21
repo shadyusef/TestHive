@@ -11,7 +11,13 @@
       "Read(./.env)",
       "Read(./.env.*)",
       "Bash(git push)",
-      "Bash(git push *)"
+      "Bash(git push *)",
+      "Bash(bash scripts/mask.sh suggest *)",
+      "Bash(bash scripts/mask.sh review *)",
+      "Bash(bash scripts/hive.sh mask suggest *)",
+      "Bash(bash scripts/hive.sh mask review *)",
+      "Read(./.mask-map.json)",
+      "Read(./.mask-terms)"
     ]
   }
 }

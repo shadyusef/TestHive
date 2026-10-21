@@ -1,0 +1,7 @@
+Module: Signup (sample, fictional data)
+
+1. The customer أحمد الحربي (ahmed.harbi@example.com) registers with a mobile number such as +966 55 123 4567 or 0551234567.
+2. The national ID (e.g. 1012345672) must be 10 digits and start with 1 or 2. Order numbers like 1012345678 are not personal data.
+3. Acme Bank refunds go to the IBAN SA03 8000 0000 6080 1016 7519; card 4111 1111 1111 1111 is used for payment tests.
+4. Questions go to Mr. John Smith or المهندس خالد العتيبي. The office line +966 11 000 0000 is public.
+5. يجب أن تظهر رسالة "تم التسجيل بنجاح" بعد التسجيل.
