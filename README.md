@@ -4,7 +4,7 @@ TestHive is a team of AI QA agents that runs inside [Claude Code](https://claude
 
 Everything lives as plain files in your project folder, so the work is visible, reviewable in git, and does not depend on any one chat or person.
 
-![How TestHive works](docs/testhive-diagram.png)
+![The TestHive team](docs/testhive-diagram.png)
 
 > **Status (v0.2.0).** The agent team, the scripts and the phase 0 foundations (stage gates, approval log, run storage, masking) work today. The guided pipeline (analysis workbook, Excel test cases, tool advice, HTML reports, a UI) is being built phase by phase: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
@@ -16,7 +16,8 @@ Everything lives as plain files in your project folder, so the work is visible, 
 | Python 3, Node.js, Java 17+, Maestro, adb, Newman | Scripts, mobile and API runs | `setup --install` installs them |
 | An Android phone with USB debugging, or an emulator | Mobile tests | You |
 | A Mac (or BrowserStack, later phase) | iOS tests; Windows cannot run the iOS Simulator | You |
-| Optional: Tesseract OCR | Blacking out personal data in screenshots | `setup --install --ocr`; **needs admin rights on Windows** |
+| Optional: Tesseract OCR | Blacking out personal data in screenshots | `setup --install --ocr` |
+| Administrator rights on Windows, or IT help | Several installers (Git, Node.js, Python, Java, Tesseract) install for all users and ask for admin rights. Maestro, adb, Newman and Claude Code do not. | You / IT |
 
 ## Start in 10 minutes
 Commands are shown for **Windows PowerShell** (`.\hive ...`). On macOS/Linux type `bash scripts/hive.sh ...` instead of `.\hive ...`.
