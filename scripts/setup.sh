@@ -22,6 +22,7 @@ py_ok() { for c in python3 python "py -3"; do $c -c "import sys; sys.exit(sys.ve
 PYPKGS="see requirements.txt"
 pypkgs_ok() { [ -n "$PYC" ] && $PYC -c "import openpyxl, pypdf, docx, PIL, pytesseract" >/dev/null 2>&1; }
 TESS=tesseract; have tesseract || { [ -x "/c/Program Files/Tesseract-OCR/tesseract.exe" ] && TESS="/c/Program Files/Tesseract-OCR/tesseract.exe"; }
+UD="${LOCALAPPDATA:+$LOCALAPPDATA/TestHive/tessdata}"; [ -z "$TESSDATA_PREFIX" ] && [ -n "$UD" ] && [ -d "$UD" ] && export TESSDATA_PREFIX="$UD"
 ocr_ok() { "$TESS" --list-langs 2>/dev/null | tr -d '\r' | grep -qx ara; }
 
 check_all() {

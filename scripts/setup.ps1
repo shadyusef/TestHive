@@ -18,7 +18,12 @@ function PyCmd {
 }
 function PyPkgsOk { $p = PyCmd; if (-not $p) { return $false }; & $p -c 'import openpyxl, pypdf, docx, PIL, pytesseract' 2>$null | Out-Null; return ($LASTEXITCODE -eq 0) }
 function TessExe { if (Have tesseract) { return 'tesseract' }; $p = Join-Path $env:ProgramFiles 'Tesseract-OCR\tesseract.exe'; if (Test-Path $p) { return $p }; return $null }
-function OcrOk { $t = TessExe; if (-not $t) { return $false }; return [bool]((& $t --list-langs 2>$null) -match '^ara$') }
+function OcrOk {
+  $t = TessExe; if (-not $t) { return $false }
+  $ud = Join-Path $env:LOCALAPPDATA 'TestHive\tessdata'   # where -Ocr puts Arabic; a terminal opened earlier may lack TESSDATA_PREFIX
+  if (-not $env:TESSDATA_PREFIX -and (Test-Path $ud)) { $env:TESSDATA_PREFIX = $ud }
+  return [bool]((& $t --list-langs 2>$null) -match '^ara$')
+}
 function GitBashDir {
   $g = Get-Command git -ErrorAction SilentlyContinue
   $c = @(); if ($g) { $c += (Join-Path (Split-Path (Split-Path $g.Source)) 'bin') }
@@ -42,7 +47,7 @@ if ($Ocr) { $tools += @{n='tesseract'; ok={OcrOk}; id='UB-Mannheim.TesseractOCR'
 function Report {
   $script:missing = @()
   foreach ($t in $tools) { if (& $t.ok) { "OK       $($t.n)" } else { "MISSING  $($t.n)"; $script:missing += $t } }
-  if (-not $Ocr) { if (OcrOk) { 'OK       tesseract (with Arabic)' } else { 'OPTIONAL tesseract + Arabic (image masking): add -Install -Ocr' } }
+  if (-not $Ocr) { if (OcrOk) { 'OK       tesseract (with Arabic)' } else { 'OPTIONAL tesseract + Arabic (image masking): .\hive setup --install --ocr  (needs admin rights)' } }
 }
 function Install-Maestro {
   $dir = Join-Path $env:USERPROFILE 'maestro'
