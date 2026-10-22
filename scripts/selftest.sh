@@ -15,6 +15,8 @@ tmpd() { mktemp -d "$TROOT/t.XXXXXX"; }
 for f in scripts/*.sh; do bash -n "$f"; done
 bash scripts/setup.sh --help >/dev/null
 for f in api/collections/*.json api/environments/*.json .claude/settings.json web/package.json; do $PY -c "import json,sys;json.load(open(sys.argv[1], encoding='utf-8'))" "$f"; done
+# unit tests of the Python libraries and Studio's API (tests/; each test uses its own temporary project)
+U=$(TH_BASH="$(cygpath -w "$BASH" 2>/dev/null || echo "$BASH")" $PY -m unittest discover -s tests 2>&1) || { echo "$U" | grep -v ResourceWarning | tail -30; echo "unit tests failed"; exit 1; }
 # gate: template passes; API-style IDs and Excel's BOM are accepted; bad IDs, bad priorities and unproven "Done" are rejected
 bash scripts/gate.sh templates/TestCases.csv
 G=$(tmpd)

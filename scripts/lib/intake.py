@@ -3,7 +3,8 @@
   PROJECT_BRIEF.md, CONTEXT.md     project facts (template placeholders replaced)
   .env                             only the non-secret keys in ENV_KEYS; passwords and tokens stay for the human to add
   requirements/modules/<M>.json    module title, URL or APK to explore, test-environment flag, masking choice
-  requirements/sources/<M>/        uploaded documents; an older file of the same name moves to _old/<time>/
+  requirements/sources/<M>/        uploaded documents; an older file of the same name, or a removed one, moves to _old/<time>/
+  requirements/sources/<M>/_old/history.csv   who uploaded, replaced, removed or restored which document, and when
   requirements/apps/<M>/           uploaded APKs (git-ignored)"""
 import sys, os, re, json, csv, time, glob, shutil, subprocess, calendar
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -134,7 +135,132 @@ def safe_name(name):
     return name
 
 
-def save_upload(module, name, data, kind="source"):
+def stamp(): return time.strftime("%Y%m%d-%H%M%S")
+
+
+def utc(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+
+OLD = re.compile(r"\d{8}-\d{6}(-\d+)?")  # an _old/ folder: the time, and a counter when two changes fall in the same second
+
+
+def keep_old(module, rel, folder=None):
+    """Moves the current file rel (a path inside the module's folder) to _old/<time>/; returns where it went.
+    Never overwrites: a second change in the same second goes to _old/<time>-2/."""
+    folder = folder or os.path.join(SOURCES, module)
+    base, n = stamp(), 1
+    while os.path.exists(os.path.join(folder, "_old", base if n == 1 else f"{base}-{n}", rel)): n += 1
+    old = os.path.join(folder, "_old", base if n == 1 else f"{base}-{n}", rel)
+    os.makedirs(os.path.dirname(old), exist_ok=True); shutil.move(os.path.join(folder, rel), old)
+    return old.replace(os.sep, "/")
+
+
+def log_change(module, action, name, by=""):
+    p = os.path.join(SOURCES, module, "_old", "history.csv")
+    os.makedirs(os.path.dirname(p), exist_ok=True); new = not os.path.exists(p)
+    with open(p, "a", encoding="utf-8", newline="") as f:
+        w = csv.writer(f, lineterminator="\n")
+        if new: w.writerow(["When", "Action", "Document", "By"])
+        w.writerow([utc(), action, name, " ".join(str(by).split())[:60]])
+
+
+def history(module):
+    p = os.path.join(SOURCES, module, "_old", "history.csv")
+    if not os.path.exists(p): return []
+    with open(p, encoding="utf-8", newline="") as f: return list(csv.DictReader(f))
+
+
+def doc_name(name):
+    """A document name inside a module folder (may contain sub-folders), checked part by part; None if not allowed."""
+    parts = str(name).replace("\\", "/").split("/")
+    if not all(safe_name(p) == p for p in parts) or "_old" in parts: return None
+    return "/".join(parts)
+
+
+def source_file(module, name):
+    """The path of one current document of the module, or None."""
+    rel = doc_name(name)
+    if not rel: return None
+    folder = os.path.realpath(os.path.join(SOURCES, module))
+    p = os.path.realpath(os.path.join(folder, rel))
+    return p if p.startswith(folder + os.sep) and os.path.isfile(p) else None
+
+
+def forget_text(module, rel):
+    """Drops what TestHive read from one document (its line in index.csv and its text file), so the analyst never reads
+    a removed or replaced document. Only TestHive's own output in analysis/sources-text/<M>/ is touched."""
+    out_dir = os.path.join(ANALYSIS, "sources-text", module)
+    idx, src = os.path.join(out_dir, "index.csv"), f"{SOURCES}/{module}/{rel}"
+    if not os.path.exists(idx): return
+    with open(idx, encoding="utf-8-sig", newline="") as f: rows = list(csv.DictReader(f))
+    for r in rows:
+        read_from = os.path.realpath(r.get("Read from") or "")
+        if r["Source"] == src and read_from.startswith(os.path.realpath(out_dir) + os.sep) and os.path.isfile(read_from): os.remove(read_from)
+    with open(idx, "w", encoding="utf-8", newline="") as f:
+        w = csv.DictWriter(f, ["Source", "Type", "Read from", "Words", "Masked"], lineterminator="\n", extrasaction="ignore")
+        w.writeheader(); w.writerows(r for r in rows if r["Source"] != src)
+
+
+def source_text(module, name):
+    """What TestHive read from one document: {"text": ...} or an explanation."""
+    rel = doc_name(name)
+    idx = os.path.join(ANALYSIS, "sources-text", module, "index.csv")
+    if not rel or not os.path.exists(idx): return {"text": "", "note": "Not read yet: press 'Read the documents'."}
+    with open(idx, encoding="utf-8-sig", newline="") as f:
+        row = next((r for r in csv.DictReader(f) if r["Source"] == f"{SOURCES}/{module}/{rel}"), None)
+    if not row: return {"text": "", "note": "Not read yet: press 'Read the documents'."}
+    if row["Type"] == "image": return {"text": "", "note": "An image: Claude looks at the picture itself (open the original)."}
+    path = os.path.realpath(row["Read from"])
+    if not path.startswith(os.path.realpath(os.path.join(ANALYSIS, "sources-text", module)) + os.sep) or not os.path.isfile(path):
+        return {"text": "", "note": "The text file is missing: read the documents again."}
+    text = read(path)
+    return {"text": re.sub(r"^<!-- source:.*?-->\n", "", text), "words": row["Words"], "masked": row["Masked"] == "yes"}
+
+
+def remove_source(module, name, by):
+    rel = doc_name(name)
+    if not rel or not source_file(module, rel): return False, "That document is not in the module."
+    kept = keep_old(module, rel); forget_text(module, rel); log_change(module, "removed", rel, by)
+    return True, f"Removed {rel}. It is kept in {os.path.dirname(kept)}/ and can be restored (Earlier versions)."
+
+
+def versions(module):
+    """Earlier versions and removed documents, newest first."""
+    old = os.path.join(SOURCES, module, "_old")
+    out = []
+    for d in sorted(glob.glob(os.path.join(old, "*")), reverse=True):
+        v = os.path.basename(d)
+        if not os.path.isdir(d) or not OLD.fullmatch(v): continue
+        for p in sorted(glob.glob(os.path.join(d, "**", "*"), recursive=True)):
+            if os.path.isfile(p):
+                out.append({"version": v, "name": os.path.relpath(p, d).replace(os.sep, "/"), "size": os.path.getsize(p),
+                            "kept": f"{v[:4]}-{v[4:6]}-{v[6:8]} {v[9:11]}:{v[11:13]}",
+                            "current": bool(source_file(module, os.path.relpath(p, d)))})
+    return out
+
+
+def old_file(module, version, name):
+    rel = doc_name(name)
+    if not rel or not OLD.fullmatch(str(version)): return None
+    base = os.path.realpath(os.path.join(SOURCES, module, "_old", version))
+    p = os.path.realpath(os.path.join(base, rel))
+    return p if p.startswith(base + os.sep) and os.path.isfile(p) else None
+
+
+def restore_source(module, version, name, by):
+    """Puts an earlier version back as the current document; the current one (if any) is kept in _old/ first."""
+    src, rel = old_file(module, version, name), doc_name(name)
+    if not src: return False, "That earlier version does not exist."
+    note = ""
+    if source_file(module, rel): note = f" The version it replaced is kept in {os.path.dirname(keep_old(module, rel))}/."
+    target = os.path.join(SOURCES, module, rel)
+    os.makedirs(os.path.dirname(target), exist_ok=True)
+    shutil.copyfile(src, target)  # a copy with today's time: the earlier version stays in _old/, and TestHive reads it again
+    forget_text(module, rel); log_change(module, f"restored {version}", rel, by)
+    return True, f"Restored {rel} from {version}.{note} Read the documents again so the analyst sees it."
+
+
+def save_upload(module, name, data, kind="source", by=""):
     """Saves an uploaded file in the module's folder. Returns (ok, message)."""
     name = safe_name(name)
     if not name: return False, "File name not allowed: use letters, digits, spaces, - _ . ( ) only."
@@ -149,15 +275,17 @@ def save_upload(module, name, data, kind="source"):
         if len(data) > MAX_DOC: return False, f"{name} is larger than 25 MB."
         folder = os.path.join(SOURCES, module)
     os.makedirs(folder, exist_ok=True)
-    target, note = os.path.join(folder, name), ""
-    if os.path.exists(target):  # keep the earlier version; nothing is deleted
-        old = os.path.join(folder, "_old", time.strftime("%Y%m%d-%H%M%S"))
-        os.makedirs(old, exist_ok=True); shutil.move(target, os.path.join(old, name))
+    target, note, replaced = os.path.join(folder, name), "", os.path.exists(os.path.join(folder, name))
+    if replaced:  # keep the earlier version; nothing is deleted
+        old = os.path.dirname(keep_old(module, name, folder))
         note = f" (the earlier version is kept in {old.replace(os.sep, '/')}/)"
     with open(target + ".part", "wb") as f: f.write(data)
     os.replace(target + ".part", target)
     if kind == "apk":
         m = meta(module); m["apk"] = target.replace(os.sep, "/"); save_meta(module, m)
+    else:
+        if replaced: forget_text(module, name)
+        log_change(module, "replaced" if replaced else "uploaded", name, by)
     return True, f"Saved {name}{note}."
 
 
@@ -180,9 +308,15 @@ def sources(module, approved_at=""):
                       "type": row["Type"] if row else os.path.splitext(p)[1].lstrip(".").lower(), "words": row["Words"] if row else "",
                       "masked": row["Masked"] if row else "", "read": bool(row) and mt <= read_at + 1,
                       "after_approval": bool(approved) and mt > approved})
-    old = sorted({os.path.basename(os.path.dirname(p)) for p in glob.glob(os.path.join(folder, "_old", "*", "*"))})
+    changed = {}  # document -> what happened to it after the analysis was approved
+    if approved:
+        for h in history(module):
+            if calendar.timegm(time.strptime(h["When"], "%Y-%m-%dT%H:%M:%SZ")) > approved: changed[h["Document"]] = h["Action"].split()[0]
+        for f in files:
+            if f["after_approval"]: changed.setdefault(f["name"], "changed")
     return {"files": files, "read_at": time.strftime("%Y-%m-%d %H:%M", time.localtime(read_at)) if read_at else "",
-            "old_versions": len(old), "apk": meta(module).get("apk", "")}
+            "old_versions": len(versions(module)), "apk": meta(module).get("apk", ""),
+            "changed_after_approval": [{"name": n, "action": a} for n, a in sorted(changed.items())]}
 
 
 def ingest(module, mask):

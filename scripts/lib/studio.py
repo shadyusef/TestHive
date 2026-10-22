@@ -5,9 +5,10 @@ scripts/stage.sh, so the rules are identical. Every API call needs the random to
 A save is refused (409) when the files changed since the page read them (an agent or Excel wrote in between)."""
 import sys, os, re, glob, json, time, hashlib, secrets, subprocess, tempfile, threading, webbrowser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analysis, design, intake, jobs
+import modules as archive
 from analysis import read_csv, refs
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -21,10 +22,14 @@ TOKEN = secrets.token_urlsafe(18)
 WRITE = threading.Lock()
 
 
+def read_bytes(p):
+    with open(p, "rb") as f: return f.read()
+
+
 def digest(*paths):
     h = hashlib.sha1()
     for p in paths:
-        h.update(open(p, "rb").read() if os.path.exists(p) else b"-")
+        h.update(read_bytes(p) if os.path.exists(p) else b"-")
     return h.hexdigest()[:16]
 
 
@@ -76,6 +81,11 @@ def step(text, command="", run=""):
 
 def next_step(module, m, info):
     """What the human does next, in plain words; 'run' names the action behind the Run button, 'command' the same in Claude Code."""
+    changed = info["sources"]["changed_after_approval"]
+    if changed and m["stages"]["analysis"]["status"] == "approved":
+        names = ", ".join(f"{c['name']} ({c['action']})" for c in changed[:4]) + (", …" if len(changed) > 4 else "")
+        return step(f"{len(changed)} requirement document(s) changed after the analysis was approved: {names}. Reopen the analysis "
+                    "(Sources tab) so the analyst reads them; after the new approval TestHive shows which test cases are affected.")
     for st in STAGES:
         status = m["stages"][st]["status"]
         if status == "approved": continue
@@ -195,7 +205,7 @@ def module_info(module):
     info["readiness"] = readiness(module, m, info)
     info["next"] = next_step(module, m, info)
     if info["next"]["run"]: info["next"].update(title=ACTIONS[info["next"]["run"]]["title"], minutes=ACTIONS[info["next"]["run"]]["minutes"])
-    info["jobs"] = jobs.listing(module)[:15]
+    info["jobs"], info["agents"] = jobs.listing(module)[:15], agents_mode()
     job = jobs.running(module)
     info["job"] = dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None
     return info
@@ -228,7 +238,9 @@ def readiness(module, m, info):
         nu = sum(1 for c in act if c["Status"] == "Needs update")
         if nu: notes.append(f"{nu} cases need an update after a requirement change")
     if info["design"]["assumptions"]: notes.append(f"{len(info['design']['assumptions'])} open questions the cases still rely on")
-    return {"ready": all(i["ok"] for i in items), "items": items, "notes": notes}
+    changed = info["sources"]["changed_after_approval"] if st["analysis"] == "approved" else []
+    if changed: notes.insert(0, f"{len(changed)} requirement document(s) changed after the analysis was approved: reopen the analysis first")
+    return {"ready": all(i["ok"] for i in items) and not changed, "items": items, "notes": notes}
 
 
 def agents_mode():
@@ -243,9 +255,10 @@ def busy(module):
 def approvals(module):
     if not os.path.exists(LOG): return []
     out = []
-    for line in open(LOG, encoding="utf-8"):
-        p = [x.strip() for x in line.strip().strip("|").split("|")]
-        if len(p) == 6 and p[1] == module: out.append(dict(zip(["When", "Module", "Stage", "Decision", "By", "Comment"], p)))
+    with open(LOG, encoding="utf-8") as f:
+        for line in f:
+            p = [x.strip() for x in line.strip().strip("|").split("|")]
+            if len(p) == 6 and p[1] == module: out.append(dict(zip(["When", "Module", "Stage", "Decision", "By", "Comment"], p)))
     return out[::-1]
 
 
@@ -322,7 +335,7 @@ def get_workbook(h, q, body, module):
         out = os.path.join(tmp, f"{module}-{kind}.xlsx")
         try: lib.cmd_workbook([module, out])
         except SystemExit: return h.send(400, {"error": f"no {kind} workbook for {module} yet"})
-        data = open(out, "rb").read()
+        data = read_bytes(out)
     return h.send(200, data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                   {"Content-Disposition": f'attachment; filename="{module}-{kind}.xlsx"'})
 
@@ -346,8 +359,78 @@ def post_upload(h, q, body, module):  # a filled workbook, read with the normal 
 
 @api("POST", "/api/source", module="query", busy_check=True, raw=True)
 def post_source(h, q, body, module):  # one uploaded document or APK as raw bytes; its name comes in the address
-    ok, msg = intake.save_upload(module, arg(q, "name"), body, arg(q, "kind") or "source")
+    ok, msg = intake.save_upload(module, arg(q, "name"), body, arg(q, "kind") or "source", arg(q, "by"))
     return h.send(200 if ok else 400, {"ok": ok, "message": msg})
+
+
+VIEW = {".pdf": "application/pdf", ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".gif": "image/gif",
+        ".bmp": "image/bmp", ".webp": "image/webp", **{e: "text/plain; charset=utf-8" for e in (".txt", ".md", ".csv", ".json", ".yaml", ".yml")}}
+
+
+@api("GET", "/api/source-file", module="query")
+def get_source_file(h, q, body, module):  # the original document (or an earlier version) to open in the browser
+    p = intake.old_file(module, arg(q, "version"), arg(q, "name")) if arg(q, "version") else intake.source_file(module, arg(q, "name"))
+    if not p: return h.send(404, {"error": "unknown document"})
+    ctype = VIEW.get(os.path.splitext(p)[1].lower())
+    extra = {"Content-Disposition": f"{'inline' if ctype else 'attachment'}; filename*=UTF-8''{quote(os.path.basename(p))}"}
+    if ctype != "application/pdf": extra["Content-Security-Policy"] = "sandbox"  # nothing in a document runs (the PDF viewer needs scripts)
+    return h.send(200, read_bytes(p), ctype or "application/octet-stream", extra)
+
+
+@api("GET", "/api/source-text", module="query")
+def get_source_text(h, q, body, module): return h.send(200, intake.source_text(module, arg(q, "name")))
+
+
+@api("GET", "/api/source-versions", module="query")
+def get_source_versions(h, q, body, module):
+    return h.send(200, {"versions": intake.versions(module), "history": intake.history(module)[::-1][:100]})
+
+
+def signer(body):
+    """The name that signs a change, or an error."""
+    by = " ".join(str(body.get("by", "")).split())
+    if not by: return None, "Your name is needed: changes are signed."
+    if "|" in by or len(by) > 60: return None, "Name: one line, without |, up to 60 characters."
+    return by, None
+
+
+@api("POST", "/api/source-remove", module="body", busy_check=True)
+def post_source_remove(h, q, body, module):
+    by, err = signer(body)
+    ok, msg = (False, err) if err else intake.remove_source(module, body.get("name", ""), by)
+    return h.send(200 if ok else 400, {"ok": ok, "message": msg})
+
+
+@api("POST", "/api/source-restore", module="body", busy_check=True)
+def post_source_restore(h, q, body, module):
+    by, err = signer(body)
+    ok, msg = (False, err) if err else intake.restore_source(module, str(body.get("version", "")), body.get("name", ""), by)
+    return h.send(200 if ok else 400, {"ok": ok, "message": msg})
+
+
+@api("GET", "/api/archive")
+def get_archive(h, q, body, module): return h.send(200, {"archived": archive.listing()})
+
+
+@api("POST", "/api/module-archive", module="body", busy_check=True)
+def post_module_archive(h, q, body, module):
+    by, err = signer(body)
+    why = " ".join(str(body.get("comment", "")).split())
+    if not err and str(body.get("confirm", "")).strip().upper() != module: err = f"Type {module} to confirm."
+    if not err and (not why or "|" in why): err = "Say why (one line, without |)."
+    if err: return h.send(400, {"ok": False, "message": err})
+    code, out = run_stage(["archive", module, "--by", by, "--comment", why])
+    return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
+
+
+@api("POST", "/api/module-restore", lock=True)
+def post_module_restore(h, q, body, module):
+    by, err = signer(body)
+    name = str(body.get("archive", ""))
+    if not err and not archive.NAME.fullmatch(name): err = "Unknown archive."
+    if err: return h.send(400, {"ok": False, "message": err})
+    code, out = run_stage(["restore", name, "--by", by])
+    return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
 
 
 @api("POST", "/api/project", lock=True)
@@ -462,7 +545,7 @@ class Handler(BaseHTTPRequestHandler):
         if method == "GET" and u.path in STATIC:  # the page itself carries no data: no token needed, but only on this PC
             if not self.local(): return self.send(403, {"error": "forbidden"})
             name, ctype = STATIC[u.path]
-            return self.send(200, open(os.path.join(PAGE_DIR, name), "rb").read(), ctype, {"Content-Security-Policy": CSP})
+            return self.send(200, read_bytes(os.path.join(PAGE_DIR, name)), ctype, {"Content-Security-Policy": CSP})
         if not self.allowed(q): return self.send(403, {"error": "missing or wrong token: open the address printed by studio"})
         fn, o = ROUTES.get((method, u.path), (None, None))
         body = None

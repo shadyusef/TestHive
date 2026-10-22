@@ -4,7 +4,7 @@ Called by scripts/check-design.sh, design-workbook.sh, import-review.sh, design-
 Formats: docs/FORMATS.md (test case sheet, design requests, design workbook, design baselines)."""
 import sys, os, re, csv, json, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from analysis import read_csv, write_csv, refs, die, add_sheet, dropdown, REQ_COLS, GAP_COLS, DIR as ADIR
+from analysis import read_csv, write_csv, refs, die, stage_status, add_sheet, dropdown, REQ_COLS, GAP_COLS, DIR as ADIR
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 TC_DIR = os.environ.get("TH_CASES", "test-cases")
@@ -239,6 +239,9 @@ def apply_review(module, case_rows, ask_rows, source="Excel"):
     A case row: ID with Review / Review Comment (and any EDITABLE column the human changed), or an empty ID for a new case.
     A request row: an empty ID with Request and Requested By. Used by the Excel import and by TestHive Studio.
     Returns (decided, edited, new_cases, new_asks, errors); nothing is written if errors."""
+    if stage_status(module, "design") == "approved":  # the approved cases are a frozen baseline: a change starts with a reopen
+        return {r: 0 for r in REVIEWS}, 0, 0, 0, [f"The design of {module} is approved, so its cases are read-only. "
+                                                  "To change them, reopen the design (Approvals) and say why."]
     rows = read_csv(CASE_FILE, CASE_COLS)
     by_id = {c["ID"]: c for c in rows}
     nums = [int(c["ID"].rsplit("-", 1)[1]) for c in rows if re.fullmatch(rf"TC-{module}-\d{{3}}", c["ID"])]

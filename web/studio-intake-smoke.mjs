@@ -40,6 +40,25 @@ await page.getByText('Personal data', { exact: true }).click();
 await page.getByRole('button', { name: 'Check the documents' }).click();
 await check('the personal-data check lists what masking would hide', async () => { await page.getByText(/Names TestHive is not sure about/).waitFor(); });
 await shot('3-masking');
+const doc = file.split(/[\\/]/).pop(), row = () => page.locator('tbody tr').filter({ hasText: doc }).filter({ has: page.locator('[data-rm]') });
+const dlg = page.getByRole('dialog');
+await check('Remove asks in the page and takes the document out of the list', async () => {
+  await row().getByRole('button', { name: 'Remove' }).click(); await dlg.getByRole('button', { name: 'Remove' }).click();
+  await row().waitFor({ state: 'detached' }); });
+await check('Earlier versions shows it as removed, and Restore brings it back', async () => {
+  await page.getByText('Earlier versions and removed documents').click(); await page.getByText('removed', { exact: true }).first().waitFor();
+  await shot('3b-versions'); await page.locator('[data-restore]').first().click(); await dlg.getByRole('button', { name: 'Restore' }).click(); await row().waitFor(); });
+const mod = (await page.locator('h2').first().textContent()).trim().split(/\s/)[0];
+await check('Archive needs the module code typed, then moves the module to Archived modules', async () => {
+  await page.getByText('Archive this module').click(); await page.getByRole('button', { name: /^Archive / }).click();
+  if (!(await dlg.getByRole('button', { name: 'Continue' }).isDisabled())) throw new Error('Continue enabled before the code is typed');
+  await dlg.locator('input').fill(mod); await dlg.getByRole('button', { name: 'Continue' }).click();
+  await dlg.locator('input').fill('Smoke test: archive and restore'); await dlg.getByRole('button', { name: `Archive ${mod}` }).click();
+  await page.getByText(/^Archived modules \(1\)/).waitFor(); });
+await check('Restore from the start page brings the module back', async () => {
+  await page.getByText(/^Archived modules/).click(); await shot('3c-archived'); await page.locator('[data-unarch]').click();
+  await dlg.getByRole('button', { name: 'Restore' }).click(); await page.locator('.module-card').first().waitFor();
+  if (await page.getByText(/^Archived modules/).count()) throw new Error('still listed as archived'); });
 await page.getByRole('button', { name: 'Project' }).click();
 await check('the Project page shows the saved facts', async () => { await page.getByRole('heading', { name: 'Project details' }).waitFor();
   if ((await page.locator('#p-project').inputValue()) !== 'Nakhla Rewards') throw new Error('project name not shown'); });

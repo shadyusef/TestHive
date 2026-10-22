@@ -77,6 +77,7 @@ td.id { white-space: nowrap; font-family: Consolas, "Cascadia Mono", monospace; 
 .form label { padding-top: 5px; color: var(--muted); }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.45); display: flex; align-items: center; justify-content: center; z-index: 10; }
 .modal .card { width: min(460px, 92vw); }
+.modal .card.wide { width: min(920px, 94vw); max-height: 86vh; overflow: auto; }
 ul.plain { margin: 4px 0; padding-inline-start: 18px; }
 .crumb { cursor: pointer; color: var(--accent); }
 @media (max-width: 700px) { .cards { grid-template-columns: 1fr; } .form { grid-template-columns: 1fr; } main { padding: 12px 16px 80px; } }

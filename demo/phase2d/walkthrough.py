@@ -81,6 +81,38 @@ d = module()
 print("  readiness: " + "; ".join(f"{i['label']}: {'yes' if i['ok'] else 'no'}" for i in d["readiness"]["items"]))
 print(f"  Activity: {len(d['jobs'])} runs: " + ", ".join(f"{j['title'].split(':')[0]} {j['status']}" for j in d["jobs"][::-1]))
 step("2 of 3 approvals: only the tools (phase 3) remain", [i["ok"] for i in d["readiness"]["items"]] == [True, True, False])
+
+print("--- after the approvals: documents, changes and archiving")
+code, r = call("/api/review", {"module": "SIGNUP", "version": d["design"]["version"], "cases": [{"ID": "TC-SIGNUP-002", "Review": "Remove", "Review Comment": "x"}]})
+step(f"an approved design is read-only: {(r.get('errors') or [''])[0]}", code == 400)
+r = call("/api/source-text?m=SIGNUP&name=prd.pdf")[1]
+step(f"the text TestHive read from prd.pdf can be checked ({len(r.get('text', '').split())} words)", len(r.get("text", "").split()) > 100)
+raw = urllib.request.urlopen(urllib.request.Request(BASE + "/api/source-file?m=SIGNUP&name=prd.pdf", headers={"X-TestHive-Token": TOKEN})).read()
+step("the original document opens", raw.startswith(b"%PDF"))
+step("a path outside the module is refused", call("/api/source-file?m=SIGNUP&name=..%2F..%2F.env")[0] == 404)
+req = urllib.request.Request(BASE + "/api/source?m=SIGNUP&name=change-note.txt&by=Sara", data=b"New rule: the minimum age is 21.", method="POST",
+                             headers={"X-TestHive-Token": TOKEN, "Content-Type": "application/octet-stream"})
+urllib.request.urlopen(req).read()
+d = module()
+step(f"a document added after the approval: Next says {d['next']['text'][:70]}…", "changed after the analysis was approved" in d["next"]["text"])
+step("…and the module is not ready for automation any more", not d["readiness"]["ready"])
+code, r = call("/api/source-remove", {"module": "SIGNUP", "name": "change-note.txt", "by": "Sara (product owner)"})
+step(f"remove a document: {r.get('message')}", code == 200 and "change-note.txt" not in [f["name"] for f in module()["sources"]["files"]])
+v = call("/api/source-versions?m=SIGNUP")[1]
+kept = next((x for x in v["versions"] if x["name"] == "change-note.txt"), None)
+step(f"it is kept as a removed version; history: {', '.join(h['Action'] for h in v['history'][::-1])}", kept and not kept["current"])
+code, r = call("/api/source-restore", {"module": "SIGNUP", "version": kept["version"], "name": "change-note.txt", "by": "Sara (product owner)"})
+step(f"restore it: {r.get('message', '')[:60]}…", code == 200 and "change-note.txt" in [f["name"] for f in module()["sources"]["files"]])
+code, r = call("/api/module-archive", {"module": "SIGNUP", "by": "Sara (QA lead)", "comment": "demo", "confirm": "NOPE"})
+step(f"archiving needs the module code typed: {r.get('message')}", code == 400)
+code, r = call("/api/module-archive", {"module": "SIGNUP", "by": "Sara (QA lead)", "comment": "Demo: archive and restore", "confirm": "signup"})
+step(f"archive the module: {(r.get('message') or '').splitlines()[0]}", code == 200 and call("/api/module?m=SIGNUP")[0] == 404)
+arch = call("/api/archive")[1]["archived"]
+step(f"it is listed as archived ({arch[0]['files'] if arch else 0} files or folders, {arch[0]['rows'] if arch else 0} register rows)", len(arch) == 1)
+code, r = call("/api/module-restore", {"archive": arch[0]["name"], "by": "Sara (QA lead)"})
+d = module() if code == 200 else {}
+step(f"restore it: {(r.get('message') or '').splitlines()[-1]}", code == 200 and d["stages"][1]["status"] == "approved"
+     and sum(1 for c in d["design"]["cases"] if c["Status"] != "Removed") == 121)
 call("/api/shutdown", {})
 print("STUDIO RUN CHECK " + ("PASS" if not failed else f"FAIL ({len(failed)})"))
 sys.exit(1 if failed else 0)

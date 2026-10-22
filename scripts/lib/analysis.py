@@ -35,6 +35,14 @@ def write_csv(path, cols, rows):
 def refs(cell): return [x.strip() for x in re.split(r"[;,]", cell or "") if x.strip()]
 
 
+def stage_status(module, stage):
+    """The stage's status in workflow/state.json (TH_STATE), '' if the module or the file is unknown."""
+    p = os.environ.get("TH_STATE", "workflow/state.json")
+    if not os.path.exists(p): return ""
+    with open(p, encoding="utf-8") as f: m = json.load(f).get("modules", {}).get(module.upper())
+    return m["stages"][stage]["status"] if m else ""
+
+
 def problems(module=None, for_approval=False):
     """Returns (errors, warnings) for the registers, limited to one module if given."""
     reqs, gaps = read_csv(REQ_FILE, REQ_COLS), read_csv(GAP_FILE, GAP_COLS)

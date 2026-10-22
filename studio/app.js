@@ -5,7 +5,7 @@ const TOKEN = new URLSearchParams(location.search).get('t') || '';
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const STAGE_LABEL = { analysis: 'Analysis', design: 'Design', tools: 'Tools', automation: 'Automation', execution: 'Execution', reporting: 'Reporting' };
 const STATUS_LABEL = { approved: 'approved', awaiting_approval: 'waiting for you', in_progress: 'in progress', pending: 'not started' };
-const S = { view: 'home', module: null, tab: 'sources', dtab: 'cases', data: null, dirty: {}, open: new Set(), filters: {} };
+const S = { view: 'home', module: null, tab: 'sources', dtab: 'cases', data: null, dirty: {}, open: new Set(), filters: {}, agents: 'live' };
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -29,6 +29,49 @@ function askName(then) {
   const done = () => { const v = inp.value.trim(); if (!v) return inp.focus(); store.set('th-name', v); m.remove(); $('#who').textContent = v; then && then(); };
   m.querySelector('#nmok').onclick = done; inp.onkeydown = e => { if (e.key === 'Enter') done(); };
 }
+/* In-page confirmation (instead of the browser's confirm()): resolves to true, false, or the typed text when opts.input is set.
+   opts: { ok: 'button text', danger: true, input: 'placeholder', match: 'text the input must equal' } */
+function ask(text, opts = {}) {
+  return new Promise(resolve => {
+    const m = document.createElement('div'); m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
+    m.innerHTML = `<div class="card"><p style="margin-top:0;white-space:pre-wrap" dir="auto">${esc(text)}</p>
+      ${opts.input ? `<input id="ask-in" style="width:100%" placeholder="${esc(opts.input)}" aria-label="${esc(opts.input)}">` : ''}
+      <p style="text-align:end;margin-bottom:0"><button id="ask-no">Cancel</button> <button id="ask-ok" class="${opts.danger ? 'danger' : 'primary'}">${esc(opts.ok || 'OK')}</button></p></div>`;
+    document.body.appendChild(m);
+    const inp = m.querySelector('#ask-in'), ok = m.querySelector('#ask-ok');
+    const close = v => { m.remove(); document.removeEventListener('keydown', key); resolve(v); };
+    const valid = () => !inp || (inp.value.trim() && (!opts.match || inp.value.trim().toUpperCase() === opts.match.toUpperCase()));
+    const yes = () => { if (valid()) close(inp ? inp.value.trim() : true); else inp.focus(); };
+    const key = e => { if (e.key === 'Escape') close(false); if (e.key === 'Enter' && document.activeElement?.tagName !== 'BUTTON') yes(); };
+    if (inp) { ok.disabled = !valid(); inp.oninput = () => ok.disabled = !valid(); }
+    ok.onclick = yes; m.querySelector('#ask-no').onclick = () => close(false);
+    document.addEventListener('keydown', key); (inp || ok).focus();
+  });
+}
+function panel(title, html) {  // a wide read-only window: document text, requirement details
+  const m = document.createElement('div'); m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
+  m.innerHTML = `<div class="card wide"><div class="bar"><h3 style="margin:0;flex:1" dir="auto">${esc(title)}</h3><button id="pn-x">Close</button></div>${html}</div>`;
+  document.body.appendChild(m);
+  const close = () => { m.remove(); document.removeEventListener('keydown', key); };
+  const key = e => { if (e.key === 'Escape') close(); };
+  m.querySelector('#pn-x').onclick = close; m.onclick = e => { if (e.target === m) close(); };
+  document.addEventListener('keydown', key); m.querySelector('#pn-x').focus();
+}
+/* Requirement IDs become links that show the requirement, its questions and its cases. */
+const reqLinks = text => esc(text).replace(/REQ-[A-Z0-9]+-\d+/g, id => `<span class="crumb" data-req="${id}">${id}</span>`);
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-req]'); if (!el || !S.data) return;
+  e.stopPropagation();
+  const id = el.dataset.req, a = S.data.analysis, d = S.data.design;
+  const r = a.requirements.find(x => x.ID === id) || (d.requirements || []).find(x => x.ID === id);
+  if (!r) return toast(`${id} is not in the requirements of ${S.module}.`, 'warn');
+  const qs = a.gaps.filter(g => refs(g.Requirement).includes(id)), cs = d.cases.filter(c => refs(c.Requirements).includes(id) && c.Status !== 'Removed');
+  panel(`${id} · ${r.Priority} · ${r.Type}`, `<p dir="auto" style="font-size:15px">${esc(r.Text)}</p>
+    <p class="small muted">Status ${esc(r.Status)} · from ${esc(r.Source)}${r.Section ? ', ' + esc(r.Section) : ''}${r.Notes ? ' · ' + esc(r.Notes) : ''}</p>
+    <h4>Questions (${qs.length})</h4>${qs.length ? `<ul class="plain">${qs.map(g => `<li dir="auto"><b>${esc(g.ID)}</b> ${esc(g.Status)}: ${esc(g.Question)}${g.Answer ? ` <span class="muted">→ ${esc(g.Answer)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted">None.</p>'}
+    <h4>Test cases (${cs.length})</h4>${cs.length ? `<ul class="plain">${cs.map(c => `<li dir="auto"><b>${esc(c.ID)}</b> ${esc(c.Priority)} ${esc(c.Title)}</li>`).join('')}</ul>` : '<p class="muted">None yet.</p>'}`);
+});
+const refs = cell => String(cell || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);
 function setTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 $('#theme').onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
   const t = cur === 'dark' ? 'light' : 'dark'; setTheme(t); store.set('th-theme', t); };
@@ -45,17 +88,37 @@ document.addEventListener('click', async e => {
   e.stopPropagation();
   const mod = b.closest('[data-mod]')?.dataset.mod || S.module;
   const script = b.dataset.run === 'explore-web';
-  if (!confirm(`${b.dataset.title} for ${mod}?\n\n${script ? 'Opens the built product in a hidden browser and records what it shows (free, no AI).' : 'Claude Code works in the background on this PC and uses your Claude plan.'} It usually takes ${b.dataset.min} minutes. You can keep using Studio; saving on ${mod} pauses until it finishes, and you can stop it at any time.`)) return;
+  const how = script ? `Opens the built product in a hidden browser and records what it shows (free, no AI). It usually takes ${b.dataset.min} minutes.`
+    : S.agents === 'recorded' ? 'Replays a recorded run of the agent (demo: free, a few seconds).'
+    : `Claude Code works in the background on this PC and uses your Claude plan. It usually takes ${b.dataset.min} minutes.`;
+  if (!await ask(`${b.dataset.title} for ${mod}?\n\n${how} You can keep using Studio; saving on ${mod} pauses until it finishes, and you can stop it at any time.`, { ok: 'Run' })) return;
   const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: mod, action: b.dataset.run }) });
   toast(r.message || r.error, r.ok ? 'ok' : 'bad');
   if (r.ok) { S.module = mod; S.tab = S.view === 'module' ? S.tab : 'activity'; openModule(mod, true); }
 });
 document.addEventListener('click', e => { const c = e.target.closest('[data-copy]'); if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => toast('Copied. Paste it in Claude Code.')).catch(() => toast('Select the text and copy it.', 'warn')); } });
 
+/* ---------- Page address: #/MODULE/tab, so a refresh or a bookmark opens the same place ---------- */
+function setHash(push) {
+  const h = S.view === 'module' ? `#/${S.module}/${S.tab}` : '#/';
+  if ((location.hash || '#/') !== h) history[push ? 'pushState' : 'replaceState'](null, '', h);
+}
+function route() {
+  const [, mod, tab] = location.hash.match(/^#\/([A-Z][A-Z0-9]*)(?:\/([a-z]+))?/) || [];
+  if (!mod) return home();
+  if (TABS.some(([t]) => t === tab)) S.tab = tab;
+  openModule(mod, TABS.some(([t]) => t === tab));
+}
+window.addEventListener('popstate', async () => {  // back / forward
+  if (Object.keys(S.dirty).length && !await ask('You have unsaved changes. Leave without saving?', { ok: 'Leave', danger: true })) return setHash(true);
+  S.dirty = {}; route();
+});
+
 async function home() {
-  S.view = 'home'; S.module = null; S.dirty = {}; updateSavebar();
-  const d = await api('/api/overview');
+  S.view = 'home'; S.module = null; S.dirty = {}; updateSavebar(); setHash(true);
+  const [d, arch] = await Promise.all([api('/api/overview'), api('/api/archive')]);
   if (d.status !== 200) return $('#main').innerHTML = `<div class="msg bad">${esc(d.error || 'Studio could not load. Open the address printed in the Studio window.')}</div>`;
+  S.agents = d.agents;
   $('#project').textContent = d.setup.setup_needed ? '' : d.project;
   if (d.setup.setup_needed) return renderSetup(d.setup, true);
   $('#main').innerHTML = `${d.setup.incomplete ? `<div class="msg warn">Some project details are missing (app name, platforms). <span class="crumb" id="fix">Complete them</span></div>` : ''}
@@ -63,8 +126,19 @@ async function home() {
     ${d.modules.length ? `<div class="cards">${d.modules.map(m => `<div class="card module-card" data-mod="${esc(m.module)}">
       <h2>${esc(m.module)}</h2>${pipeline(m.stages)}
       <p class="small muted">${m.open_gaps} open questions · ${m.cases} active test cases</p>${nextBox(m.next, m.job)}</div>`).join('')}</div>`
-    : `<div class="card"><h2 style="margin-top:0">Start with your first module</h2><p>A module is one part of the product, tested on its own: sign-up, login, checkout… Add it, then give TestHive its requirement documents or the address of the built product.</p></div>`}`;
+    : `<div class="card"><h2 style="margin-top:0">Start with your first module</h2><p>A module is one part of the product, tested on its own: sign-up, login, checkout… Add it, then give TestHive its requirement documents or the address of the built product.</p></div>`}
+    ${(arch.archived || []).length ? `<details class="card" style="margin-top:14px"><summary><b>Archived modules (${arch.archived.length})</b> <span class="small muted">kept in the archive folder; restore puts everything back</span></summary>
+      <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Module</th><th>Archived (UTC)</th><th>By</th><th>Why</th><th>Kept</th><th></th></tr></thead><tbody>
+      ${arch.archived.map(a => `<tr><td><b>${esc(a.module)}</b></td><td class="small">${esc(a.archived_at.replace('T', ' ').slice(0, 16))}</td><td>${esc(a.by)}</td><td dir="auto">${esc(a.why)}</td>
+        <td class="small">${a.files} files or folders, ${a.rows} register rows</td><td><button class="small" data-unarch="${esc(a.name)}">Restore</button></td></tr>`).join('')}
+      </tbody></table></div></details>` : ''}`;
   $('#newmod').onclick = renderNewModule;
+  document.querySelectorAll('[data-unarch]').forEach(b => b.onclick = async e => {
+    e.stopPropagation(); if (!me()) return askName();
+    if (!await ask(`Restore ${b.dataset.unarch.replace(/-\d{8}-\d{6}$/, '')} from the archive? Its files and register rows go back where they were.`, { ok: 'Restore' })) return;
+    const r = await api('/api/module-restore', { method: 'POST', body: JSON.stringify({ archive: b.dataset.unarch, by: me() }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); home();
+  });
   if (!me() && !document.querySelector('.modal')) askName();  // first opening asks the name in the setup form instead
   if ($('#fix')) $('#fix').onclick = () => renderSetup(d.setup, false);
   document.querySelectorAll('[data-mod]').forEach(el => el.onclick = e => { if (!e.target.closest('[data-copy],[data-run]')) openModule(el.dataset.mod); });
@@ -109,8 +183,8 @@ function renderNewModule() {
       <label>Module code</label><input id="m-code" placeholder="SIGNUP" style="text-transform:uppercase">
       <label>Title</label><input id="m-title" dir="auto" placeholder="Sign-up and mobile verification">
       <label>Built product (optional)</label><input id="m-url" placeholder="https://staging.example.com/signup">
-      <span></span><label><input type="checkbox" id="m-test"> This address is a test environment (the analyst may submit forms with test data)</label>
-      <span></span><label><input type="checkbox" id="m-mask"> The documents contain personal data: mask it before the AI reads them</label>
+      <span></span><label><input type="checkbox" id="m-test" aria-label="This address is a test environment"> This address is a test environment (the analyst may submit forms with test data)</label>
+      <span></span><label><input type="checkbox" id="m-mask" aria-label="Mask personal data"> The documents contain personal data: mask it before the AI reads them</label>
       <span></span><span><button class="primary" id="m-save">Add module</button> <span class="small muted">Next: add the documents (and an APK if you have one).</span></span>
     </div></div>`;
   $('#back').onclick = home;
@@ -123,10 +197,11 @@ function renderNewModule() {
 
 async function openModule(mod, keepTab) {
   const d = await api('/api/module?m=' + encodeURIComponent(mod));
-  if (d.status !== 200) return toast(d.error || 'Could not load the module', 'bad');
-  S.view = 'module'; S.module = mod; S.data = d; S.dirty = {};
+  if (d.status !== 200) { toast(d.error === 'unknown module' ? `There is no module ${mod} (it may be archived).` : d.error || 'Could not load the module', 'bad'); return home(); }
+  const push = !(S.view === 'module' && S.module === mod);
+  S.view = 'module'; S.module = mod; S.data = d; S.dirty = {}; S.agents = d.agents;
   if (!keepTab) { S.tab = d.stages[0].status === 'pending' ? 'sources' : 'analysis'; S.open.clear(); }
-  render();
+  render(); setHash(push);
 }
 const TABS = [['sources', 'Sources'], ['analysis', 'Analysis (questions)'], ['design', 'Design (test cases)'], ['approvals', 'Approvals'], ['activity', 'Activity']];
 let POLL = null;
@@ -153,7 +228,7 @@ function watchJob() {
 function bindStop() {
   const b = $('#jobstop'); if (!b) return;
   b.onclick = async () => {
-    if (!confirm('Stop the agent now? Files it already wrote stay as they are; you can run it again later.')) return;
+    if (!await ask('Stop the agent now? Files it already wrote stay as they are; you can run it again later.', { ok: 'Stop', danger: true })) return;
     const r = await api('/api/stop', { method: 'POST', body: JSON.stringify({ module: S.module, id: b.dataset.id }) });
     toast(r.message || r.error, r.ok ? 'ok' : 'bad'); openModule(S.module, true);
   };
@@ -187,41 +262,48 @@ function render() {
     <div class="tabs">${TABS.map(([t, l]) => `<button data-tab="${t}" class="${S.tab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="tab"></div>`;
   $('#back').onclick = () => confirmLeave(home);
-  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => confirmLeave(() => { S.tab = b.dataset.tab; S.dirty = {}; render(); }));
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => confirmLeave(() => { S.tab = b.dataset.tab; S.dirty = {}; render(); setHash(false); }));
   ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals, activity: renderActivity })[S.tab]();
   updateSavebar(); bindStop(); watchJob();
 }
 
 /* ---------- Sources ---------- */
+const fileUrl = (name, version) => `/api/source-file?m=${encodeURIComponent(S.module)}&name=${encodeURIComponent(name)}${version ? '&version=' + encodeURIComponent(version) : ''}&t=${encodeURIComponent(TOKEN)}`;
 function renderSources() {
   const d = S.data, src = d.sources, mt = d.meta, analysisDone = d.stages[0].status === 'approved';
-  const late = src.files.filter(f => f.after_approval);
+  const changed = analysisDone ? src.changed_after_approval : [];
   const unread = src.files.filter(f => !f.read).length;
-  $('#tab').innerHTML = `${late.length && analysisDone ? `<div class="msg warn"><b>${late.length} document(s) changed after the analysis was approved.</b> Reopen the analysis so the analyst reads them; after the new approval TestHive shows which test cases are affected.
-      <div class="bar" style="margin-top:8px;margin-bottom:0"><input class="grow" id="ro-c" placeholder="What changed (required)"><button id="ro">Reopen analysis</button></div></div>` : ''}
+  $('#tab').innerHTML = `${changed.length ? `<div class="msg warn"><b>${changed.length} document(s) changed after the analysis was approved:</b> ${esc(changed.map(c => `${c.name} (${c.action})`).join(', '))}.
+      Reopen the analysis so the analyst reads them; after the new approval TestHive shows which test cases are affected.
+      <div class="bar" style="margin-top:8px;margin-bottom:0"><input class="grow" id="ro-c" placeholder="What changed (required)" aria-label="What changed"><button id="ro">Reopen analysis</button></div></div>` : ''}
     <div class="card"><h3 style="margin-top:0">Requirement documents</h3>
       <div id="drop" style="border:1px dashed var(--line);border-radius:8px;padding:18px;text-align:center" class="muted">
         Drop files here, or <label class="crumb">choose files<input type="file" id="files" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.bmp,.webp"></label>
         <div class="small">PDF, Word (.docx), Excel, CSV, text, OpenAPI / Swagger (.json, .yaml), design images · up to 25 MB each · a file with the same name replaces the old one, which is kept</div></div>
-      <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Document</th><th>Type</th><th>Changed</th><th>Read by TestHive</th></tr></thead><tbody>
-      ${src.files.map(f => `<tr><td dir="auto">${esc(f.name)}</td><td>${esc(f.type)}</td><td class="small">${esc(f.modified)}</td>
-        <td class="small">${f.read ? `✓ ${f.type === 'image' ? 'image (read directly)' : esc(f.words) + ' words'}${f.masked === 'yes' ? ' · masked' : ''}` : '<span class="chip s-in_progress">not read yet</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No documents yet.</td></tr>'}
+      <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Document</th><th>Type</th><th>Changed</th><th>Read by TestHive</th><th></th></tr></thead><tbody>
+      ${src.files.map(f => `<tr><td dir="auto"><span class="crumb" data-doc="${esc(f.name)}" title="See what TestHive read">${esc(f.name)}</span></td><td>${esc(f.type)}</td><td class="small">${esc(f.modified)}</td>
+        <td class="small">${f.read ? `✓ ${f.type === 'image' ? 'image (read directly)' : esc(f.words) + ' words'}${f.masked === 'yes' ? ' · masked' : ''}` : '<span class="chip s-in_progress">not read yet</span>'}</td>
+        <td class="small" style="white-space:nowrap"><button class="small" data-doc="${esc(f.name)}">Text</button> <a href="${fileUrl(f.name)}" target="_blank" rel="noopener">Original</a>
+          <button class="small danger" data-rm="${esc(f.name)}">Remove</button></td></tr>`).join('') || '<tr><td colspan="5" class="muted">No documents yet.</td></tr>'}
       </tbody></table></div>
-      ${src.old_versions ? `<p class="small muted">${src.old_versions} earlier upload(s) kept in requirements/sources/${esc(d.module)}/_old/.</p>` : ''}
-      <div class="bar" style="margin-top:10px"><label><input type="checkbox" id="rd-mask" ${mt.mask ? 'checked' : ''}> Mask personal data</label>
+      <div class="bar" style="margin-top:10px"><label><input type="checkbox" id="rd-mask" aria-label="Mask personal data" ${mt.mask ? 'checked' : ''}> Mask personal data</label>
         <button class="primary" id="read" ${src.files.length ? '' : 'disabled'}>Read the documents${unread ? ` (${unread} new)` : ''}</button>
         <span class="small muted">${src.read_at ? 'Last read ' + esc(src.read_at) : 'Turns every document into text the analyst can read (free, no AI).'}</span></div>
       <pre id="readout" class="small" style="white-space:pre-wrap;display:none;background:var(--soft);padding:8px;border-radius:6px"></pre></div>
+    <details class="card" id="vercard"><summary><b>Earlier versions and removed documents</b> <span class="small muted">${src.old_versions} kept · who changed what</span></summary><div id="verbody" style="margin-top:10px"></div></details>
     <div class="card"><h3 style="margin-top:0">Built product (optional)</h3><div class="form">
-      <label>Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://staging.example.com/signup">
-      <span></span><label><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
+      <label for="u-url">Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://staging.example.com/signup">
+      <span></span><label><input type="checkbox" id="u-test" aria-label="Test environment" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
       <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="crumb">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
-      <label>Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
+      <label for="u-title">Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
       <span></span><span><button id="u-save">Save</button> ${mt.url ? `<button data-run="explore-web" data-title="Web exploration" data-min="1-5">Run exploration</button>` : ''} <span class="small muted">The analyst also explores it during its first pass.</span></span></div></div>
-    <details class="card" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody" style="margin-top:10px"><button id="mprev">Check the documents</button></div></details>`;
+    <details class="card" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody" style="margin-top:10px"><button id="mprev">Check the documents</button></div></details>
+    <details class="card"><summary><b>Archive this module</b> <span class="small muted">moves it and all its files out of the project; it can be restored from the start page</span></summary>
+      <p class="small muted">Use it for a module added by mistake or no longer tested. Nothing is deleted: everything goes to archive/${esc(d.module)}-&lt;time&gt;/ and the decision is logged with your name.</p>
+      <button class="danger" id="arch">Archive ${esc(d.module)}…</button></details>`;
   const upload = async (files, kind) => {
     for (const f of files) {
-      const r = await api(`/api/source?m=${encodeURIComponent(d.module)}&kind=${kind}&name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f, headers: { 'Content-Type': 'application/octet-stream' } });
+      const r = await api(`/api/source?m=${encodeURIComponent(d.module)}&kind=${kind}&name=${encodeURIComponent(f.name)}&by=${encodeURIComponent(me())}`, { method: 'POST', body: f, headers: { 'Content-Type': 'application/octet-stream' } });
       toast(r.message || r.error, r.ok ? 'ok' : 'bad');
     }
     openModule(d.module, true);
@@ -232,6 +314,14 @@ function renderSources() {
   drop.ondragover = e => { e.preventDefault(); drop.style.borderColor = 'var(--accent)'; };
   drop.ondragleave = () => drop.style.borderColor = '';
   drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = ''; upload([...e.dataTransfer.files], 'source'); };
+  document.querySelectorAll('[data-doc]').forEach(b => b.onclick = () => showText(b.dataset.doc));
+  document.querySelectorAll('[data-rm]').forEach(b => b.onclick = async () => {
+    if (!me()) return askName();
+    if (!await ask(`Remove ${b.dataset.rm}?\n\nIt moves to the earlier versions (nothing is deleted) and the analyst no longer reads it.${analysisDone ? ' The analysis is approved: removing a document is a change that needs a reopen.' : ''}`, { ok: 'Remove', danger: true })) return;
+    const r = await api('/api/source-remove', { method: 'POST', body: JSON.stringify({ module: d.module, name: b.dataset.rm, by: me() }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); openModule(d.module, true);
+  });
+  $('#vercard').ontoggle = () => { if ($('#vercard').open) renderVersions(); };
   $('#read').onclick = async () => {
     $('#read').disabled = true; $('#read').textContent = 'Reading…';
     const r = await api('/api/ingest', { method: 'POST', body: JSON.stringify({ module: d.module, mask: $('#rd-mask').checked }) });
@@ -245,11 +335,44 @@ function renderSources() {
   };
   if ($('#ro')) $('#ro').onclick = async () => {
     if (!me()) return askName(); const c = $('#ro-c').value.trim(); if (!c) return toast('Say what changed.', 'warn');
-    if (!confirm('Reopen the analysis? Later stages go back to in progress and need a new approval.')) return;
+    if (!await ask('Reopen the analysis? Later stages go back to in progress and need a new approval.', { ok: 'Reopen' })) return;
     const r = await api('/api/stage', { method: 'POST', body: JSON.stringify({ module: d.module, stage: 'analysis', action: 'reopen', by: me(), comment: c }) });
     toast(r.message || r.error, r.ok ? 'ok' : 'bad'); openModule(d.module, true);
   };
+  $('#arch').onclick = () => archiveModule(d.module);
   $('#mprev').onclick = renderMask;
+}
+async function showText(name) {
+  const r = await api(`/api/source-text?m=${encodeURIComponent(S.module)}&name=${encodeURIComponent(name)}`);
+  panel(name, `<p class="small muted">${r.text ? `What TestHive read${r.masked ? ' (masked)' : ''}: this is what the analyst works from. ` : esc(r.note || r.error || '')}
+      <a href="${fileUrl(name)}" target="_blank" rel="noopener">Open the original</a></p>
+    ${r.text ? `<pre dir="auto" style="white-space:pre-wrap;background:var(--soft);padding:10px;border-radius:6px;margin:0">${esc(r.text)}</pre>` : ''}`);
+}
+async function renderVersions() {
+  const r = await api('/api/source-versions?m=' + encodeURIComponent(S.module));
+  $('#verbody').innerHTML = `${r.versions.length ? `<div class="table-wrap"><table><thead><tr><th>Kept since</th><th>Document</th><th>Size</th><th></th></tr></thead><tbody>
+      ${r.versions.map(v => `<tr><td class="small">${esc(v.kept)}</td><td dir="auto">${esc(v.name)} ${v.current ? '' : '<span class="chip sev-Medium">removed</span>'}</td><td class="small">${Math.ceil(v.size / 1024)} KB</td>
+        <td class="small" style="white-space:nowrap"><a href="${fileUrl(v.name, v.version)}" target="_blank" rel="noopener">Open</a>
+          <button class="small" data-restore="${esc(v.version)}" data-name="${esc(v.name)}" data-current="${v.current ? 1 : ''}">Restore</button></td></tr>`).join('')}</tbody></table></div>`
+    : '<p class="muted">No earlier versions: nothing was replaced or removed yet.</p>'}
+    ${r.history.length ? `<h4>Changes</h4><div class="table-wrap"><table><thead><tr><th>When (UTC)</th><th>What</th><th>Document</th><th>By</th></tr></thead><tbody>
+      ${r.history.map(h => `<tr><td class="small">${esc(h.When.replace('T', ' ').slice(0, 16))}</td><td>${esc(h.Action)}</td><td dir="auto">${esc(h.Document)}</td><td>${esc(h.By)}</td></tr>`).join('')}</tbody></table></div>` : ''}`;
+  document.querySelectorAll('[data-restore]').forEach(b => b.onclick = async () => {
+    if (!me()) return askName();
+    if (!await ask(`Restore ${b.dataset.name} as it was on ${b.closest('tr').firstElementChild.textContent}?${b.dataset.current ? '\n\nThe current version is kept as an earlier version.' : ''}`, { ok: 'Restore' })) return;
+    const x = await api('/api/source-restore', { method: 'POST', body: JSON.stringify({ module: S.module, version: b.dataset.restore, name: b.dataset.name, by: me() }) });
+    toast(x.message || x.error, x.ok ? 'ok' : 'bad'); openModule(S.module, true);
+  });
+}
+async function archiveModule(mod) {
+  if (!me()) return askName();
+  const typed = await ask(`Archive ${mod}?\n\nThe module, its documents, questions, test cases, baselines and agent logs move to the archive folder and leave Studio. You can restore it from the start page.\n\nType ${mod} to confirm.`,
+    { input: `Type ${mod}`, match: mod, ok: 'Continue', danger: true });
+  if (!typed) return;
+  const why = await ask(`Why is ${mod} archived? (kept in the approvals log)`, { input: 'Reason, e.g. added by mistake', ok: `Archive ${mod}`, danger: true });
+  if (!why) return;
+  const r = await api('/api/module-archive', { method: 'POST', body: JSON.stringify({ module: mod, confirm: typed, comment: why, by: me() }) });
+  toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) home();
 }
 async function renderMask() {
   $('#maskbody').innerHTML = '<p class="muted">Checking…</p>';
@@ -272,7 +395,10 @@ async function renderMask() {
     toast(r.message || r.error, r.ok ? 'ok' : 'bad');
   };
 }
-function confirmLeave(go) { if (Object.keys(S.dirty).length && !confirm('You have unsaved changes. Leave without saving?')) return; S.dirty = {}; go(); }
+async function confirmLeave(go) {
+  if (Object.keys(S.dirty).length && !await ask('You have unsaved changes. Leave without saving?', { ok: 'Leave', danger: true })) return false;
+  S.dirty = {}; go(); return true;
+}
 window.addEventListener('beforeunload', e => { if (Object.keys(S.dirty).length) { e.preventDefault(); e.returnValue = ''; } });
 
 function filterBar(key, fields) {
@@ -293,8 +419,9 @@ function renderAnalysis() {
   const a = S.data.analysis, gaps = a.gaps, f = (S.filters.gaps = S.filters.gaps || { status: 'Open' });
   const shown = gaps.filter(g => matches(g, f, ['ID', 'Question', 'Answer', 'Requirement']) && (!f.severity || g.Severity === f.severity) && (!f.status || g.Status === f.status));
   const cnt = (k, v) => gaps.filter(g => g[k] === v).length;
-  const req = Object.fromEntries(a.requirements.map(r => [r.ID, r]));
-  $('#tab').innerHTML = `<div class="card"><div class="stats">
+  const approved = S.data.stages[0].status === 'approved';
+  $('#tab').innerHTML = `${approved ? `<div class="msg ok">The analysis is approved. Answers and questions you add now are kept for the next analysis round; to use them now, reopen the analysis in the Approvals tab.</div>` : ''}
+    <div class="card"><div class="stats">
       <div class="stat"><b>${a.requirements.length}</b>requirements</div><div class="stat"><b>${gaps.length}</b>questions</div>
       <div class="stat"><b>${cnt('Status', 'Open')}</b>open</div><div class="stat"><b>${gaps.filter(g => g.Severity === 'High' && g.Status !== 'Closed').length}</b>High not closed</div>
       <div class="stat"><b>${cnt('Status', 'Answered')}</b>answered, waiting for the analyst</div></div>
@@ -303,7 +430,7 @@ function renderAnalysis() {
     <div class="table-wrap"><table><thead><tr><th>ID</th><th>Severity</th><th style="min-width:300px">Question</th><th style="min-width:300px">Your answer</th><th>Status</th></tr></thead><tbody>
     ${shown.map(g => { const dv = S.dirty[g.ID] || {}; const closed = g.Status === 'Closed';
       return `<tr class="${S.dirty[g.ID] ? 'dirty' : ''}"><td class="id">${esc(g.ID)}</td><td><span class="chip sev-${esc(g.Severity)}">${esc(g.Severity)}</span><div class="small muted">${esc(g.Kind)}</div></td>
-      <td dir="auto">${esc(g.Question)}${g.Requirement ? `<div class="small muted" title="${esc(g.Requirement.split(/[;,]/).map(x => req[x.trim()]?.Text || '').join(' | '))}">About ${esc(g.Requirement)}</div>` : ''}</td>
+      <td dir="auto">${esc(g.Question)}${g.Requirement ? `<div class="small muted">About ${reqLinks(g.Requirement)}</div>` : ''}</td>
       <td>${closed ? `<div dir="auto">${esc(g.Answer)}</div><div class="small muted">${esc(g['Answered By'])}</div>` :
         `<textarea dir="auto" class="edit" data-gap="${esc(g.ID)}" rows="2">${esc(dv.Answer ?? g.Answer)}</textarea>${g['Answered By'] && !dv.Answer ? `<div class="small muted">${esc(g['Answered By'])}</div>` : ''}`}</td>
       <td>${closed ? 'Closed' : esc(dv.Status || g.Status)}</td></tr>`; }).join('') || `<tr><td colspan="5" class="muted">No questions match.</td></tr>`}
@@ -317,7 +444,7 @@ function renderAnalysis() {
       <datalist id="reqids">${a.requirements.map(r => `<option value="${esc(r.ID)}">`).join('')}</datalist></div>
     <details class="card"><summary><b>Requirements (${a.requirements.length})</b> <span class="small muted">read-only; the analyst maintains them</span></summary>
       <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>ID</th><th>Priority</th><th>Type</th><th>Status</th><th>Requirement</th><th>Source</th></tr></thead><tbody>
-      ${a.requirements.map(r => `<tr class="${r.Status === 'Removed' ? 'removed' : ''}"><td class="id">${esc(r.ID)}</td><td>${esc(r.Priority)}</td><td>${esc(r.Type)}</td><td>${esc(r.Status)}</td><td dir="auto">${esc(r.Text)}</td><td class="small muted">${esc(r.Source)}</td></tr>`).join('')}
+      ${a.requirements.map(r => `<tr class="${r.Status === 'Removed' ? 'removed' : ''}"><td class="id">${reqLinks(r.ID)}</td><td>${esc(r.Priority)}</td><td>${esc(r.Type)}</td><td>${esc(r.Status)}</td><td dir="auto">${esc(r.Text)}</td><td class="small muted">${esc(r.Source)}</td></tr>`).join('')}
       </tbody></table></div></details>`;
   bindFilters(renderAnalysis); bindUploads();
   document.querySelectorAll('[data-gap]').forEach(t => t.oninput = () => {
@@ -344,12 +471,13 @@ function renderDesign() {
   if (!d.baseline) return $('#tab').innerHTML = `<div class="card"><p>Test design starts when the analysis is approved (see the Approvals tab).</p></div>`;
   if (!d.cases.length) return $('#tab').innerHTML = `<div class="card"><p>No test cases yet. In Claude Code: <code>/th-manual ${esc(S.module)}</code></p></div>`;
   const act = d.cases.filter(c => c.Status !== 'Removed'), covered = d.coverage.filter(r => r.Cases.length).length;
-  const reviewed = act.filter(c => c.Review).length;
-  $('#tab').innerHTML = `<div class="card"><div class="stats">
+  const reviewed = act.filter(c => c.Review).length, frozen = designApproved();
+  $('#tab').innerHTML = `${frozen ? `<div class="msg ok">The design is approved, so the cases are read-only (a frozen baseline). To change them, reopen the design in the Approvals tab and say why.</div>` : ''}
+    <div class="card"><div class="stats">
       <div class="stat"><b>${act.length}</b>active cases</div><div class="stat"><b>${covered}/${d.coverage.length}</b>requirements covered</div>
       ${['P0', 'P1', 'P2', 'P3'].map(p => `<div class="stat"><b>${act.filter(c => c.Priority === p).length}</b>${p}</div>`).join('')}
       <div class="stat"><b>${reviewed}</b>reviewed</div><div class="stat"><b>${d.requests.filter(q => q.Status === 'Open').length}</b>open requests</div></div>
-      <p class="small muted">Designed from analysis baseline ${esc(d.baseline)}. Review each case: Accepted, Change (say what) or Remove. Prefer Excel? <a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=design&t=${encodeURIComponent(TOKEN)}">Download the workbook</a> · <label class="crumb">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="design"></label></p></div>
+      <p class="small muted">Designed from analysis baseline ${esc(d.baseline)}. ${frozen ? '' : 'Review each case: Accepted, Change (say what) or Remove. Prefer Excel? '}<a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=design&t=${encodeURIComponent(TOKEN)}">Download the workbook</a>${frozen ? '' : ` · <label class="crumb">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="design"></label>`}</p></div>
     <div class="tabs">${[['cases', 'Cases'], ['coverage', 'Coverage'], ['assumptions', 'Open questions'], ['requests', 'Requests and new cases']].map(([k, l]) => `<button data-dtab="${k}" class="${S.dtab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="dtab"></div>`;
   document.querySelectorAll('[data-dtab]').forEach(b => b.onclick = () => { S.dtab = b.dataset.dtab; renderDesign(); updateSavebar(); });
   bindUploads();
@@ -364,11 +492,11 @@ function renderCases() {
       ['review', 'Review', ['Not reviewed', 'Accepted', 'Change', 'Remove', 'Updated']], ['state', 'Cases', ['Active', 'Removed']]]) +
     `<p class="small muted">${shown.length} shown. Click a title for steps and expected result.</p>
     <div class="table-wrap"><table><thead><tr><th>ID</th><th>P</th><th style="min-width:280px">Title</th><th>Type · technique</th><th>Tags</th><th>Review</th><th style="min-width:220px">Comment</th></tr></thead><tbody>
-    ${shown.map(c => { const dv = S.dirty[c.ID] || {}; const rev = dv.Review ?? c.Review; const locked = c.Status === 'Removed';
+    ${shown.map(c => { const dv = S.dirty[c.ID] || {}; const rev = dv.Review ?? c.Review; const locked = c.Status === 'Removed' || designApproved();
       return `<tr class="${S.dirty[c.ID] ? 'dirty' : ''} ${locked ? 'removed' : ''}"><td class="id">${esc(c.ID)}</td><td>${esc(c.Priority)}</td>
-        <td><span class="crumb" data-open="${esc(c.ID)}" dir="auto">${esc(c.Title)}</span><div class="small muted">${esc(c.Platform)} · ${esc(c.Requirements)}${c.Origin !== 'Designed' ? ' · added by ' + (c.Origin === 'Human' ? 'a person' : 'request') : ''}</div></td>
+        <td><span class="crumb" data-open="${esc(c.ID)}" dir="auto">${esc(c.Title)}</span><div class="small muted">${esc(c.Platform)} · ${reqLinks(c.Requirements)}${c.Origin !== 'Designed' ? ' · added by ' + (c.Origin === 'Human' ? 'a person' : 'request') : ''}</div></td>
         <td class="small">${esc(c.Type)}<br><span class="muted">${esc(c.Technique)} · risk ${esc(c.Risk)}</span></td><td class="small">${esc(c.Tags)}</td>
-        <td>${locked ? 'Removed' : `<select class="edit" data-rev="${esc(c.ID)}"><option value="">—</option>${['Accepted', 'Change', 'Remove'].map(o => `<option ${rev === o ? 'selected' : ''}>${o}</option>`).join('')}${c.Review === 'Updated' ? `<option ${rev === 'Updated' ? 'selected' : ''} value="Updated">Updated by designer</option>` : ''}</select>`}</td>
+        <td>${locked ? (c.Status === 'Removed' ? 'Removed' : esc(c.Review) || '—') : `<select class="edit" aria-label="Review of ${esc(c.ID)}" data-rev="${esc(c.ID)}"><option value="">—</option>${['Accepted', 'Change', 'Remove'].map(o => `<option ${rev === o ? 'selected' : ''}>${o}</option>`).join('')}${c.Review === 'Updated' ? `<option ${rev === 'Updated' ? 'selected' : ''} value="Updated">Updated by designer</option>` : ''}</select>`}</td>
         <td>${locked ? `<span class="small muted">${esc(c['Review Comment'])}</span>` : `<textarea dir="auto" class="edit" rows="1" data-com="${esc(c.ID)}" placeholder="${rev === 'Change' ? 'What should change? (required)' : ''}">${esc(dv['Review Comment'] ?? c['Review Comment'])}</textarea>`}</td></tr>
         ${S.open.has(c.ID) ? `<tr class="detail"><td></td><td colspan="6"><dl>
           <dt>Preconditions</dt><dd dir="auto">${esc(c.Preconditions)}</dd><dt>Steps</dt><dd dir="auto">${esc(c.Steps).replace(/; (\d+\.)/g, '<br>$1')}</dd>
@@ -389,7 +517,7 @@ function renderCoverage() {
   const cov = S.data.design.coverage;
   $('#dtab').innerHTML = `<p class="small muted">Each approved requirement and the active cases that test it. "NO" means a negative or boundary case is required and missing.</p>
     <div class="table-wrap"><table><thead><tr><th>Requirement</th><th>P</th><th style="min-width:320px">Text</th><th>Cases</th><th>Negative</th><th>Boundary</th></tr></thead><tbody>
-    ${cov.map(r => `<tr><td class="id">${esc(r.ID)}</td><td>${esc(r.Priority)}</td><td dir="auto">${esc(r.Text)}</td>
+    ${cov.map(r => `<tr><td class="id">${reqLinks(r.ID)}</td><td>${esc(r.Priority)}</td><td dir="auto">${esc(r.Text)}</td>
       <td class="small"><b>${r.Cases.length}</b> ${esc(r.Cases.map(x => x.replace(/^TC-[A-Z0-9]+-/, '')).join(', '))}</td>
       <td>${r.Negative === 'NO' ? '<span class="chip sev-High">missing</span>' : esc(r.Negative)}</td><td>${r.Boundary === 'NO' ? '<span class="chip sev-High">missing</span>' : esc(r.Boundary)}</td></tr>`).join('')}
     </tbody></table></div>`;
@@ -402,8 +530,13 @@ function renderAssumptions() {
       <td class="small">${g.Cases.length ? esc(g.Cases.map(x => x.replace(/^TC-[A-Z0-9]+-/, '')).join(', ')) : '<span class="muted">none</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No open questions.</td></tr>'}
     </tbody></table></div>`;
 }
+function designApproved() { return S.data.stages[1].status === 'approved'; }
 function renderRequests() {
   const d = S.data.design, reqs = d.requirements || [];
+  const list = `<div class="table-wrap"><table><thead><tr><th>Request</th><th style="min-width:300px">Text</th><th>By</th><th>Status</th><th style="min-width:240px">Answer</th></tr></thead><tbody>
+    ${d.requests.map(q => `<tr><td class="id">${esc(q.ID)}</td><td dir="auto">${esc(q.Request)}</td><td>${esc(q['Requested By'])}</td><td>${esc(q.Status)}</td><td dir="auto" class="small">${esc(q.Response)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No requests yet.</td></tr>'}
+    </tbody></table></div>`;
+  if (designApproved()) return $('#dtab').innerHTML = `<p class="small muted">The design is approved: new cases and requests wait until it is reopened.</p>${list}`;
   $('#dtab').innerHTML = `<div class="card"><h3 style="margin-top:0">Ask TestHive for more cases</h3><div class="form">
       <label>What is missing?</label><textarea id="rq" dir="auto" rows="2" placeholder="e.g. Add cases for pasting the code into the first box"></textarea>
       <label>Requirement (optional)</label><input id="rqr" list="dreq"><span></span><span><button id="rqadd">Send request</button></span></div></div>
@@ -417,10 +550,7 @@ function renderRequests() {
       <label>Test data</label><input id="nc-data" dir="auto">
       <label>Tags</label><span>${TAGS.map(t => `<label style="margin-inline-end:10px"><input type="checkbox" value="${t}" class="nc-tag" ${t === 'regression' ? 'checked' : ''}> ${t}</label>`).join('')}</span>
       <span></span><span><button id="ncadd">Add case</button> <span class="small muted">The manual-tester completes the rest (type, technique, risk) at its re-check.</span></span></div>
-      <datalist id="dreq">${reqs.map(r => `<option value="${esc(r.ID)}">${esc(r.Text.slice(0, 80))}</option>`).join('')}</datalist></div>
-    <div class="table-wrap"><table><thead><tr><th>Request</th><th style="min-width:300px">Text</th><th>By</th><th>Status</th><th style="min-width:240px">Answer</th></tr></thead><tbody>
-    ${d.requests.map(q => `<tr><td class="id">${esc(q.ID)}</td><td dir="auto">${esc(q.Request)}</td><td>${esc(q['Requested By'])}</td><td>${esc(q.Status)}</td><td dir="auto" class="small">${esc(q.Response)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No requests yet.</td></tr>'}
-    </tbody></table></div>`;
+      <datalist id="dreq">${reqs.map(r => `<option value="${esc(r.ID)}">${esc(r.Text.slice(0, 80))}</option>`).join('')}</datalist></div>${list}`;
   $('#rqadd').onclick = () => { const t = $('#rq').value.trim(); if (!t) return toast('Write the request first.', 'warn');
     saveReview([], [{ ID: '', Request: t, Requirement: $('#rqr').value.trim(), 'Requested By': me() }]); };
   $('#ncadd').onclick = () => {
@@ -463,7 +593,7 @@ function renderApprovals() {
     if (act !== 'approve' && !comment) return toast('Write a comment: say why.', 'warn');
     const what = { approve: `Approve the ${stg} of ${S.module} as ${me()}? This freezes a baseline.`, reject: `Send the ${stg} back to the agent?`,
       reopen: `Reopen the ${stg}? Later stages go back to in progress and need a new approval.` }[act];
-    if (!confirm(what)) return;
+    if (!await ask(what, { ok: { approve: 'Approve', reject: 'Send back', reopen: 'Reopen' }[act], danger: act !== 'approve' })) return;
     const r = await api('/api/stage', { method: 'POST', body: JSON.stringify({ module: S.module, stage: stg, action: act, by: me(), comment }) });
     toast(r.message || r.error || 'Done', r.ok ? 'ok' : 'bad'); openModule(S.module, true);
   });
@@ -493,4 +623,4 @@ $('#discard').onclick = () => { S.dirty = {}; render(); };
 
 $('#who').textContent = me() || 'set your name';
 if (!TOKEN) $('#main').innerHTML = '<div class="msg bad">Open Studio with the address printed in its window (it contains an access key).</div>';
-else home();
+else route();

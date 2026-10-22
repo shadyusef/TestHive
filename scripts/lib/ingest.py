@@ -161,6 +161,9 @@ def main():
         if mask: text = masker.mask_string(text)[0]
         with open(out_file, "w", encoding="utf-8", newline="\n") as f: f.write(header + text.strip() + "\n")
         rows.append([rel, kind, out_file.replace(os.sep, "/"), len(text.split()), "yes" if mask else "no"])
+    made = {os.path.realpath(r[2]) for r in rows}
+    for old in glob.glob(os.path.join(out_dir, "*.md")) + glob.glob(os.path.join(out_dir, "*.masked.png")):
+        if os.path.realpath(old) not in made: os.remove(old)  # text of a document that is gone: the analyst must not read it
     idx = os.path.join(out_dir, "index.csv")
     with open(idx, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, lineterminator="\n"); w.writerow(["Source", "Type", "Read from", "Words", "Masked"]); w.writerows(rows)

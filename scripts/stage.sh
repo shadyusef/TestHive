@@ -10,6 +10,8 @@
 #   reopen  <MODULE> <stage> --by <name> --comment "why"      an approved stage changes again (e.g. new requirements);
 #                                        later stages that were started go back to in progress and need a new approval
 #   check   <MODULE> <stage>             exit 0 if the stage may start, 2 if not
+#   archive <MODULE> --by <name> --comment "why"    moves the module, its files and its register rows to archive/<MODULE>-<time>/
+#   restore <MODULE>-<time> --by <name> [--comment "..."]   puts an archived module back (nothing is ever deleted)
 # Stages, in order: analysis design tools automation execution reporting
 # State lives in workflow/state.json; every decision is appended to workflow/APPROVALS.md.
 # Submitting or approving "analysis" first runs check-analysis --for-approval (when analysis/requirements.csv exists) and then
@@ -25,7 +27,7 @@ STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 SF = os.environ.get("TH_STATE", "workflow/state.json")
 LOG = os.path.join(os.path.dirname(SF) or ".", "APPROVALS.md")
 RUN = os.environ["TH_CMD"] + " stage" if os.environ.get("TH_CMD") else "bash scripts/stage.sh"  # how the user types it
-USAGE = f"Usage: {RUN} init|status|start|submit|approve|reject|reopen|check ...  (see the top of scripts/stage.sh)"
+USAGE = f"Usage: {RUN} init|status|start|submit|approve|reject|reopen|check|archive|restore ...  (see the top of scripts/stage.sh)"
 
 def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 def die(msg, code=1): print(msg); sys.exit(code)
@@ -119,7 +121,7 @@ elif cmd == "submit":
     if not ready(pos[0].upper(), st):
         die("BLOCKED: not ready to submit. Give the workbook to the human, import the review, re-check, then submit.", 2)
     mark(m, st, "awaiting_approval"); save(s); print(f"{pos[0].upper()} {st}: waiting for human approval")
-elif cmd in ("approve", "reject", "reopen") and os.environ.get("TH_JOB"):
+elif cmd in ("approve", "reject", "reopen", "archive", "restore") and os.environ.get("TH_JOB"):
     die(f"BLOCKED: {cmd} is a human decision; an agent started from TestHive Studio cannot make it", 2)
 elif cmd in ("approve", "reject"):
     if len(pos) != 2: die(f"Usage: stage.sh {cmd} <MODULE> <stage> --by <name> [--comment ...]")
@@ -146,6 +148,30 @@ elif cmd == "reopen":
     for x in later: mark(m, x, "in_progress", opt["by"], f"{st} reopened")
     save(s); log(pos[0].upper(), st, "Reopened", opt["by"], opt["comment"])
     print(f"{pos[0].upper()} {st}: reopened by {opt['by']}" + (f"; {', '.join(later)} back to in progress (needs a new approval)" if later else ""))
+elif cmd in ("archive", "restore"):
+    if len(pos) != 1 or "by" not in opt or (cmd == "archive" and "comment" not in opt):
+        die(f"Usage: stage.sh archive <MODULE> --by <name> --comment \"why\"  |  stage.sh restore <MODULE>-<time> --by <name>")
+    lib, arch = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", "modules.py"), os.environ.get("TH_ARCHIVE", "archive")
+    sys.stdout.flush()
+    if cmd == "archive":
+        name = pos[0].upper(); m = module(name)
+        dest = os.path.join(arch, f"{name}-{time.strftime('%Y%m%d-%H%M%S')}")
+        if subprocess.run([sys.executable, lib, "archive", name, dest, opt["by"], opt["comment"]]).returncode: die("Not archived.", 2)
+        with open(os.path.join(dest, "state.json"), "w", encoding="utf-8", newline="\n") as f: json.dump(m, f, indent=2, ensure_ascii=False)
+        del s["modules"][name]; save(s)
+        log(name, "-", "Archived", opt["by"], f"{opt['comment']} (kept in {dest.replace(os.sep, '/')}/)")
+        print(f"{name}: archived by {opt['by']}. Restore with: {RUN} restore {os.path.basename(dest)} --by <name>")
+    else:
+        if not re.fullmatch(r"[A-Z][A-Z0-9]*-\d{8}-\d{6}", pos[0]): die(f"Unknown archive {pos[0]}: give the folder name, e.g. SIGNUP-20261022-153000")
+        dest = os.path.join(arch, pos[0])
+        if not os.path.exists(os.path.join(dest, "state.json")): die(f"No archived module in {dest}/")
+        with open(os.path.join(dest, "state.json"), encoding="utf-8") as f: m = json.load(f)
+        name = pos[0].rsplit("-", 2)[0]
+        if name in s["modules"]: die(f"{name} exists again: archive or rename it first", 2)
+        if subprocess.run([sys.executable, lib, "restore", dest]).returncode: die("Not restored.", 2)
+        s["modules"][name] = m; save(s)
+        log(name, "-", "Restored", opt["by"], opt.get("comment") or f"from {dest.replace(os.sep, '/')}/")
+        print(f"{name}: restored by {opt['by']}")
 else:
     die(USAGE)
 PY

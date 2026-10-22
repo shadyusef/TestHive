@@ -15,7 +15,7 @@ const page = await browser.newPage({ viewport: { width: 1366, height: 860 }, col
 await page.addInitScript(() => { try { localStorage.setItem('th-name', 'Sara (QA lead)'); } catch {} });
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
-page.on('dialog', d => d.accept());  // the "Run ... for SIGNUP?" confirmation
+page.on('dialog', d => { errors.push(`a browser pop-up appeared: ${d.message().slice(0, 60)}`); d.dismiss(); });  // Studio asks in the page
 const shot = async name => page.screenshot({ path: `${out}/${name}.png` });
 const check = async (text, fn) => { try { await fn(); console.log('  ok    ' + text); } catch (e) { errors.push(`${text}: ${e.message.split('\n')[0]}`); console.log('  WRONG ' + text); } };
 
@@ -23,7 +23,14 @@ await page.goto(url);
 await page.locator('.module-card').first().click();
 await check('Next shows a Run button for the analyst', async () => { await page.getByRole('button', { name: /^Run: Business analyst/ }).waitFor(); });
 await shot('1-run-button');
+await check('the module has its own address, and a refresh stays on it', async () => {
+  await page.waitForURL(/#\/SIGNUP\//); await page.reload(); await page.getByRole('button', { name: /^Run: Business analyst/ }).waitFor(); });
+await check('Sources: a document shows the text TestHive read from it', async () => {
+  await page.getByRole('button', { name: 'Sources' }).click(); await page.getByRole('button', { name: 'Text' }).first().click();
+  await page.getByRole('dialog').locator('pre').waitFor(); await shot('1b-document-text'); await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click(); });
 await page.getByRole('button', { name: /^Run: Business analyst/ }).click();
+await check('Run asks in the page and says the run is recorded', async () => {
+  const dlg = page.getByRole('dialog'); await dlg.getByText(/recorded run/).waitFor(); await dlg.getByRole('button', { name: 'Run' }).click(); });
 await check('the job panel shows the agent at work, with its steps and a Stop button', async () => {
   await page.getByText(/is working…/).first().waitFor(); await page.getByRole('button', { name: 'Stop' }).waitFor(); });
 await page.locator('#jobcard pre').filter({ hasText: '$ bash scripts' }).waitFor({ timeout: 15000 }).catch(() => {});
@@ -31,6 +38,10 @@ await shot('2-job-running');
 await check('when the agent finishes, its questions appear and Next moves on', async () => {
   await page.getByRole('button', { name: 'Stop' }).waitFor({ state: 'detached', timeout: 60000 });
   await page.getByText(/questions are open/).first().waitFor({ timeout: 15000 }); });
+await check('a requirement ID opens the requirement, its questions and its cases', async () => {
+  await page.getByRole('button', { name: 'Analysis (questions)' }).click();
+  await page.locator('[data-req]').first().click(); await page.getByRole('dialog').getByText(/^Questions \(/).waitFor();
+  await shot('2b-requirement'); await page.keyboard.press('Escape'); });
 await page.getByRole('button', { name: 'Activity' }).click();
 await page.getByRole('button', { name: 'Log' }).first().click();
 await check('Activity lists the run and shows its log', async () => { await page.getByText('Task: Module SIGNUP').waitFor(); });
