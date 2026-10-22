@@ -226,8 +226,10 @@ PY
 grep -q "^GAP-DEMO-001,DEMO,REQ-DEMO-002,Missing,Medium,Which help page does the link open?,The /help page,tester,Answered" "$TH_ANALYSIS/gaps.csv" || { echo "studio did not write the answer"; exit 1; }
 unset TH_ANALYSIS TH_STATE TH_CASES
 # phase 2c: Studio from an empty project (setup, module, uploads and refusals, masking preview, read, readiness), in a temporary copy
+# phase 2d: Run buttons with the recorded agents (jobs, progress, Stop, lock, every step to an approved design)
+D_OUT=$(bash demo/phase2d/run.sh --check 2>&1); echo "$D_OUT" | grep -q "STUDIO RUN CHECK PASS" || { echo "$D_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio run check failed"; exit 1; }
 C_OUT=$(bash demo/phase2c/run.sh --check 2>&1); echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio intake check failed"; exit 1; }
-$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py
+$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then
   for f in scripts/*.ps1; do

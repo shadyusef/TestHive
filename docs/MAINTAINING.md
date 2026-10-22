@@ -24,6 +24,9 @@ You do not need the original author or any chat history; everything is in this r
 | `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline) | Behaviour changes |
 | `web/explore.mjs` | Web exploration with Playwright (Edge on Windows) | Exploration behaviour changes |
 | `scripts/lib/studio.py`, `studio/index.html` | TestHive Studio lite: a local server (Python standard library, 127.0.0.1 only, token per start) and one page with no libraries or build step. Writes only through `analysis.apply_answers`, `design.apply_review` and `stage.sh` | A screen or an action changes; keep every rule in the shared functions, never in the page |
+| `scripts/lib/jobs.py` | Background jobs for Studio: starts `claude --agent ... -p <task> --output-format stream-json` (or a script), turns the event stream into progress lines, Stop kills the whole process tree, one job per module, saved in `runs/agents/<id>/` | How agents are started or shown changes |
+| `ACTIONS` in `scripts/lib/studio.py` | Each Run button: agent, model, task text, usual duration; `next_step` picks the button | A step of the flow changes; keep the task texts in step with the agents' rules and with `demo/phase2d/fake-claude.py` |
+| `demo/phase2d/` | Run buttons end to end; `fake-claude.py` replays the recorded SIGNUP runs as a stand-in for Claude Code (`TH_CLAUDE_FAKE`), so demos, selftest and CI spend nothing; `web/studio-run-smoke.mjs` clicks Run in a browser | When ACTIONS or the recordings change |
 | `scripts/lib/intake.py` | Studio's project setup, modules, uploads, sources list and masking preview (uses `ingest.convert`, `mask.find`, `mask.suggest_names`) | Intake behaviour changes |
 | `web/studio-intake-smoke.mjs`, `demo/phase2c/` | Studio from an empty project: `run.sh --check` drives setup, module, uploads (and refusals), masking preview, reading, readiness; with web tools also the screens | When intake changes |
 | `web/studio-smoke.mjs`, `demo/phase2b/` | Studio click-through (Playwright) and the Studio demo; `run.sh --check` drives the API (`walkthrough.py`) and, with web tools, the screens | When Studio changes |
@@ -67,6 +70,9 @@ You do not need the original author or any chat history; everything is in this r
 | `TH_SCORE_TARGET` | `score-analysis`, `score-design` | Pass mark in percent (default 80) |
 | `TH_BROWSER_CHANNEL` | `explore-web`, web tests | `msedge` (Windows default), `chrome` or `chromium` |
 | `TH_BASH` | `studio` (set by `studio.sh`) | The bash that runs `stage.sh` for approvals from Studio |
+| `TH_CLAUDE_FAKE` | `studio` | A stand-in for Claude Code (`demo/phase2d/fake-claude.py`): Run buttons replay recordings |
+| `TH_FAKE_DELAY` | `fake-claude.py` | Seconds between recorded events (default 0.3) |
+| `TH_JOB_MAX_MINUTES` | `studio` | A job is stopped after this many minutes (default 90) |
 | `TH_SCRIPTS` | `stage` (set by itself) | Where the scripts are, to call `lib/analysis.py` |
 | `PLATFORM`, `INCLUDE_TAGS`, `EXCLUDE_TAGS` | `run-mobile` | iOS instead of Android; tag filters |
 | `TEST_ENV` and every other `.env` key | `run-*` | Environment name recorded with each run; all keys are passed to Maestro flows |
@@ -92,7 +98,7 @@ You do not need the original author or any chat history; everything is in this r
 
 ## Testing
 - `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped.
-- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` and `demo/phase2c/run.sh --check` (Studio API; the browser click-through runs where the web tools are installed).
+- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` and `demo/phase2c/run.sh --check` and `demo/phase2d/run.sh --check` (Studio API; the browser click-through runs where the web tools are installed).
 - CI runs the selftest on Linux, Windows and macOS for every push and pull request (GitHub, Actions tab).
 - Not covered by automated tests: real installs (`setup --install`), real Maestro/Newman/Playwright runs against an app, the agents' own work. Check those by hand when they change.
 

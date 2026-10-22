@@ -131,6 +131,11 @@ Columns `Key`, `Condition`, `Requirement` (`|`-separated REQ IDs; a matching cas
 `Keywords` (as in the analysis key; a number must match a whole number, so `7` does not match `17`). `scripts/score-design.sh`
 reports how many conditions at least one active case covers (target `TH_SCORE_TARGET`, default 80 %).
 
+## Agent runs from Studio: `runs/agents/<yyyymmdd-hhmmss>-<MODULE>-<agent>/` (git-ignored)
+`meta.json` (`id`, `module`, `kind` agent or script, `agent`, `title`, `task`, `status` running / done / failed / stopped /
+interrupted, `started`, `ended`, `summary`, `cost_usd` as reported by Claude Code, `exit_code`), `progress.txt` (one line per
+step: `$` commands, `writes` files, `>` messages, `!` errors) and, for agents, `transcript.jsonl` (the raw Claude Code event stream).
+
 ## Runs: `runs/<RUN-ID>/` (written by `scripts/collect-run.sh`)
 `RUN-ID` is `R-<yyyymmdd>-<nn>` (UTC date, then a sequence number).
 

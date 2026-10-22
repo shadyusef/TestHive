@@ -2,6 +2,11 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.7.0 (2026-10-22)
+- Phase 2d, run the agents from Studio: every step that needs an agent has a Run button under Next (analyst first pass and re-check, manual-tester design, QA pre-review, fixing the findings, re-check of the human review, update after a requirement change), with a confirmation (time, plan usage). A live job panel shows the agent's steps; Stop ends it (the whole process tree); saving on the module pauses while it works; one job per module. Activity tab: every run with status, time, cost and log, saved in `runs/agents/` (git-ignored). Run exploration button for the web address.
+- `scripts/lib/jobs.py` (background jobs, Claude Code stream-json); Studio stops running agents when it closes. Agents started from Studio can run only `bash scripts/*` and edit files.
+- `demo/phase2d/run.sh`: the whole flow through Run buttons with a recorded stand-in for Claude Code (free; `--live` for real agents; `--check` for CI, with a browser click-through when web tools are installed).
+
 ## 0.6.0 (2026-10-22)
 - Phase 2c, Studio setup and intake: first opening asks for the project (writes PROJECT_BRIEF, CONTEXT and the non-secret .env values: APP_ID, TEST_ENV, BASE_URL, API_BASE_URL); New module (code, title, URL of the built product and whether it is a test environment, masking choice); Sources tab: drag-and-drop upload of documents (and an APK), earlier versions kept in `_old/`, personal-data check (tick real names, untick false matches), Read the documents (`ingest`), reopen offer when documents change after approval; "Ready for automation" card per module.
 - The analyst command shown under Next includes the URL / APK to explore. Upload checks: file types, size (25 MB, APK 300 MB), safe names.

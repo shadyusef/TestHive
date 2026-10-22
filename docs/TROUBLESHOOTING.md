@@ -28,6 +28,10 @@ First run these two; most problems show up in them:
 | Studio: approve or reopen does nothing / an error mentions bash | Studio runs `scripts/stage.sh` with Git Bash | Start Studio with `.\hive studio` (not by running the Python file directly) |
 | Studio refuses an upload ("file type cannot be read", "old Word format", "larger than 25 MB", "file name not allowed") | Only documents TestHive can read are accepted, up to 25 MB (APK 300 MB) | Save .doc as .docx, split very large files, rename files with unusual characters |
 | A document shows "not read yet" in Studio | It was added or replaced after the last read | Click **Read the documents** |
+| Studio: "Claude Code is not installed here" | The `claude` command is not found | `.\hive setup --install`, then type `claude` once in a terminal to sign in; restart Studio |
+| A run from Studio fails at once, or its log says it needs approval / is not signed in | Claude Code is not signed in, or the agent tried something outside `bash scripts/*` and file edits | Open a terminal, type `claude`, sign in; read the run's log in Activity; run that step in Claude Code yourself if it needs a permission |
+| Studio: "saving is paused" | An agent is working on that module | Wait for the job panel to finish, or press Stop |
+| A run shows "interrupted" in Activity | Studio was closed while it ran (the agent was stopped) | Run it again |
 | `no approved analysis baseline` | Design needs the approved requirements | Approve the analysis stage first (`.\hive stage status <MODULE>`) |
 | `No results file: reports/...xml` | The test run did not produce results (tool crashed, wrong module name) | Run `.\hive run-mobile <module>` and read its output; module name = folder under `mobile/flows/`. |
 | `GATE FAIL` | The case sheet breaks a definition-of-done rule | Each line says which case and why. Fix the sheet or finish the work (e.g. run `stable` for "Done" cases). |

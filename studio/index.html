@@ -130,7 +130,19 @@ setTheme(store.get('th-theme'));
 
 const chip = (st, status) => `<span class="chip s-${status}" title="${esc(STAGE_LABEL[st])}: ${esc(STATUS_LABEL[status])}">${esc(STAGE_LABEL[st])} · ${esc(STATUS_LABEL[status])}</span>`;
 const pipeline = stages => `<div class="pipeline">${stages.map(s => chip(s.stage, s.status)).join('')}</div>`;
-const nextBox = n => `<div class="next"><b>Next:</b> ${esc(n.text)} ${n.command ? `<code>${esc(n.command)}</code> <button class="small" data-copy="${esc(n.command)}">Copy</button>` : ''}</div>`;
+const nextBox = (n, job) => `<div class="next"><b>Next:</b> ${esc(n.text)}
+  ${job ? `<span class="chip s-in_progress">${esc(job)} is working…</span>` : n.run ? `<button class="primary" data-run="${esc(n.run)}" data-title="${esc(n.title)}" data-min="${esc(n.minutes)}">Run: ${esc(n.title)}</button>` : ''}
+  ${n.command && !job ? `<span class="small muted">${n.run ? 'or in Claude Code:' : ''}</span> <code>${esc(n.command)}</code> <button class="small" data-copy="${esc(n.command)}">Copy</button>` : ''}</div>`;
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-run]'); if (!b) return;
+  e.stopPropagation();
+  const mod = b.closest('[data-mod]')?.dataset.mod || S.module;
+  const script = b.dataset.run === 'explore-web';
+  if (!confirm(`${b.dataset.title} for ${mod}?\n\n${script ? 'Opens the built product in a hidden browser and records what it shows (free, no AI).' : 'Claude Code works in the background on this PC and uses your Claude plan.'} It usually takes ${b.dataset.min} minutes. You can keep using Studio; saving on ${mod} pauses until it finishes, and you can stop it at any time.`)) return;
+  const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: mod, action: b.dataset.run }) });
+  toast(r.message || r.error, r.ok ? 'ok' : 'bad');
+  if (r.ok) { S.module = mod; S.tab = S.view === 'module' ? S.tab : 'activity'; openModule(mod, true); }
+});
 document.addEventListener('click', e => { const c = e.target.closest('[data-copy]'); if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => toast('Copied. Paste it in Claude Code.')).catch(() => toast('Select the text and copy it.', 'warn')); } });
 
 async function home() {
@@ -143,12 +155,12 @@ async function home() {
     <div class="bar"><h2 style="margin:0;flex:1">Modules</h2><button class="primary" id="newmod">New module</button></div>
     ${d.modules.length ? `<div class="cards">${d.modules.map(m => `<div class="card module-card" data-mod="${esc(m.module)}">
       <h2>${esc(m.module)}</h2>${pipeline(m.stages)}
-      <p class="small muted">${m.open_gaps} open questions · ${m.cases} active test cases</p>${nextBox(m.next)}</div>`).join('')}</div>`
+      <p class="small muted">${m.open_gaps} open questions · ${m.cases} active test cases</p>${nextBox(m.next, m.job)}</div>`).join('')}</div>`
     : `<div class="card"><h2 style="margin-top:0">Start with your first module</h2><p>A module is one part of the product, tested on its own: sign-up, login, checkout… Add it, then give TestHive its requirement documents or the address of the built product.</p></div>`}`;
   $('#newmod').onclick = renderNewModule;
   if (!me() && !document.querySelector('.modal')) askName();  // first opening asks the name in the setup form instead
   if ($('#fix')) $('#fix').onclick = () => renderSetup(d.setup, false);
-  document.querySelectorAll('[data-mod]').forEach(el => el.onclick = e => { if (!e.target.closest('[data-copy]')) openModule(el.dataset.mod); });
+  document.querySelectorAll('[data-mod]').forEach(el => el.onclick = e => { if (!e.target.closest('[data-copy],[data-run]')) openModule(el.dataset.mod); });
 }
 
 /* ---------- Project setup (first opening) ---------- */
@@ -209,7 +221,51 @@ async function openModule(mod, keepTab) {
   if (!keepTab) { S.tab = d.stages[0].status === 'pending' ? 'sources' : 'analysis'; S.open.clear(); }
   render();
 }
-const TABS = [['sources', 'Sources'], ['analysis', 'Analysis (questions)'], ['design', 'Design (test cases)'], ['approvals', 'Approvals']];
+const TABS = [['sources', 'Sources'], ['analysis', 'Analysis (questions)'], ['design', 'Design (test cases)'], ['approvals', 'Approvals'], ['activity', 'Activity']];
+let POLL = null;
+function jobCard(j) {
+  if (!j) return '';
+  const secs = Math.max(0, Math.round((Date.now() - Date.parse(j.started)) / 1000));
+  return `<div class="card" id="jobcard" style="border-color:var(--accent)"><div class="bar" style="margin:0"><b style="flex:1">${esc(j.title)} is working… <span class="muted small">${Math.floor(secs / 60)} min ${secs % 60} s</span></b>
+    <button class="danger" id="jobstop" data-id="${esc(j.id)}">Stop</button></div>
+    <pre class="small" style="white-space:pre-wrap;max-height:260px;overflow:auto;background:var(--soft);padding:8px;border-radius:6px;margin:8px 0 0">${esc((j.lines || []).join('\n')) || 'Starting…'}</pre>
+    <p class="small muted" style="margin:6px 0 0">Saving on this module is paused until it finishes. The full log is kept in runs/agents/.</p></div>`;
+}
+function watchJob() {
+  clearInterval(POLL);
+  if (!S.data?.job) return;
+  POLL = setInterval(async () => {
+    if (S.view !== 'module') return clearInterval(POLL);
+    const r = await api('/api/jobs?m=' + encodeURIComponent(S.module));
+    if (r.job) { const c = $('#jobcard'); if (c) c.outerHTML = jobCard(r.job); bindStop(); return; }
+    clearInterval(POLL);
+    if (r.last) toast(`${r.last.title}: ${r.last.status}. ${r.last.summary || ''}`.slice(0, 400), r.last.status === 'done' ? 'ok' : 'bad');
+    openModule(S.module, true);
+  }, 2000);
+}
+function bindStop() {
+  const b = $('#jobstop'); if (!b) return;
+  b.onclick = async () => {
+    if (!confirm('Stop the agent now? Files it already wrote stay as they are; you can run it again later.')) return;
+    const r = await api('/api/stop', { method: 'POST', body: JSON.stringify({ module: S.module, id: b.dataset.id }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); openModule(S.module, true);
+  };
+}
+function renderActivity() {
+  const js = S.data.jobs;
+  $('#tab').innerHTML = `<p class="small muted">Every agent run and exploration started from Studio, newest first. Runs started in Claude Code directly are not listed.</p>
+    <div class="table-wrap"><table><thead><tr><th>Started (UTC)</th><th>What</th><th>Status</th><th>Took</th><th style="min-width:320px">Result</th><th></th></tr></thead><tbody>
+    ${js.map(j => { const took = j.ended ? Math.round((Date.parse(j.ended) - Date.parse(j.started)) / 60000) : null;
+      return `<tr><td class="small">${esc(j.started.replace('T', ' ').slice(0, 16))}</td><td>${esc(j.title)}</td>
+        <td><span class="chip ${j.status === 'done' ? 's-approved' : j.status === 'running' ? 's-in_progress' : 'sev-High'}">${esc(j.status)}</span></td>
+        <td class="small">${took === null ? '' : took + ' min'}${j.cost_usd ? ` · $${esc(j.cost_usd)}` : ''}</td><td class="small" dir="auto">${esc(j.summary)}</td>
+        <td><button class="small" data-log="${esc(j.id)}">Log</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="muted">Nothing run from Studio yet.</td></tr>'}
+    </tbody></table></div><pre id="logview" class="small" style="white-space:pre-wrap;display:none;background:var(--soft);padding:8px;border-radius:6px;margin-top:10px"></pre>`;
+  document.querySelectorAll('[data-log]').forEach(b => b.onclick = async () => {
+    const r = await api('/api/job?id=' + encodeURIComponent(b.dataset.log));
+    const v = $('#logview'); v.style.display = 'block'; v.textContent = `${r.title} (${r.status})\nTask: ${r.task}\n\n${(r.lines || []).join('\n')}`;
+  });
+}
 function readinessCard(r) {
   return `<details class="card" ${r.ready ? 'open' : ''}><summary><b>Ready for automation:</b> ${r.ready ? '<span class="chip s-approved">yes</span>' : `<span class="chip s-pending">not yet</span> <span class="small muted">${r.items.filter(i => i.ok).length} of ${r.items.length} approvals</span>`}</summary>
     <ul class="plain" style="margin-top:8px">${r.items.map(i => `<li>${i.ok ? '✓' : '○'} <b>${esc(i.label)}</b> <span class="muted small">${esc(i.detail)}</span></li>`).join('')}</ul>
@@ -218,14 +274,15 @@ function readinessCard(r) {
 function render() {
   const d = S.data;
   $('#main').innerHTML = `<p class="small"><span class="crumb" id="back">All modules</span> › ${esc(d.module)}</p>
-    <div class="card"><h2 style="margin:0">${esc(d.module)} ${d.meta.title ? `<span class="muted" style="font-weight:400;font-size:15px">${esc(d.meta.title)}</span>` : ''}</h2>${pipeline(d.stages)}${nextBox(d.next)}</div>
+    <div class="card"><h2 style="margin:0">${esc(d.module)} ${d.meta.title ? `<span class="muted" style="font-weight:400;font-size:15px">${esc(d.meta.title)}</span>` : ''}</h2>${pipeline(d.stages)}${nextBox(d.next, d.job && d.job.title)}</div>
+    ${jobCard(d.job)}
     ${readinessCard(d.readiness)}
     <div class="tabs">${TABS.map(([t, l]) => `<button data-tab="${t}" class="${S.tab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="tab"></div>`;
   $('#back').onclick = () => confirmLeave(home);
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => confirmLeave(() => { S.tab = b.dataset.tab; S.dirty = {}; render(); }));
-  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals })[S.tab]();
-  updateSavebar();
+  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals, activity: renderActivity })[S.tab]();
+  updateSavebar(); bindStop(); watchJob();
 }
 
 /* ---------- Sources ---------- */
@@ -253,7 +310,7 @@ function renderSources() {
       <span></span><label><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
       <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="crumb">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
       <label>Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
-      <span></span><span><button id="u-save">Save</button> <span class="small muted">The analyst explores it when you run its command (see Next).</span></span></div></div>
+      <span></span><span><button id="u-save">Save</button> ${mt.url ? `<button data-run="explore-web" data-title="Web exploration" data-min="1-5">Run exploration</button>` : ''} <span class="small muted">The analyst also explores it during its first pass.</span></span></div></div>
     <details class="card" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody" style="margin-top:10px"><button id="mprev">Check the documents</button></div></details>`;
   const upload = async (files, kind) => {
     for (const f of files) {
