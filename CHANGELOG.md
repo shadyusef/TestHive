@@ -7,6 +7,7 @@ Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 - Requirements stage: Sources as clear blocks (documents, built product, earlier versions, personal data, archive); Analysis with a summary row and Questions / Requirements tabs. Test-case stage: a summary row (coverage, priority, your review) and an Accept / Change / Remove switch per case, with the comment box only when it is needed. Lists turn into two-line items on a phone; light and dark themes.
 - Answers are read-only once the analysis is approved, in Studio and in the Excel import, the same as an approved design: a change starts with a reopen, so the approved baseline always matches the answers it was approved with (0.8.0 kept such answers for the next round).
 - Fonts: IBM Plex Sans and Mono are kept in `studio/fonts/` (SIL Open Font License), so Studio works offline. The page is split into `style.css` (every colour and size is a token) and one script per screen in `studio/js/`; Studio serves only those page files.
+- The Run buttons say what they do: Analyse the documents, Analyst: check my answers, Design the test cases, Review the cases (QA reviewer), Tester: apply my review, Explore the built product.
 - Click-throughs cover answering, the review switch and the read-only analysis, and keep a screenshot of any check that fails.
 
 ## 0.8.0 (2026-10-22)

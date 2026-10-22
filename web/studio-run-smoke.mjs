@@ -21,14 +21,14 @@ const check = async (text, fn) => { try { await fn(); console.log('  ok    ' + t
 
 await page.goto(url);
 await page.locator('.module-card').first().click();
-await check('Next shows a Run button for the analyst', async () => { await page.getByRole('button', { name: /^Run: Business analyst/ }).waitFor(); });
+await check('Next shows a Run button for the analyst', async () => { await page.getByRole('button', { name: 'Analyse the documents' }).waitFor(); });
 await shot('1-run-button');
 await check('the module has its own address, and a refresh stays on it', async () => {
-  await page.waitForURL(/#\/SIGNUP\//); await page.reload(); await page.getByRole('button', { name: /^Run: Business analyst/ }).waitFor(); });
+  await page.waitForURL(/#\/SIGNUP\//); await page.reload(); await page.getByRole('button', { name: 'Analyse the documents' }).waitFor(); });
 await check('Sources: a document shows the text TestHive read from it', async () => {
   await page.getByRole('tab', { name: 'Sources' }).click(); await page.getByRole('button', { name: 'Text' }).first().click();
   await page.getByRole('dialog').locator('pre').waitFor(); await shot('1b-document-text'); await page.getByRole('dialog').getByRole('button', { name: 'Close' }).click(); });
-await page.getByRole('button', { name: /^Run: Business analyst/ }).click();
+await page.getByRole('button', { name: 'Analyse the documents' }).click();
 await check('Run asks in the page and says the run is recorded', async () => {
   const dlg = page.getByRole('dialog'); await dlg.getByText(/recorded run/).waitFor(); await dlg.getByRole('button', { name: 'Run' }).click(); });
 await check('the job panel shows the agent at work, with its steps and a Stop button', async () => {

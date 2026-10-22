@@ -138,21 +138,21 @@ def explore_note(mt):
 
 # What each Run button does: the agent, a task in the words of the demos, how long it usually takes.
 ACTIONS = {
-    "analyse": {"agent": "business-analyst", "title": "Business analyst: first pass", "minutes": "15-25", "command": "/th-analyst {m}",
+    "analyse": {"agent": "business-analyst", "title": "Analyse the documents", "minutes": "15-25", "command": "/th-analyst {m}",
                 "task": "Module {m} (started from TestHive Studio). Analyse the documents in requirements/sources/{m}/; they are already read into analysis/sources-text/{m}/.{explore} Produce the registers and the workbook as your rules say."},
-    "analyst-recheck": {"agent": "business-analyst", "title": "Business analyst: re-check", "minutes": "5-15", "command": "/th-analyst re-check {m}",
+    "analyst-recheck": {"agent": "business-analyst", "title": "Analyst: check my answers", "minutes": "5-15", "command": "/th-analyst re-check {m}",
                         "task": "Module {m} (started from TestHive Studio). The human answered questions in TestHive Studio: they are in analysis/gaps.csv with Status Answered. If the analysis was reopened, read the last entries of workflow/APPROVALS.md for why and re-read analysis/sources-text/{m}/. Re-check as your rules say, then run the checks, rebuild the workbook, and submit if ready."},
-    "design": {"agent": "manual-tester", "title": "Manual tester: design the cases", "minutes": "15-30", "command": "/th-manual {m}",
+    "design": {"agent": "manual-tester", "title": "Design the test cases", "minutes": "15-30", "command": "/th-manual {m}",
                "task": "Module {m} (started from TestHive Studio). Design the test cases from the approved analysis baseline as your rules say (platforms in CONTEXT.md). Run the checks and create the workbook. Do not submit."},
-    "prereview": {"agent": "qa-reviewer", "model": "sonnet", "title": "QA reviewer: design pre-review", "minutes": "5-10", "command": "/th-review design pre-review of {m}",
+    "prereview": {"agent": "qa-reviewer", "model": "sonnet", "title": "Review the cases (QA reviewer)", "minutes": "5-10", "command": "/th-review design pre-review of {m}",
                   "task": "Design pre-review of module {m} as your rules say (started from TestHive Studio)."},
-    "design-fix": {"agent": "manual-tester", "title": "Manual tester: fix the reviewer's findings", "minutes": "10-25", "command": "/th-manual fix the review findings of {m}",
+    "design-fix": {"agent": "manual-tester", "title": "Fix the reviewer's findings", "minutes": "10-25", "command": "/th-manual fix the review findings of {m}",
                    "task": "Module {m} (started from TestHive Studio). The QA reviewer wrote {review}. Fix every Blocker and Major finding and every Minor one that is right, then run the checks and rebuild the workbook. Do not submit."},
-    "design-recheck": {"agent": "manual-tester", "title": "Manual tester: re-check your review", "minutes": "5-20", "command": "/th-manual re-check {m}",
+    "design-recheck": {"agent": "manual-tester", "title": "Tester: apply my review", "minutes": "5-20", "command": "/th-manual re-check {m}",
                        "task": "Module {m} (started from TestHive Studio). The human reviewed the cases in TestHive Studio (Review column of test-cases/TestCases.csv and test-cases/requests.csv). Handle it as your rules say, then run the checks, rebuild the workbook, and submit if ready."},
-    "design-impact": {"agent": "manual-tester", "title": "Manual tester: update cases after a requirement change", "minutes": "5-20", "command": "/th-manual update the cases of {m}",
+    "design-impact": {"agent": "manual-tester", "title": "Update the cases for the new requirements", "minutes": "5-20", "command": "/th-manual update the cases of {m}",
                       "task": "Module {m} (started from TestHive Studio). Requirements changed: run bash scripts/design-impact.sh {m} --apply, update the cases marked Needs update as your rules say, add cases for new requirements, run the checks, and submit if ready."},
-    "explore-web": {"title": "Web exploration", "minutes": "1-5", "command": ""},
+    "explore-web": {"title": "Explore the built product", "minutes": "1-5", "command": ""},
 }
 
 

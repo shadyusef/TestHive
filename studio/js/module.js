@@ -96,7 +96,7 @@ function showReadiness(r) {
 function headerActions(d) {
   const n = d.next, wait = d.stages.find(s => s.status === 'awaiting_approval');
   if (d.job) return '';
-  if (n.run) return `<button class="primary" data-run="${esc(n.run)}" data-title="${esc(n.title)}" data-min="${esc(n.minutes)}">Run: ${esc(n.title)}</button>`;
+  if (n.run) return `<button class="primary" data-run="${esc(n.run)}" data-title="${esc(n.title)}" data-min="${esc(n.minutes)}">${esc(n.title)}</button>`;
   if (wait && S.tab !== 'approvals') return `<button class="primary" data-goto="approvals">Review and approve the ${esc(STAGE_LABEL[wait.stage].toLowerCase())}</button>`;
   return '';
 }

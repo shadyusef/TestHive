@@ -27,7 +27,7 @@ def module(): return call("/api/module?m=SIGNUP")[1]
 def press(expect):
     """Presses the Run button next to what to do next, waits for the job, prints its progress and result."""
     d = module(); n = d["next"]
-    step(f"Next says: {n['text']} -> button 'Run: {n.get('title')}'", n["run"] == expect)
+    step(f"Next says: {n['text']} -> button '{n.get('title')}'", n["run"] == expect)
     code, r = call("/api/run", {"module": "SIGNUP", "action": n["run"]})
     if code != 200: step(f"run refused: {r}", False); return None
     for _ in range(300):
@@ -43,7 +43,7 @@ def press(expect):
 d = module()
 if d["next"]["run"] != "analyse":  # the browser click-through already ran the first pass; use the re-run of it for the Stop test
     print("  (first pass already run in the browser click-through)")
-step(f"Next says: {d['next']['text']} -> button 'Run: {d['next'].get('title')}'", d["next"]["run"] in ("analyse", "analyst-recheck"))
+step(f"Next says: {d['next']['text']} -> button '{d['next'].get('title')}'", d["next"]["run"] in ("analyse", "analyst-recheck"))
 code, r = call("/api/run", {"module": "SIGNUP", "action": "analyse"})
 code2, r2 = call("/api/run", {"module": "SIGNUP", "action": "analyse"})
 step(f"a second job on the same module is refused: {r2.get('message')}", code2 == 409)

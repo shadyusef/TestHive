@@ -32,7 +32,7 @@ export function renderSources() {
       <span></span><label class="check"><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
       <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="link accent">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
       <label for="u-title">Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
-      <span></span><span class="bar"><button id="u-save">Save</button>${mt.url ? `<button data-run="explore-web" data-title="Web exploration" data-min="1-5">Run exploration</button>` : ''}</span></div></section>
+      <span></span><span class="bar"><button id="u-save">Save</button>${mt.url ? `<button data-run="explore-web" data-title="Explore the built product" data-min="1-5">Explore the built product</button>` : ''}</span></div></section>
     <details class="fold" id="vercard"><summary><b>Earlier versions and removed documents</b> <span class="small muted">${src.old_versions} kept · who changed what</span></summary><div id="verbody"></div></details>
     <details class="fold" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody"><button id="mprev">Check the documents</button></div></details>
     <details class="fold danger-zone"><summary><b>Archive this module</b> <span class="small muted">moves it and all its files out of the project; it can be restored from the start page</span></summary>
