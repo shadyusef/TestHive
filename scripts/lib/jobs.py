@@ -10,7 +10,7 @@ import sys, os, re, json, time, shutil, signal, subprocess, threading
 
 DIR = os.path.join("runs", "agents")
 MAX_MINUTES = int(os.environ.get("TH_JOB_MAX_MINUTES", "90"))
-JOBS, LOCK = {}, threading.Lock()
+JOBS, LOCK = {}, threading.RLock()
 
 
 def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
@@ -146,6 +146,11 @@ def start(module, kind, title, cmd, task="", agent=""):
 
 
 def stop(job_id, why="stopped by the user"):
+    with LOCK:  # _follow saves the same job when the process ends: one writer of meta.json at a time
+        return _stop(job_id, why)
+
+
+def _stop(job_id, why):
     job = JOBS.get(job_id)
     if not job or job["status"] != "running": return False
     proc = job.get("_proc")
