@@ -18,15 +18,25 @@ later stages that were submitted or approved go back to in progress too and need
 ## Modules and uploads (written by TestHive Studio)
 `requirements/modules/<MODULE>.json`: `title`, `url` (built product to explore), `test_env` (true: the analyst may submit forms),
 `apk` (path of an uploaded APK), `mask` (mask personal data when reading). Documents go to `requirements/sources/<MODULE>/`;
-uploading a file with the same name moves the earlier one to `requirements/sources/<MODULE>/_old/<yyyymmdd-hhmmss>/`
-(`ingest` skips `_old`). APKs go to `requirements/apps/<MODULE>/` (git-ignored).
+uploading a file with the same name, or removing a document, moves it to `requirements/sources/<MODULE>/_old/<yyyymmdd-hhmmss>/`
+(`-2`, `-3` is added when two changes fall in the same second; nothing is overwritten; `ingest` skips `_old`). Restoring copies
+an earlier version back (it also stays in `_old/`). `_old/history.csv` logs every change: `When` (UTC), `Action` (uploaded,
+replaced, removed, restored <version>), `Document`, `By`. APKs go to `requirements/apps/<MODULE>/` (git-ignored).
 
 ## Ingested sources: `analysis/sources-text/<MODULE>/` (written by `scripts/ingest.sh`)
 One `<file>.md` per source document; line 1 is `<!-- source: <path> | type: <kind> | ingested: <date> -->`.
 PDF pages are marked `<!-- page N -->`; Word headings become `#` lines and tables become Markdown tables;
 OpenAPI/Swagger becomes one section per endpoint with fields, required flags and limits. `index.csv` lists
 Source, Type (text, pdf, word, excel, csv, openapi, data, image), Read from, Words, Masked. Images are listed, not
-converted: Claude reads them directly.
+converted: Claude reads them directly. Reading again removes the text of documents that are gone, and removing or
+replacing a document in Studio removes its text at once, so the analyst never works from a document that was taken out.
+
+## Archived modules: `archive/<MODULE>-<yyyymmdd-hhmmss>/` (written by `stage.sh archive`)
+`files/<original path>` (the module's documents, module file, APKs, read texts, explorations, baselines, workbooks, reviews and
+agent logs), `rows/<register path>` (the module's rows of `analysis/requirements.csv`, `gaps.csv`, `test-cases/TestCases.csv`,
+`requests.csv`), `state.json` (its stage state) and `ARCHIVE.json` (`module`, `archived_at`, `by`, `why`, `files`, `rows`).
+`stage.sh restore` puts everything back, refusing if any of it exists again, and moves the folder to `archive/_restored/`.
+Both are logged in `workflow/APPROVALS.md` (stage `-`). APKs and agent logs stay git-ignored inside the archive too.
 
 ## Exploration: `analysis/exploration/<MODULE>/web|android/`
 `exploration.md` (for the analyst), screenshots, and for web `exploration.json` (pages, form fields with their HTML

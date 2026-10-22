@@ -161,19 +161,25 @@ def log_change(module, action, name, by=""):
     with open(p, "a", encoding="utf-8", newline="") as f:
         w = csv.writer(f, lineterminator="\n")
         if new: w.writerow(["When", "Action", "Document", "By"])
-        w.writerow([utc(), action, name, " ".join(str(by).split())[:60]])
+        cell = lambda v: "'" + v if v[:1] in ("=", "+", "-", "@") else v  # never a formula when the file is opened in Excel
+        w.writerow([utc(), action, cell(name), cell(" ".join(str(by).split())[:60])])
 
 
 def history(module):
     p = os.path.join(SOURCES, module, "_old", "history.csv")
     if not os.path.exists(p): return []
-    with open(p, encoding="utf-8", newline="") as f: return list(csv.DictReader(f))
+    with open(p, encoding="utf-8", newline="") as f: rows = list(csv.DictReader(f))
+    out = []
+    for r in rows:  # a damaged line is skipped, never a reason the module cannot open
+        try: time.strptime(r.get("When") or "", "%Y-%m-%dT%H:%M:%SZ"); out.append({k: r.get(k) or "" for k in ("When", "Action", "Document", "By")})
+        except ValueError: continue
+    return out
 
 
 def doc_name(name):
     """A document name inside a module folder (may contain sub-folders), checked part by part; None if not allowed."""
     parts = str(name).replace("\\", "/").split("/")
-    if not all(safe_name(p) == p for p in parts) or "_old" in parts: return None
+    if not all(safe_name(p) == p for p in parts) or "_old" in (x.lower() for x in parts): return None  # _OLD is _old on Windows
     return "/".join(parts)
 
 
@@ -251,11 +257,18 @@ def restore_source(module, version, name, by):
     """Puts an earlier version back as the current document; the current one (if any) is kept in _old/ first."""
     src, rel = old_file(module, version, name), doc_name(name)
     if not src: return False, "That earlier version does not exist."
-    note = ""
-    if source_file(module, rel): note = f" The version it replaced is kept in {os.path.dirname(keep_old(module, rel))}/."
+    note, folder = "", os.path.realpath(os.path.join(SOURCES, module))
     target = os.path.join(SOURCES, module, rel)
-    os.makedirs(os.path.dirname(target), exist_ok=True)
-    shutil.copyfile(src, target)  # a copy with today's time: the earlier version stays in _old/, and TestHive reads it again
+    try:
+        os.makedirs(os.path.dirname(target), exist_ok=True)
+        d = os.path.realpath(os.path.dirname(target))  # a junction or link inside the folder never redirects the write
+        if not (d == folder or d.startswith(folder + os.sep)) or os.path.isdir(target): return False, "That document cannot be restored here."
+        shutil.copyfile(src, target + ".part")  # copy first: if it fails, the current document is untouched
+        if source_file(module, rel): note = f" The version it replaced is kept in {os.path.dirname(keep_old(module, rel))}/."
+        os.replace(target + ".part", target)  # a copy with today's time: the earlier version stays in _old/, and TestHive reads it again
+    except OSError as e:
+        if os.path.exists(target + ".part"): os.remove(target + ".part")
+        return False, f"Not restored: {e.strerror}."
     forget_text(module, rel); log_change(module, f"restored {version}", rel, by)
     return True, f"Restored {rel} from {version}.{note} Read the documents again so the analyst sees it."
 

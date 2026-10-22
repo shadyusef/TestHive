@@ -158,8 +158,9 @@ elif cmd in ("archive", "restore"):
         dest = os.path.join(arch, f"{name}-{time.strftime('%Y%m%d-%H%M%S')}")
         if subprocess.run([sys.executable, lib, "archive", name, dest, opt["by"], opt["comment"]]).returncode: die("Not archived.", 2)
         with open(os.path.join(dest, "state.json"), "w", encoding="utf-8", newline="\n") as f: json.dump(m, f, indent=2, ensure_ascii=False)
-        del s["modules"][name]; save(s)
-        log(name, "-", "Archived", opt["by"], f"{opt['comment']} (kept in {dest.replace(os.sep, '/')}/)")
+        fp = subprocess.run([sys.executable, lib, "fingerprint", dest], capture_output=True, text=True).stdout.strip()
+        del s["modules"][name]; save(s)  # the fingerprint lets restore refuse a folder changed or planted later
+        log(name, "-", "Archived", opt["by"], f"{opt['comment']} (kept in {dest.replace(os.sep, '/')}/, fingerprint {fp})")
         print(f"{name}: archived by {opt['by']}. Restore with: {RUN} restore {os.path.basename(dest)} --by <name>")
     else:
         if not re.fullmatch(r"[A-Z][A-Z0-9]*-\d{8}-\d{6}", pos[0]): die(f"Unknown archive {pos[0]}: give the folder name, e.g. SIGNUP-20261022-153000")

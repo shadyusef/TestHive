@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.7.1).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.8.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -91,12 +91,15 @@ See it with the fictional app: `.\hive demo/phase2/run.sh` (recorded agents, fre
 `.\hive studio` opens a page in your browser, on this PC only. On it you can:
 - **first opening:** describe the project (name, app, platforms, test environment addresses). Studio writes `PROJECT_BRIEF.md`, `CONTEXT.md` and the non-secret `.env` values; passwords and tokens are never typed into Studio;
 - **New module:** give its code and title, and optionally the address of the built product (say whether it is a test environment);
-- **Sources:** drop the requirement documents (PDF, Word, Excel, text, OpenAPI, design images; an APK for Android), check what masking would hide and tick the real names, then **Read the documents** (free, no AI). A new version of a document keeps the old one in `_old/`; if the analysis was already approved, Studio offers to reopen it;
+- **Sources:** drop the requirement documents (PDF, Word, Excel, text, OpenAPI, design images; an APK for Android), check what masking would hide and tick the real names, then **Read the documents** (free, no AI). Open any document, or see the text TestHive read from it (what the analyst works from); **Remove** one, or bring back an earlier version or a removed document (**Earlier versions**, with who changed what). Nothing is deleted: a replaced or removed document is kept in `_old/`. If a document changes after the analysis was approved, **Next** says so and the module is no longer ready for automation until the analysis is reopened;
 - **Ready for automation:** a card on every module shows the three approvals (requirements, test cases, tools) and what is still assumed;
 - see every module and its six stages, with what to do next. Where an agent is needed, **Run** starts it in the background (Claude Code, on your plan, after you confirm): a panel shows its steps live, **Stop** ends it, and saving on that module pauses while it works. **Activity** lists every run with its result, time, cost and log (`runs/agents/`). The same command is still shown, to run it in Claude Code yourself if you prefer;
 - **Analysis:** answer the analyst's questions, or ask your own;
-- **Design:** review the test cases (Accepted, Change with a comment, Remove), see each case's steps and expected result, see coverage and the open questions the cases rely on, add a case, or ask for more cases;
-- **Approvals:** see whether a stage passes its rules, then approve, reject or reopen it, signed with your name; the decision log is there too.
+- **Design:** review the test cases (Accepted, Change with a comment, Remove), see each case's steps and expected result, see coverage and the open questions the cases rely on, add a case, or ask for more cases. Once the design is approved its cases are read-only until it is reopened. A requirement ID anywhere opens the requirement with its questions and cases;
+- **Approvals:** see whether a stage passes its rules, then approve, reject or reopen it, signed with your name; the decision log is there too;
+- **Archive a module** added by mistake or no longer tested (bottom of Sources; you type its code and a reason): the module, its documents, questions, cases, baselines and logs move to `archive/<MODULE>-<time>/`, and **Restore** on the start page puts everything back. The same from a terminal: `.\hive stage archive <MODULE> --by "<name>" --comment "<why>"` and `.\hive stage restore <MODULE>-<time> --by "<name>"`.
+
+Every module and tab has its own address (for example `#/SIGNUP/design`), so a refresh or a bookmark opens the same place.
 
 Studio writes the same files with the same rules as the Excel workbooks (which still work: download and upload them from the page) and as the `stage` script. If an agent or Excel saved in the meantime, Studio refuses to overwrite and reloads. Agents started by Studio can run only the TestHive scripts and edit files: anything that would need your permission fails and is reported (allowing it from the page comes later). Approvals always stay with you. Keep its window open while you use it; Ctrl+C stops it. Try it: `.\hive demo/phase2d/run.sh` presses Run through the whole flow with recorded agents (free; `--live` for real ones); `.\hive demo/phase2c/run.sh` starts from an empty project (upload the files in `demo/phase1/sources/`); `.\hive demo/phase2b/run.sh` opens a project whose cases wait for approval.
 
@@ -108,7 +111,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `setup` | Checks and installs the tools. `--check` (default), `--install`, `--web`, `--ocr` |
 | `selftest` | Proves TestHive works on this machine |
 | `init-project` | Creates the project files from `templates/` |
-| `stage` | Stage gates and approvals |
+| `stage` | Stage gates and approvals; `archive` / `restore` move a module out of the project and back (nothing is deleted) |
 | `ingest` | Turns a module's documents (text, PDF, Word, Excel, OpenAPI, images) into text for the analyst; `--mask` hides personal data first |
 | `explore-web` / `explore-android` | Record what a built web app (URL) or Android app (APK) actually does, as observed behaviour |
 | `check-analysis` | Checks the requirement and gap registers; `--for-approval` checks they are ready to approve |
@@ -149,7 +152,7 @@ CLAUDE.md            rules every Claude session in this folder follows
 scripts/             all scripts (lib/ holds their Python code)
 templates/           files init-project copies: brief, CONTEXT, intake, board, case sheet, registers, reports, env
 docs/                FORMATS, TROUBLESHOOTING, MAINTAINING, ROADMAP
-demo/                one runnable demo per phase       studio/  the Studio page (served by scripts/lib/studio.py)
+demo/                one runnable demo per phase       studio/  the Studio page: index.html (markup, styles) and app.js (logic), served by scripts/lib/studio.py
 mobile/ api/ web/    test code per platform
 requirements/sources/  your input documents          analysis/  requirements and gap registers
 workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv, requests.csv, baseline/

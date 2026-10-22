@@ -24,13 +24,15 @@ You do not need the original author or any chat history; everything is in this r
 | `hive.cmd`, `scripts/hive.sh` | Launcher: `.\hive <name>` runs `scripts/<name>.sh` | Rarely |
 | `scripts/*.sh` | One script per job. Line 2 is its one-line description (shown by `.\hive`); then `# Usage:` lines | Behaviour changes |
 | `scripts/_py.sh` | Finds a Python 3 that really runs (Windows `python3` is often a Store stub) | Never, unless Python lookup breaks |
-| `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline) | Behaviour changes |
+| `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline), `modules.py` (archive and restore a module, called by `stage.sh`) | Behaviour changes |
 | `web/explore.mjs` | Web exploration with Playwright (Edge on Windows) | Exploration behaviour changes |
-| `scripts/lib/studio.py`, `studio/index.html` | TestHive Studio lite: a local server (Python standard library, 127.0.0.1 only, token per start) and one page with no libraries or build step. Writes only through `analysis.apply_answers`, `design.apply_review` and `stage.sh` | A screen or an action changes; keep every rule in the shared functions, never in the page |
+| `scripts/lib/studio.py`, `studio/index.html`, `studio/app.js` | TestHive Studio lite: a local server (Python standard library, 127.0.0.1 only, token per start) and one page with no libraries or build step (markup and styles in `index.html`, logic in `app.js`; no inline scripts are allowed). Each API route is a function registered with `@api(method, path, module=, lock=, busy_check=, raw=)`: the dispatcher checks the token, the module and the write lock. Writes only through `analysis.apply_answers`, `design.apply_review`, `intake` and `stage.sh` | A screen or an action changes; keep every rule in the shared functions, never in the page |
 | `scripts/lib/jobs.py` | Background jobs for Studio: starts `claude --agent ... -p <task> --output-format stream-json` (or a script), turns the event stream into progress lines, Stop kills the whole process tree, one job per module, saved in `runs/agents/<id>/` | How agents are started or shown changes |
 | `ACTIONS` in `scripts/lib/studio.py` | Each Run button: agent, model, task text, usual duration; `next_step` picks the button | A step of the flow changes; keep the task texts in step with the agents' rules and with `demo/phase2d/fake-claude.py` |
 | `demo/phase2d/` | Run buttons end to end; `fake-claude.py` replays the recorded SIGNUP runs as a stand-in for Claude Code (`TH_CLAUDE_FAKE`), so demos, selftest and CI spend nothing; `web/studio-run-smoke.mjs` clicks Run in a browser | When ACTIONS or the recordings change |
-| `scripts/lib/intake.py` | Studio's project setup, modules, uploads, sources list and masking preview (uses `ingest.convert`, `mask.find`, `mask.suggest_names`) | Intake behaviour changes |
+| `scripts/lib/intake.py` | Studio's project setup, modules, uploads, sources list (with what changed after approval), document text, remove and restore with `_old/history.csv`, and masking preview (uses `ingest.convert`, `mask.find`, `mask.suggest_names`) | Intake behaviour changes |
+| `tests/test_libs.py` | Unit tests (standard-library `unittest`) of the libraries and Studio's HTTP API, each in a temporary project; run by the selftest | Every change to a library or a route: add a test |
+| `demo/_lib.sh` | Shared by the demos: a throw-away copy of the tool without the owner's private files, removed on exit (`TH_KEEP_DEMO=1` keeps it) | How demos copy the tool changes |
 | `web/studio-intake-smoke.mjs`, `demo/phase2c/` | Studio from an empty project: `run.sh --check` drives setup, module, uploads (and refusals), masking preview, reading, readiness; with web tools also the screens | When intake changes |
 | `web/studio-smoke.mjs`, `demo/phase2b/` | Studio click-through (Playwright) and the Studio demo; `run.sh --check` drives the API (`walkthrough.py`) and, with web tools, the screens | When Studio changes |
 | `.claude/agents/business-analyst.md` | The analyst's procedure and checklist; the quality of the gaps depends on it | After a benchmark shows misses; re-run `demo/phase1/run.sh --live` and `score-analysis` |
@@ -76,7 +78,9 @@ You do not need the original author or any chat history; everything is in this r
 | `TH_CLAUDE_FAKE` | `studio` | A stand-in for Claude Code (`demo/phase2d/fake-claude.py`): Run buttons replay recordings |
 | `TH_FAKE_DELAY` | `fake-claude.py` | Seconds between recorded events (default 0.3) |
 | `TH_JOB_MAX_MINUTES` | `studio` | A job is stopped after this many minutes (default 90) |
-| `TH_JOB` | set by `jobs.py` for agents started from Studio | `stage.sh` refuses approve, reject and reopen; the `guard_records` hook also protects `scripts/`, `.claude/`, `templates/`, `.env` and the masking files |
+| `TH_ARCHIVE` | `stage` (archive, restore) | Archive folder (default `archive`) |
+| `TH_KEEP_DEMO` | demos | `1` = keep the demo's temporary folder to look around afterwards |
+| `TH_JOB` | set by `jobs.py` for agents started from Studio | `stage.sh` refuses approve, reject, reopen, archive and restore; the `guard_records` hook also protects `scripts/`, `.claude/`, `templates/`, `.env` and the masking files |
 | `TH_SCRIPTS` | `stage` (set by itself) | Where the scripts are, to call `lib/analysis.py` |
 | `PLATFORM`, `INCLUDE_TAGS`, `EXCLUDE_TAGS` | `run-mobile` | iOS instead of Android; tag filters |
 | `TEST_ENV` and every other `.env` key | `run-*` | Environment name recorded with each run; all keys are passed to Maestro flows |
@@ -85,6 +89,8 @@ You do not need the original author or any chat history; everything is in this r
 **Add a script:** create `scripts/<name>.sh` (line 2 = description, then `# Usage:`), add a test to `scripts/selftest.sh`, add it to the README table if users run it, and to `.claude/settings.json` only if agents need it beyond `bash scripts/*`. `.\hive` lists it automatically.
 
 **Add or change an agent:** edit `.claude/agents/<name>.md` (frontmatter `name` must equal the file name; give only the tools it needs), add `.claude/commands/th-<short>.md` and the short name in `scripts/th.sh` and `th.ps1`. The selftest checks names and commands. Update the team table in README and `skills/testhive/SKILL.md`.
+
+**Add a Studio action:** put the rule in a library function (`intake`, `analysis`, `design` or a `stage.sh` command), register a route in `studio.py` with `@api(...)` (`busy_check=True` for anything that writes module files), call it from `app.js` (use `ask()` for confirmations, never the browser's `confirm()`), and add a unit test in `tests/` plus a step in a demo walkthrough or click-through.
 
 **Change a file format:** update the template, `docs/FORMATS.md`, every script that reads it, and the selftest. Keep old files readable or explain the migration in `CHANGELOG.md`.
 
@@ -101,8 +107,8 @@ You do not need the original author or any chat history; everything is in this r
 **Re-recording the phase 2 demo:** run `demo/phase2/run.sh --live`, or run its agent steps by hand on a copy, and copy `test-cases/TestCases.csv` after the first pass to `demo/phase2/recorded/first-pass/`, the review file to `recorded/DESIGN-SIGNUP-1.md`, the cases and `analysis/gaps.csv` (it holds the designer's new questions) after the fixes to `recorded/after-review/`, and the cases, `requests.csv` and `gaps.csv` after the re-check to `recorded/recheck-1/`. Remove the template's `TC-EXAMPLE-001` row if an older project copy still has it. `recorded/sample-review.csv` is the human's review: if the case IDs changed, rewrite it so the IDs match.
 
 ## Testing
-- `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped.
-- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` and `demo/phase2c/run.sh --check` and `demo/phase2d/run.sh --check` (Studio API; the browser click-through runs where the web tools are installed).
+- `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. It includes the unit tests in `tests/` (`python -m unittest discover -s tests` runs them alone). Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped. Every temporary folder is removed at the end.
+- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` and `demo/phase2c/run.sh --check` and `demo/phase2d/run.sh --check` (Studio API; the browser click-throughs run where the web tools are installed, and in CI on Linux).
 - CI runs the selftest on Linux, Windows and macOS for every push and pull request (GitHub, Actions tab).
 - Not covered by automated tests: real installs (`setup --install`), real Maestro/Newman/Playwright runs against an app, the agents' own work. Check those by hand when they change.
 

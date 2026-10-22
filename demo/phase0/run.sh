@@ -88,4 +88,4 @@ if $PY -c "import PIL, pytesseract" 2>/dev/null && { command -v tesseract >/dev/
 else
   echo "Skipped: Tesseract is not installed (setup -Install -Ocr)."
 fi
-printf '\nDemo finished. Temporary folder: %s\n' "$W"
+echo; echo "Demo finished. The temporary folder is removed now (TH_KEEP_DEMO=1 keeps it to look around)."

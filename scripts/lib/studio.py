@@ -359,7 +359,7 @@ def post_upload(h, q, body, module):  # a filled workbook, read with the normal 
 
 @api("POST", "/api/source", module="query", busy_check=True, raw=True)
 def post_source(h, q, body, module):  # one uploaded document or APK as raw bytes; its name comes in the address
-    ok, msg = intake.save_upload(module, arg(q, "name"), body, arg(q, "kind") or "source", arg(q, "by"))
+    ok, msg = intake.save_upload(module, arg(q, "name"), body, arg(q, "kind") or "source", signer({"by": arg(q, "by")})[0] or "")
     return h.send(200 if ok else 400, {"ok": ok, "message": msg})
 
 

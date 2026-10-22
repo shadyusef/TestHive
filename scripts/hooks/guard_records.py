@@ -21,7 +21,8 @@ if os.environ.get("TH_JOB"):  # an agent started by TestHive Studio: the tool it
                       ".mask-allow": "masking lists are kept by a person", ".mask-map.json": "the masking map is written by mask.sh"})
     PROTECTED_DIRS.update({"scripts/": "agents started from Studio may run the scripts, not change them",
                            ".claude/": "agents started from Studio may not change their own rules or settings",
-                           "templates/": "agents started from Studio may not change the templates"})
+                           "templates/": "agents started from Studio may not change the templates",
+                           "archive/": "archived modules are moved there by stage.sh archive, never written by hand"})
 fold = (lambda x: x.lower()) if os.name == "nt" else (lambda x: x)  # Windows paths ignore case
 why = next((w for f, w in PROTECTED.items() if fold(rel) == fold(f)), None) or \
       next((w for d, w in PROTECTED_DIRS.items() if fold(rel).startswith(fold(d))), None)

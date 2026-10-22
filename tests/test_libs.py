@@ -36,7 +36,7 @@ class DocumentNames(unittest.TestCase):
         for n in ("prd.pdf", "specs/api.yaml", "قصص المستخدم.docx", "notes (v2).txt"): self.assertEqual(intake.doc_name(n), n)
 
     def test_refused(self):
-        for n in ("../x.pdf", "a/../b.pdf", "/etc/passwd", "C:\\x.pdf", "..\\..\\.env", "_old/x.pdf", ".env", "con.txt", "a//b.pdf", ""):
+        for n in ("../x.pdf", "a/../b.pdf", "/etc/passwd", "C:\\x.pdf", "..\\..\\.env", "_old/x.pdf", "_OLD/x.pdf", ".env", "con.txt", "a//b.pdf", ""):
             self.assertIsNone(intake.doc_name(n), n)
 
 
@@ -54,6 +54,12 @@ class Documents(Project):
         with open(intake.source_file("SIGNUP", "prd.txt"), "rb") as f: self.assertEqual(f.read(), b"version two")
         self.assertEqual([h["Action"].split()[0] for h in intake.history("SIGNUP")], ["uploaded", "replaced", "removed", "restored"])
         self.assertTrue(intake.old_file("SIGNUP", newest["version"], "prd.txt"), "the restored version stays in _old/")
+
+    def test_history_is_safe_to_open(self):
+        intake.save_upload("SIGNUP", "a.txt", b"x", by="=HYPERLINK(1)")
+        with open(os.path.join(intake.SOURCES, "SIGNUP", "_old", "history.csv"), "a", encoding="utf-8") as f: f.write("not a date,removed,a.txt,x\n")
+        self.assertEqual([h["By"] for h in intake.history("SIGNUP")], ["'=HYPERLINK(1)"], "no formula, and the damaged line is skipped")
+        intake.sources("SIGNUP", "2026-01-01T00:00:00Z")  # a damaged history never stops the module from opening
 
     def test_nothing_outside_the_module(self):
         self.write(".env", "SECRET=1"); intake.save_upload("SIGNUP", "a.txt", b"x")
@@ -111,6 +117,40 @@ class Archive(Project):
 
     def test_archive_needs_a_reason(self):
         self.assertNotEqual(self.stage("archive", "SIGNUP", "--by", "Sara").returncode, 0)
+
+    def test_changed_or_planted_archive_is_refused(self):
+        self.stage("archive", "SIGNUP", "--by", "Sara", "--comment", "x")
+        [a] = modules.listing(); dest = os.path.join("archive", a["name"])
+        with open(os.path.join(dest, "state.json"), encoding="utf-8") as f: st = json.load(f)
+        st["stages"]["design"]["status"] = "approved"  # an approval nobody gave
+        self.write(os.path.join(dest, "state.json"), json.dumps(st))
+        r = self.stage("restore", a["name"], "--by", "Sara")
+        self.assertNotEqual(r.returncode, 0); self.assertIn("fingerprint", r.stdout)
+        planted = os.path.join("archive", "GHOST-20260101-000000")
+        self.write(os.path.join(planted, "ARCHIVE.json"), json.dumps({"module": "GHOST", "archived_at": "x", "files": [], "rows": {}}))
+        self.write(os.path.join(planted, "state.json"), json.dumps(st))
+        self.assertIn("fingerprint", self.stage("restore", "GHOST-20260101-000000", "--by", "Sara").stdout)
+
+    def test_only_the_modules_own_paths(self):
+        for p in ("requirements/sources/SIGNUP", "reviews/DESIGN-SIGNUP-2.md", "runs/agents/20261022-101010-SIGNUP-manual-tester"):
+            self.assertTrue(modules.belongs(p, "SIGNUP"), p)
+        for p in ("../.env", "/etc/passwd", "C:/x", "requirements/sources/LOGIN", "reviews/DESIGN-LOGIN-1.md", "workflow/state.json",
+                  "requirements/sources/SIGNUP/../../../.env", "runs/agents/20261022-101010-SIGNUP-x/../../../.env"):
+            self.assertFalse(modules.belongs(p, "SIGNUP"), p)
+
+    def test_a_locked_file_undoes_the_archive(self):
+        real, calls = shutil.move, []
+        def move(src, dst):
+            calls.append(src)
+            if len(calls) == 2: raise PermissionError(13, "in use", src)
+            return real(src, dst)
+        modules.shutil.move = move
+        try:
+            with self.assertRaises(SystemExit): modules.archive("SIGNUP", os.path.join("archive", "SIGNUP-20260101-000000"), "Sara", "x")
+        finally: modules.shutil.move = real
+        self.assertTrue(os.path.exists("requirements/sources/SIGNUP/prd.txt") and os.path.exists("reviews/DESIGN-SIGNUP-1.md"))
+        self.assertEqual(len(analysis.read_csv(analysis.REQ_FILE, analysis.REQ_COLS)), 2, "the registers are untouched")
+        self.assertFalse(os.path.exists("archive/SIGNUP-20260101-000000"))
 
 
 class ApprovedDesign(Project):

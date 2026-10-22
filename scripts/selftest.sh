@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Proves TestHive itself works on this machine (run it after setup and after every change).
-# Usage: bash scripts/selftest.sh   Proves the template itself is healthy.
+# Usage: bash scripts/selftest.sh   Proves the template itself is healthy (includes the unit tests in tests/).
 set -eE
 # a failing line names itself (otherwise "set -e" exits silently, e.g. inside VAR=$(...))
 trap 'echo "SELFTEST FAIL at scripts/selftest.sh line $LINENO: $BASH_COMMAND" >&2' ERR

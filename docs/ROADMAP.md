@@ -15,6 +15,7 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 2b | TestHive Studio lite: local web page to see stage status, answer gaps, approve stages, open the workbooks (for people who do not use a terminal) | Done (v0.5.0) |
 | 2c | Studio setup and intake: first-opening project setup, new module, document and APK upload, masking review, read the documents, sources with versions, readiness for automation | Done (v0.6.0) |
 | 2d | Run the agents from Studio: Run buttons, live job panel, Stop, Activity log, one job per module, web exploration button; recorded stand-in for free demos and CI | Done (v0.7.0) |
+| 2e | Hardening before phase 3: view, remove and restore documents with a change history; archive and restore modules; approved design read-only; changes after approval shown in Next; page addresses and requirement links; demos clean up; unit tests; browser click-throughs in CI | Done (v0.8.0) |
 | 3 | Tool advice: decision matrix per test type, human choice | Next |
 | 4 | Automation: framework scaffolds, reusable steps, E2E journeys, tags (smoke, sanity, regression, e2e), environments, test data, contract tests | Planned |
 | 5 | Execution: run picker (type, suite, environment, device, BrowserStack), video and step screenshots, API request/response logs, retest after fix, flaky quarantine | Planned |

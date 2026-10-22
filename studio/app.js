@@ -1,7 +1,11 @@
 // TestHive Studio page logic, loaded by studio/index.html. Plain JS, no libraries, no build step.
 // All data comes from the JSON API (scripts/lib/studio.py); every save goes through the same rules as the Excel imports and stage.sh.
 'use strict';
-const TOKEN = new URLSearchParams(location.search).get('t') || '';
+// The access key arrives in the address; it is kept for this tab only and taken out of the address bar and history.
+const TOKEN = (() => { let t = new URLSearchParams(location.search).get('t') || '';
+  try { if (t) sessionStorage.setItem('th-token', t); else t = sessionStorage.getItem('th-token') || ''; } catch {}
+  if (location.search) history.replaceState(null, '', location.pathname + location.hash);
+  return t; })();
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const STAGE_LABEL = { analysis: 'Analysis', design: 'Design', tools: 'Tools', automation: 'Automation', execution: 'Execution', reporting: 'Reporting' };
 const STATUS_LABEL = { approved: 'approved', awaiting_approval: 'waiting for you', in_progress: 'in progress', pending: 'not started' };
@@ -283,7 +287,7 @@ function renderSources() {
       <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Document</th><th>Type</th><th>Changed</th><th>Read by TestHive</th><th></th></tr></thead><tbody>
       ${src.files.map(f => `<tr><td dir="auto"><span class="crumb" data-doc="${esc(f.name)}" title="See what TestHive read">${esc(f.name)}</span></td><td>${esc(f.type)}</td><td class="small">${esc(f.modified)}</td>
         <td class="small">${f.read ? `✓ ${f.type === 'image' ? 'image (read directly)' : esc(f.words) + ' words'}${f.masked === 'yes' ? ' · masked' : ''}` : '<span class="chip s-in_progress">not read yet</span>'}</td>
-        <td class="small" style="white-space:nowrap"><button class="small" data-doc="${esc(f.name)}">Text</button> <a href="${fileUrl(f.name)}" target="_blank" rel="noopener">Original</a>
+        <td class="small" style="white-space:nowrap"><button class="small" data-doc="${esc(f.name)}">Text</button> <a href="${fileUrl(f.name)}" target="_blank" rel="noopener noreferrer">Original</a>
           <button class="small danger" data-rm="${esc(f.name)}">Remove</button></td></tr>`).join('') || '<tr><td colspan="5" class="muted">No documents yet.</td></tr>'}
       </tbody></table></div>
       <div class="bar" style="margin-top:10px"><label><input type="checkbox" id="rd-mask" aria-label="Mask personal data" ${mt.mask ? 'checked' : ''}> Mask personal data</label>
@@ -345,14 +349,14 @@ function renderSources() {
 async function showText(name) {
   const r = await api(`/api/source-text?m=${encodeURIComponent(S.module)}&name=${encodeURIComponent(name)}`);
   panel(name, `<p class="small muted">${r.text ? `What TestHive read${r.masked ? ' (masked)' : ''}: this is what the analyst works from. ` : esc(r.note || r.error || '')}
-      <a href="${fileUrl(name)}" target="_blank" rel="noopener">Open the original</a></p>
+      <a href="${fileUrl(name)}" target="_blank" rel="noopener noreferrer">Open the original</a></p>
     ${r.text ? `<pre dir="auto" style="white-space:pre-wrap;background:var(--soft);padding:10px;border-radius:6px;margin:0">${esc(r.text)}</pre>` : ''}`);
 }
 async function renderVersions() {
   const r = await api('/api/source-versions?m=' + encodeURIComponent(S.module));
   $('#verbody').innerHTML = `${r.versions.length ? `<div class="table-wrap"><table><thead><tr><th>Kept since</th><th>Document</th><th>Size</th><th></th></tr></thead><tbody>
       ${r.versions.map(v => `<tr><td class="small">${esc(v.kept)}</td><td dir="auto">${esc(v.name)} ${v.current ? '' : '<span class="chip sev-Medium">removed</span>'}</td><td class="small">${Math.ceil(v.size / 1024)} KB</td>
-        <td class="small" style="white-space:nowrap"><a href="${fileUrl(v.name, v.version)}" target="_blank" rel="noopener">Open</a>
+        <td class="small" style="white-space:nowrap"><a href="${fileUrl(v.name, v.version)}" target="_blank" rel="noopener noreferrer">Open</a>
           <button class="small" data-restore="${esc(v.version)}" data-name="${esc(v.name)}" data-current="${v.current ? 1 : ''}">Restore</button></td></tr>`).join('')}</tbody></table></div>`
     : '<p class="muted">No earlier versions: nothing was replaced or removed yet.</p>'}
     ${r.history.length ? `<h4>Changes</h4><div class="table-wrap"><table><thead><tr><th>When (UTC)</th><th>What</th><th>Document</th><th>By</th></tr></thead><tbody>

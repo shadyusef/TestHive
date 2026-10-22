@@ -2,6 +2,15 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.8.0 (2026-10-22)
+- Phase 2e, Studio housekeeping: open any document or the text TestHive read from it; remove a document and bring back earlier versions or removed ones (kept in `_old/`, never deleted; `_old/history.csv` says who changed what). Reading the documents drops the text of removed ones.
+- Archive a module (typed code and a reason) and restore it from the start page; `stage archive` / `stage restore` do the same from a terminal, logged in the approvals log (with a fingerprint of the folder, so a changed or planted archive is refused) and refused for agents started from Studio. Everything goes to `archive/<MODULE>-<time>/`; a file that cannot be moved (a workbook open in Excel) undoes the whole step.
+- An approved design is read-only in Studio and in the Excel import (reopen to change it); answers given after the analysis is approved are kept for the next round. When a document changes after the analysis approval, Next and the readiness card say so.
+- Every module and tab has its own address (refresh and bookmarks work); requirement IDs open the requirement with its questions and cases; confirmations appear in the page (and say when agents are recorded). Studio's page logic is in `studio/app.js` and inline scripts are no longer allowed.
+- Security review fixes: the access key leaves the address bar after the page loads; document links send no referrer; a damaged change log or archive entry never stops a module or the start page from opening; names cannot become Excel formulas in the log.
+- Fixes: two changes to a document in the same second no longer overwrite the kept version; demos, selftest and `stable.sh` remove their temporary folders (about 650 were left behind), and demo copies never keep `.env`, masking files, `.private-names` or `HANDOVER.md`.
+- For maintainers: routes registered with `@api` in `studio.py`; unit tests in `tests/` (standard-library unittest) run in the selftest; CI installs the web tools on Linux so the Studio demos also click through the pages.
+
 ## 0.7.1 (2026-10-22)
 - Claude Code hooks in `.claude/settings.json` (`scripts/hooks/`): `check_edit` checks every file Claude edits (bash, Python, JSON, JavaScript, PowerShell syntax; no carriage returns where LF is required); `guard_records` refuses direct edits of `workflow/APPROVALS.md`, `workflow/state.json` and the baselines (also with other capitals or `..` on Windows).
 - Maintainer tools: skills `/release-phase` and `/rerecord-demo`; agents `studio-security-reviewer` and `docs-consistency-reviewer` (read-only); `check-private` with a git-ignored `.private-names` list.

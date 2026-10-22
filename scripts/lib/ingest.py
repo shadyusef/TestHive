@@ -161,10 +161,14 @@ def main():
         if mask: text = masker.mask_string(text)[0]
         with open(out_file, "w", encoding="utf-8", newline="\n") as f: f.write(header + text.strip() + "\n")
         rows.append([rel, kind, out_file.replace(os.sep, "/"), len(text.split()), "yes" if mask else "no"])
-    made = {os.path.realpath(r[2]) for r in rows}
-    for old in glob.glob(os.path.join(out_dir, "*.md")) + glob.glob(os.path.join(out_dir, "*.masked.png")):
-        if os.path.realpath(old) not in made: os.remove(old)  # text of a document that is gone: the analyst must not read it
     idx = os.path.join(out_dir, "index.csv")
+    if os.path.exists(idx):  # text this script wrote earlier for a document that is gone: the analyst must not read it
+        made, home = {os.path.realpath(r[2]) for r in rows}, os.path.realpath(out_dir) + os.sep
+        with open(idx, encoding="utf-8-sig", newline="") as f:
+            for r in csv.DictReader(f):
+                old = os.path.realpath(r.get("Read from") or "")
+                if not os.path.exists(r.get("Source") or "") and old.startswith(home) and old not in made and os.path.isfile(old):
+                    os.remove(old); print(f"  REMOVED the text of {r['Source']} (the document is gone)")
     with open(idx, "w", encoding="utf-8", newline="") as f:
         w = csv.writer(f, lineterminator="\n"); w.writerow(["Source", "Type", "Read from", "Words", "Masked"]); w.writerows(rows)
     print(f"INGESTED {len(rows)} sources for {module} -> {out_dir.replace(os.sep, '/')}/ (index.csv lists them)")
