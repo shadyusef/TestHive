@@ -272,9 +272,18 @@ def run_stage(args):
 # Each route is a function f(h, q, body, module) registered with @api. The dispatcher (Handler.handle_api) checks the token,
 # reads the body, refuses an unknown module and, for writes, holds the write lock and refuses while an agent works on the module.
 ROUTES = {}
-STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8")}
-CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; "
+# The page: index.html, its styles, scripts (studio/js/) and fonts (studio/fonts/). Only these names and types are served.
+PAGE_TYPES = {".html": "text/html; charset=utf-8", ".js": "text/javascript; charset=utf-8", ".css": "text/css; charset=utf-8", ".woff2": "font/woff2"}
+PAGE_FILE = re.compile(r"/(?:(?:js|fonts)/)?[a-z0-9][a-z0-9-]*\.(?:js|css|woff2)")
+CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; font-src 'self'; "
        "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+
+
+def page_file(path):
+    """The file of the page for a URL path, or None. The path already matched PAGE_FILE; it must still resolve inside studio/."""
+    root = os.path.realpath(PAGE_DIR)
+    p = os.path.realpath(os.path.join(root, "index.html" if path == "/" else path.lstrip("/")))
+    return p if p.startswith(root + os.sep) and os.path.isfile(p) else None
 
 
 def api(method, path, module=None, lock=False, busy_check=False, raw=False):
@@ -542,10 +551,11 @@ class Handler(BaseHTTPRequestHandler):
 
     def handle_api(self, method):
         u = urlparse(self.path); q = parse_qs(u.query)
-        if method == "GET" and u.path in STATIC:  # the page itself carries no data: no token needed, but only on this PC
+        if method == "GET" and (u.path == "/" or PAGE_FILE.fullmatch(u.path)):  # the page carries no data: no token needed, but only on this PC
             if not self.local(): return self.send(403, {"error": "forbidden"})
-            name, ctype = STATIC[u.path]
-            return self.send(200, read_bytes(os.path.join(PAGE_DIR, name)), ctype, {"Content-Security-Policy": CSP})
+            p = page_file(u.path)
+            if not p: return self.send(404, {"error": "not found"})
+            return self.send(200, read_bytes(p), PAGE_TYPES[os.path.splitext(p)[1]], {"Content-Security-Policy": CSP})
         if not self.allowed(q): return self.send(403, {"error": "missing or wrong token: open the address printed by studio"})
         fn, o = ROUTES.get((method, u.path), (None, None))
         body = None

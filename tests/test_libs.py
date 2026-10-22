@@ -193,6 +193,11 @@ class StudioApi(Project):
         code, _, h = self.call("/", token=False)
         self.assertEqual(code, 200); self.assertIn("script-src 'self';", h["Content-Security-Policy"]); self.assertNotIn("unsafe-inline'; img", h["Content-Security-Policy"].split("script-src")[1])
         self.assertEqual(self.call("/app.js", token=False)[0], 200)
+        for path, ctype in (("/style.css", "text/css"), ("/js/core.js", "text/javascript"), ("/fonts/ibm-plex-sans-400.woff2", "font/woff2")):
+            code, _, h = self.call(path, token=False); self.assertEqual((code, h["Content-Type"].split(";")[0]), (200, ctype), path)
+        self.assertEqual(self.call("/js/nothing.js", token=False)[0], 404)
+        for path in ("/fonts/OFL.txt", "/js/../index.html", "/..%2fscripts/lib/studio.py", "/JS/core.js"):  # only page files, never anything else
+            self.assertEqual(self.call(path, token=False)[0], 403, path)
         self.assertEqual(self.call("/api/overview", token=False)[0], 403)
         self.assertEqual(self.call("/api/nothing")[0], 404)
         self.assertEqual(self.call("/api/module?m=NOPE")[0], 404)

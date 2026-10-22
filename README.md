@@ -152,7 +152,7 @@ CLAUDE.md            rules every Claude session in this folder follows
 scripts/             all scripts (lib/ holds their Python code)
 templates/           files init-project copies: brief, CONTEXT, intake, board, case sheet, registers, reports, env
 docs/                FORMATS, TROUBLESHOOTING, MAINTAINING, ROADMAP
-demo/                one runnable demo per phase       studio/  the Studio page: index.html (markup, styles) and app.js (logic), served by scripts/lib/studio.py
+demo/                one runnable demo per phase       studio/  the Studio page: index.html, style.css, fonts/, app.js and js/ (one file per screen), served by scripts/lib/studio.py
 mobile/ api/ web/    test code per platform
 requirements/sources/  your input documents          analysis/  requirements and gap registers
 workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv, requests.csv, baseline/
