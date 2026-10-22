@@ -1,0 +1,496 @@
+// TestHive Studio page logic, loaded by studio/index.html. Plain JS, no libraries, no build step.
+// All data comes from the JSON API (scripts/lib/studio.py); every save goes through the same rules as the Excel imports and stage.sh.
+'use strict';
+const TOKEN = new URLSearchParams(location.search).get('t') || '';
+const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
+const STAGE_LABEL = { analysis: 'Analysis', design: 'Design', tools: 'Tools', automation: 'Automation', execution: 'Execution', reporting: 'Reporting' };
+const STATUS_LABEL = { approved: 'approved', awaiting_approval: 'waiting for you', in_progress: 'in progress', pending: 'not started' };
+const S = { view: 'home', module: null, tab: 'sources', dtab: 'cases', data: null, dirty: {}, open: new Set(), filters: {} };
+const $ = s => document.querySelector(s);
+const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+async function api(path, opts = {}) {
+  const r = await fetch(path, { ...opts, headers: { 'X-TestHive-Token': TOKEN, ...(opts.body && !(opts.body instanceof Blob) ? { 'Content-Type': 'application/json' } : {}), ...(opts.headers || {}) } });
+  let body = {}; try { body = await r.json(); } catch {}
+  return { status: r.status, ...body };
+}
+function toast(text, kind = 'ok') {
+  const d = document.createElement('div'); d.className = `msg ${kind} toast`; d.textContent = text; document.body.appendChild(d);
+  setTimeout(() => d.remove(), kind === 'ok' ? 3500 : 9000);
+}
+function me() { return store.get('th-name') || ''; }
+function askName(then) {
+  const m = document.createElement('div'); m.className = 'modal';
+  m.innerHTML = `<div class="card"><h3 style="margin-top:0">Who are you?</h3>
+    <p class="muted small">Your name signs your answers, reviews and approvals (as in the approvals log). It stays in this browser.</p>
+    <input id="nm" style="width:100%" placeholder="e.g. Sara (QA lead)" value="${esc(me())}">
+    <p style="text-align:end;margin-bottom:0"><button class="primary" id="nmok">Continue</button></p></div>`;
+  document.body.appendChild(m); const inp = m.querySelector('#nm'); inp.focus();
+  const done = () => { const v = inp.value.trim(); if (!v) return inp.focus(); store.set('th-name', v); m.remove(); $('#who').textContent = v; then && then(); };
+  m.querySelector('#nmok').onclick = done; inp.onkeydown = e => { if (e.key === 'Enter') done(); };
+}
+function setTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
+$('#theme').onclick = () => { const cur = document.documentElement.dataset.theme || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+  const t = cur === 'dark' ? 'light' : 'dark'; setTheme(t); store.set('th-theme', t); };
+$('#who').onclick = () => askName();
+setTheme(store.get('th-theme'));
+
+const chip = (st, status) => `<span class="chip s-${status}" title="${esc(STAGE_LABEL[st])}: ${esc(STATUS_LABEL[status])}">${esc(STAGE_LABEL[st])} · ${esc(STATUS_LABEL[status])}</span>`;
+const pipeline = stages => `<div class="pipeline">${stages.map(s => chip(s.stage, s.status)).join('')}</div>`;
+const nextBox = (n, job) => `<div class="next"><b>Next:</b> ${esc(n.text)}
+  ${job ? `<span class="chip s-in_progress">${esc(job)} is working…</span>` : n.run ? `<button class="primary" data-run="${esc(n.run)}" data-title="${esc(n.title)}" data-min="${esc(n.minutes)}">Run: ${esc(n.title)}</button>` : ''}
+  ${n.command && !job ? `<span class="small muted">${n.run ? 'or in Claude Code:' : ''}</span> <code>${esc(n.command)}</code> <button class="small" data-copy="${esc(n.command)}">Copy</button>` : ''}</div>`;
+document.addEventListener('click', async e => {
+  const b = e.target.closest('[data-run]'); if (!b) return;
+  e.stopPropagation();
+  const mod = b.closest('[data-mod]')?.dataset.mod || S.module;
+  const script = b.dataset.run === 'explore-web';
+  if (!confirm(`${b.dataset.title} for ${mod}?\n\n${script ? 'Opens the built product in a hidden browser and records what it shows (free, no AI).' : 'Claude Code works in the background on this PC and uses your Claude plan.'} It usually takes ${b.dataset.min} minutes. You can keep using Studio; saving on ${mod} pauses until it finishes, and you can stop it at any time.`)) return;
+  const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: mod, action: b.dataset.run }) });
+  toast(r.message || r.error, r.ok ? 'ok' : 'bad');
+  if (r.ok) { S.module = mod; S.tab = S.view === 'module' ? S.tab : 'activity'; openModule(mod, true); }
+});
+document.addEventListener('click', e => { const c = e.target.closest('[data-copy]'); if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => toast('Copied. Paste it in Claude Code.')).catch(() => toast('Select the text and copy it.', 'warn')); } });
+
+async function home() {
+  S.view = 'home'; S.module = null; S.dirty = {}; updateSavebar();
+  const d = await api('/api/overview');
+  if (d.status !== 200) return $('#main').innerHTML = `<div class="msg bad">${esc(d.error || 'Studio could not load. Open the address printed in the Studio window.')}</div>`;
+  $('#project').textContent = d.setup.setup_needed ? '' : d.project;
+  if (d.setup.setup_needed) return renderSetup(d.setup, true);
+  $('#main').innerHTML = `${d.setup.incomplete ? `<div class="msg warn">Some project details are missing (app name, platforms). <span class="crumb" id="fix">Complete them</span></div>` : ''}
+    <div class="bar"><h2 style="margin:0;flex:1">Modules</h2><button class="primary" id="newmod">New module</button></div>
+    ${d.modules.length ? `<div class="cards">${d.modules.map(m => `<div class="card module-card" data-mod="${esc(m.module)}">
+      <h2>${esc(m.module)}</h2>${pipeline(m.stages)}
+      <p class="small muted">${m.open_gaps} open questions · ${m.cases} active test cases</p>${nextBox(m.next, m.job)}</div>`).join('')}</div>`
+    : `<div class="card"><h2 style="margin-top:0">Start with your first module</h2><p>A module is one part of the product, tested on its own: sign-up, login, checkout… Add it, then give TestHive its requirement documents or the address of the built product.</p></div>`}`;
+  $('#newmod').onclick = renderNewModule;
+  if (!me() && !document.querySelector('.modal')) askName();  // first opening asks the name in the setup form instead
+  if ($('#fix')) $('#fix').onclick = () => renderSetup(d.setup, false);
+  document.querySelectorAll('[data-mod]').forEach(el => el.onclick = e => { if (!e.target.closest('[data-copy],[data-run]')) openModule(el.dataset.mod); });
+}
+
+/* ---------- Project setup (first opening) ---------- */
+function renderSetup(p, first) {
+  S.view = 'setup'; updateSavebar();
+  const plat = ['Web', 'API', 'Android', 'iOS'];
+  $('#main').innerHTML = `<div class="card" style="max-width:760px">
+    <h2 style="margin-top:0">${first ? 'Welcome to TestHive' : 'Project details'}</h2>
+    <p class="muted">${first ? 'Tell TestHive about the product you are testing. You can change this later (Project, top right).' : 'These facts are shared with the agents (CONTEXT.md).'}</p>
+    <div class="form">
+      <label>Project name</label><input id="p-project" dir="auto" value="${esc(p.project)}" placeholder="Nakhla Rewards">
+      <label>App name</label><input id="p-app" dir="auto" value="${esc(p.app)}" placeholder="Nakhla">
+      <label>Platforms</label><span>${plat.map(x => `<label style="margin-inline-end:14px"><input type="checkbox" class="p-plat" value="${x}" ${p.platforms.includes(x) ? 'checked' : ''}> ${x}</label>`).join('')}</span>
+      <label>Environment name</label><input id="p-env" value="${esc(p.test_env)}" placeholder="staging">
+      <label>Web address</label><input id="p-web" value="${esc(p.base_url)}" placeholder="https://staging.example.com">
+      <label>API address</label><input id="p-api" value="${esc(p.api_url)}" placeholder="https://api.staging.example.com">
+      <label>Android package</label><input id="p-appid" value="${esc(p.app_id)}" placeholder="com.company.app (optional)">
+      <label>Your name</label><input id="p-me" value="${esc(me())}" placeholder="Sara (QA lead)">
+      <span></span><span class="small muted">Passwords and tokens are never typed here: add them to the .env file yourself when a test needs them.</span>
+      <span></span><span><button class="primary" id="p-save">${first ? 'Create project' : 'Save'}</button> ${first ? '' : '<button id="p-cancel">Cancel</button>'}</span>
+    </div></div>`;
+  if ($('#p-cancel')) $('#p-cancel').onclick = home;
+  $('#p-save').onclick = async () => {
+    const name = $('#p-me').value.trim(); if (!name) return toast('Enter your name: it signs your decisions.', 'warn');
+    store.set('th-name', name); $('#who').textContent = name;
+    const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ project: $('#p-project').value, app: $('#p-app').value,
+      platforms: [...document.querySelectorAll('.p-plat:checked')].map(x => x.value), test_env: $('#p-env').value.trim(), base_url: $('#p-web').value.trim(),
+      api_url: $('#p-api').value.trim(), app_id: $('#p-appid').value.trim() }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) home();
+  };
+}
+$('#projbtn').onclick = async () => confirmLeave(async () => { const p = await api('/api/project'); if (p.status === 200) renderSetup(p, p.setup_needed); });
+
+/* ---------- New module ---------- */
+function renderNewModule() {
+  S.view = 'newmodule'; updateSavebar();
+  $('#main').innerHTML = `<p class="small"><span class="crumb" id="back">All modules</span> › New module</p><div class="card" style="max-width:760px">
+    <h2 style="margin-top:0">New module</h2><div class="form">
+      <label>Module code</label><input id="m-code" placeholder="SIGNUP" style="text-transform:uppercase">
+      <label>Title</label><input id="m-title" dir="auto" placeholder="Sign-up and mobile verification">
+      <label>Built product (optional)</label><input id="m-url" placeholder="https://staging.example.com/signup">
+      <span></span><label><input type="checkbox" id="m-test"> This address is a test environment (the analyst may submit forms with test data)</label>
+      <span></span><label><input type="checkbox" id="m-mask"> The documents contain personal data: mask it before the AI reads them</label>
+      <span></span><span><button class="primary" id="m-save">Add module</button> <span class="small muted">Next: add the documents (and an APK if you have one).</span></span>
+    </div></div>`;
+  $('#back').onclick = home;
+  $('#m-save').onclick = async () => {
+    const r = await api('/api/module-new', { method: 'POST', body: JSON.stringify({ module: $('#m-code').value.trim().toUpperCase(), title: $('#m-title').value,
+      url: $('#m-url').value.trim(), test_env: $('#m-test').checked, mask: $('#m-mask').checked }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) { S.tab = 'sources'; openModule(r.module, true); }
+  };
+}
+
+async function openModule(mod, keepTab) {
+  const d = await api('/api/module?m=' + encodeURIComponent(mod));
+  if (d.status !== 200) return toast(d.error || 'Could not load the module', 'bad');
+  S.view = 'module'; S.module = mod; S.data = d; S.dirty = {};
+  if (!keepTab) { S.tab = d.stages[0].status === 'pending' ? 'sources' : 'analysis'; S.open.clear(); }
+  render();
+}
+const TABS = [['sources', 'Sources'], ['analysis', 'Analysis (questions)'], ['design', 'Design (test cases)'], ['approvals', 'Approvals'], ['activity', 'Activity']];
+let POLL = null;
+function jobCard(j) {
+  if (!j) return '';
+  const secs = Math.max(0, Math.round((Date.now() - Date.parse(j.started)) / 1000));
+  return `<div class="card" id="jobcard" style="border-color:var(--accent)"><div class="bar" style="margin:0"><b style="flex:1">${esc(j.title)} is working… <span class="muted small">${Math.floor(secs / 60)} min ${secs % 60} s</span></b>
+    <button class="danger" id="jobstop" data-id="${esc(j.id)}">Stop</button></div>
+    <pre class="small" style="white-space:pre-wrap;max-height:260px;overflow:auto;background:var(--soft);padding:8px;border-radius:6px;margin:8px 0 0">${esc((j.lines || []).join('\n')) || 'Starting…'}</pre>
+    <p class="small muted" style="margin:6px 0 0">Saving on this module is paused until it finishes. The full log is kept in runs/agents/.</p></div>`;
+}
+function watchJob() {
+  clearInterval(POLL);
+  if (!S.data?.job) return;
+  POLL = setInterval(async () => {
+    if (S.view !== 'module') return clearInterval(POLL);
+    const r = await api('/api/jobs?m=' + encodeURIComponent(S.module));
+    if (r.job) { const c = $('#jobcard'); if (c) c.outerHTML = jobCard(r.job); bindStop(); return; }
+    clearInterval(POLL);
+    if (r.last) toast(`${r.last.title}: ${r.last.status}. ${r.last.summary || ''}`.slice(0, 400), r.last.status === 'done' ? 'ok' : 'bad');
+    openModule(S.module, true);
+  }, 2000);
+}
+function bindStop() {
+  const b = $('#jobstop'); if (!b) return;
+  b.onclick = async () => {
+    if (!confirm('Stop the agent now? Files it already wrote stay as they are; you can run it again later.')) return;
+    const r = await api('/api/stop', { method: 'POST', body: JSON.stringify({ module: S.module, id: b.dataset.id }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); openModule(S.module, true);
+  };
+}
+function renderActivity() {
+  const js = S.data.jobs;
+  $('#tab').innerHTML = `<p class="small muted">Every agent run and exploration started from Studio, newest first. Runs started in Claude Code directly are not listed.</p>
+    <div class="table-wrap"><table><thead><tr><th>Started (UTC)</th><th>What</th><th>Status</th><th>Took</th><th style="min-width:320px">Result</th><th></th></tr></thead><tbody>
+    ${js.map(j => { const took = j.ended ? Math.round((Date.parse(j.ended) - Date.parse(j.started)) / 60000) : null;
+      return `<tr><td class="small">${esc(j.started.replace('T', ' ').slice(0, 16))}</td><td>${esc(j.title)}</td>
+        <td><span class="chip ${j.status === 'done' ? 's-approved' : j.status === 'running' ? 's-in_progress' : 'sev-High'}">${esc(j.status)}</span></td>
+        <td class="small">${took === null ? '' : took + ' min'}${j.cost_usd ? ` · $${esc(j.cost_usd)}` : ''}</td><td class="small" dir="auto">${esc(j.summary)}</td>
+        <td><button class="small" data-log="${esc(j.id)}">Log</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="muted">Nothing run from Studio yet.</td></tr>'}
+    </tbody></table></div><pre id="logview" class="small" style="white-space:pre-wrap;display:none;background:var(--soft);padding:8px;border-radius:6px;margin-top:10px"></pre>`;
+  document.querySelectorAll('[data-log]').forEach(b => b.onclick = async () => {
+    const r = await api('/api/job?id=' + encodeURIComponent(b.dataset.log));
+    const v = $('#logview'); v.style.display = 'block'; v.textContent = `${r.title} (${r.status})\nTask: ${r.task}\n\n${(r.lines || []).join('\n')}`;
+  });
+}
+function readinessCard(r) {
+  return `<details class="card" ${r.ready ? 'open' : ''}><summary><b>Ready for automation:</b> ${r.ready ? '<span class="chip s-approved">yes</span>' : `<span class="chip s-pending">not yet</span> <span class="small muted">${r.items.filter(i => i.ok).length} of ${r.items.length} approvals</span>`}</summary>
+    <ul class="plain" style="margin-top:8px">${r.items.map(i => `<li>${i.ok ? '✓' : '○'} <b>${esc(i.label)}</b> <span class="muted small">${esc(i.detail)}</span></li>`).join('')}</ul>
+    ${r.notes.length ? `<p class="small muted" style="margin-bottom:0">${r.notes.map(esc).join(' · ')}</p>` : ''}</details>`;
+}
+function render() {
+  const d = S.data;
+  $('#main').innerHTML = `<p class="small"><span class="crumb" id="back">All modules</span> › ${esc(d.module)}</p>
+    <div class="card"><h2 style="margin:0">${esc(d.module)} ${d.meta.title ? `<span class="muted" style="font-weight:400;font-size:15px">${esc(d.meta.title)}</span>` : ''}</h2>${pipeline(d.stages)}${nextBox(d.next, d.job && d.job.title)}</div>
+    ${jobCard(d.job)}
+    ${readinessCard(d.readiness)}
+    <div class="tabs">${TABS.map(([t, l]) => `<button data-tab="${t}" class="${S.tab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
+    <div id="tab"></div>`;
+  $('#back').onclick = () => confirmLeave(home);
+  document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => confirmLeave(() => { S.tab = b.dataset.tab; S.dirty = {}; render(); }));
+  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals, activity: renderActivity })[S.tab]();
+  updateSavebar(); bindStop(); watchJob();
+}
+
+/* ---------- Sources ---------- */
+function renderSources() {
+  const d = S.data, src = d.sources, mt = d.meta, analysisDone = d.stages[0].status === 'approved';
+  const late = src.files.filter(f => f.after_approval);
+  const unread = src.files.filter(f => !f.read).length;
+  $('#tab').innerHTML = `${late.length && analysisDone ? `<div class="msg warn"><b>${late.length} document(s) changed after the analysis was approved.</b> Reopen the analysis so the analyst reads them; after the new approval TestHive shows which test cases are affected.
+      <div class="bar" style="margin-top:8px;margin-bottom:0"><input class="grow" id="ro-c" placeholder="What changed (required)"><button id="ro">Reopen analysis</button></div></div>` : ''}
+    <div class="card"><h3 style="margin-top:0">Requirement documents</h3>
+      <div id="drop" style="border:1px dashed var(--line);border-radius:8px;padding:18px;text-align:center" class="muted">
+        Drop files here, or <label class="crumb">choose files<input type="file" id="files" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.bmp,.webp"></label>
+        <div class="small">PDF, Word (.docx), Excel, CSV, text, OpenAPI / Swagger (.json, .yaml), design images · up to 25 MB each · a file with the same name replaces the old one, which is kept</div></div>
+      <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Document</th><th>Type</th><th>Changed</th><th>Read by TestHive</th></tr></thead><tbody>
+      ${src.files.map(f => `<tr><td dir="auto">${esc(f.name)}</td><td>${esc(f.type)}</td><td class="small">${esc(f.modified)}</td>
+        <td class="small">${f.read ? `✓ ${f.type === 'image' ? 'image (read directly)' : esc(f.words) + ' words'}${f.masked === 'yes' ? ' · masked' : ''}` : '<span class="chip s-in_progress">not read yet</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No documents yet.</td></tr>'}
+      </tbody></table></div>
+      ${src.old_versions ? `<p class="small muted">${src.old_versions} earlier upload(s) kept in requirements/sources/${esc(d.module)}/_old/.</p>` : ''}
+      <div class="bar" style="margin-top:10px"><label><input type="checkbox" id="rd-mask" ${mt.mask ? 'checked' : ''}> Mask personal data</label>
+        <button class="primary" id="read" ${src.files.length ? '' : 'disabled'}>Read the documents${unread ? ` (${unread} new)` : ''}</button>
+        <span class="small muted">${src.read_at ? 'Last read ' + esc(src.read_at) : 'Turns every document into text the analyst can read (free, no AI).'}</span></div>
+      <pre id="readout" class="small" style="white-space:pre-wrap;display:none;background:var(--soft);padding:8px;border-radius:6px"></pre></div>
+    <div class="card"><h3 style="margin-top:0">Built product (optional)</h3><div class="form">
+      <label>Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://staging.example.com/signup">
+      <span></span><label><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
+      <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="crumb">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
+      <label>Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
+      <span></span><span><button id="u-save">Save</button> ${mt.url ? `<button data-run="explore-web" data-title="Web exploration" data-min="1-5">Run exploration</button>` : ''} <span class="small muted">The analyst also explores it during its first pass.</span></span></div></div>
+    <details class="card" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody" style="margin-top:10px"><button id="mprev">Check the documents</button></div></details>`;
+  const upload = async (files, kind) => {
+    for (const f of files) {
+      const r = await api(`/api/source?m=${encodeURIComponent(d.module)}&kind=${kind}&name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f, headers: { 'Content-Type': 'application/octet-stream' } });
+      toast(r.message || r.error, r.ok ? 'ok' : 'bad');
+    }
+    openModule(d.module, true);
+  };
+  $('#files').onchange = e => upload([...e.target.files], 'source');
+  $('#apk').onchange = e => upload([...e.target.files], 'apk');
+  const drop = $('#drop');
+  drop.ondragover = e => { e.preventDefault(); drop.style.borderColor = 'var(--accent)'; };
+  drop.ondragleave = () => drop.style.borderColor = '';
+  drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = ''; upload([...e.dataTransfer.files], 'source'); };
+  $('#read').onclick = async () => {
+    $('#read').disabled = true; $('#read').textContent = 'Reading…';
+    const r = await api('/api/ingest', { method: 'POST', body: JSON.stringify({ module: d.module, mask: $('#rd-mask').checked }) });
+    toast(r.ok ? 'Documents read.' : 'Some documents could not be read.', r.ok ? 'ok' : 'bad');
+    await openModule(d.module, true); const o = $('#readout'); o.textContent = r.message || r.error; o.style.display = 'block';
+  };
+  $('#u-save').onclick = async () => {
+    const r = await api('/api/module-meta', { method: 'POST', body: JSON.stringify({ module: d.module, url: $('#u-url').value.trim(), test_env: $('#u-test').checked,
+      title: $('#u-title').value, mask: $('#rd-mask').checked }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(d.module, true);
+  };
+  if ($('#ro')) $('#ro').onclick = async () => {
+    if (!me()) return askName(); const c = $('#ro-c').value.trim(); if (!c) return toast('Say what changed.', 'warn');
+    if (!confirm('Reopen the analysis? Later stages go back to in progress and need a new approval.')) return;
+    const r = await api('/api/stage', { method: 'POST', body: JSON.stringify({ module: d.module, stage: 'analysis', action: 'reopen', by: me(), comment: c }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); openModule(d.module, true);
+  };
+  $('#mprev').onclick = renderMask;
+}
+async function renderMask() {
+  $('#maskbody').innerHTML = '<p class="muted">Checking…</p>';
+  const m = await api('/api/mask-preview?m=' + encodeURIComponent(S.module));
+  if (m.status !== 200) return $('#maskbody').innerHTML = `<div class="msg bad">${esc(m.error)}</div>`;
+  const counts = Object.entries(m.counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(', ') || 'nothing';
+  $('#maskbody').innerHTML = `<p class="small muted">This stays on your PC: the agents cannot open Studio. Ticked names are added to the names to hide (.mask-terms); unticked values are left as they are (.mask-allow). Then read the documents again with "Mask personal data" on.</p>
+    <h4>Names TestHive is not sure about (${m.names.length})</h4>
+    ${m.names.length ? `<div class="table-wrap"><table><thead><tr><th>Hide</th><th>Name</th><th>Why</th><th>In</th></tr></thead><tbody>${m.names.map((n, i) =>
+      `<tr><td><input type="checkbox" class="mk-name" data-i="${i}"></td><td dir="auto">${esc(n.name)}</td><td class="small muted">${esc(n.why)}</td><td class="small">${esc(n.file)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None.</p>'}
+    <h4>Values masking would hide (${counts})</h4>
+    ${m.values.length ? `<div class="table-wrap"><table><thead><tr><th>Hide</th><th>Kind</th><th style="min-width:340px">In context</th><th>In</th></tr></thead><tbody>${m.values.map((v, i) =>
+      `<tr><td><input type="checkbox" class="mk-val" data-i="${i}" checked></td><td>${esc(v.kind)}</td><td dir="auto" class="small">${esc(v.context)}</td><td class="small">${esc(v.file)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None.</p>'}
+    ${m.skipped.length ? `<div class="msg warn small">${m.skipped.map(esc).join('<br>')}</div>` : ''}
+    <p><button class="primary" id="mk-save">Save choices</button></p>`;
+  $('#mk-save').onclick = async () => {
+    const terms = [...document.querySelectorAll('.mk-name:checked')].map(x => m.names[x.dataset.i].name);
+    const allow = [...new Set([...document.querySelectorAll('.mk-val:not(:checked)')].map(x => m.values[x.dataset.i].value))];
+    const r = await api('/api/mask-lists', { method: 'POST', body: JSON.stringify({ module: S.module, terms, allow }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad');
+  };
+}
+function confirmLeave(go) { if (Object.keys(S.dirty).length && !confirm('You have unsaved changes. Leave without saving?')) return; S.dirty = {}; go(); }
+window.addEventListener('beforeunload', e => { if (Object.keys(S.dirty).length) { e.preventDefault(); e.returnValue = ''; } });
+
+function filterBar(key, fields) {
+  const f = S.filters[key] = S.filters[key] || {};
+  return `<div class="bar"><input class="grow" placeholder="Search" data-f="${key}:q" value="${esc(f.q || '')}">${fields.map(([name, label, opts]) =>
+    `<select data-f="${key}:${name}"><option value="">${esc(label)}: all</option>${opts.map(o => `<option ${f[name] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`).join('')}</div>`;
+}
+function bindFilters(rerender) {
+  document.querySelectorAll('[data-f]').forEach(el => {
+    const [key, name] = el.dataset.f.split(':');
+    el.oninput = el.onchange = () => { S.filters[key][name] = el.value; rerender(); if (el.tagName === 'INPUT') { const again = document.querySelector(`[data-f="${key}:${name}"]`); again.focus(); again.setSelectionRange(el.value.length, el.value.length); } };
+  });
+}
+const matches = (row, f, cols) => (!f.q || cols.some(c => String(row[c] || '').toLowerCase().includes(f.q.toLowerCase())));
+
+/* ---------- Analysis ---------- */
+function renderAnalysis() {
+  const a = S.data.analysis, gaps = a.gaps, f = (S.filters.gaps = S.filters.gaps || { status: 'Open' });
+  const shown = gaps.filter(g => matches(g, f, ['ID', 'Question', 'Answer', 'Requirement']) && (!f.severity || g.Severity === f.severity) && (!f.status || g.Status === f.status));
+  const cnt = (k, v) => gaps.filter(g => g[k] === v).length;
+  const req = Object.fromEntries(a.requirements.map(r => [r.ID, r]));
+  $('#tab').innerHTML = `<div class="card"><div class="stats">
+      <div class="stat"><b>${a.requirements.length}</b>requirements</div><div class="stat"><b>${gaps.length}</b>questions</div>
+      <div class="stat"><b>${cnt('Status', 'Open')}</b>open</div><div class="stat"><b>${gaps.filter(g => g.Severity === 'High' && g.Status !== 'Closed').length}</b>High not closed</div>
+      <div class="stat"><b>${cnt('Status', 'Answered')}</b>answered, waiting for the analyst</div></div>
+      <p class="small muted">Answer in the yellow column; your name is added. Closed questions were settled by the analyst. Prefer Excel? <a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=analysis&t=${encodeURIComponent(TOKEN)}">Download the workbook</a> · <label class="crumb">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="analysis"></label></p></div>
+    ${filterBar('gaps', [['severity', 'Severity', ['High', 'Medium', 'Low']], ['status', 'Status', ['Open', 'Answered', 'Closed']]])}
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>Severity</th><th style="min-width:300px">Question</th><th style="min-width:300px">Your answer</th><th>Status</th></tr></thead><tbody>
+    ${shown.map(g => { const dv = S.dirty[g.ID] || {}; const closed = g.Status === 'Closed';
+      return `<tr class="${S.dirty[g.ID] ? 'dirty' : ''}"><td class="id">${esc(g.ID)}</td><td><span class="chip sev-${esc(g.Severity)}">${esc(g.Severity)}</span><div class="small muted">${esc(g.Kind)}</div></td>
+      <td dir="auto">${esc(g.Question)}${g.Requirement ? `<div class="small muted" title="${esc(g.Requirement.split(/[;,]/).map(x => req[x.trim()]?.Text || '').join(' | '))}">About ${esc(g.Requirement)}</div>` : ''}</td>
+      <td>${closed ? `<div dir="auto">${esc(g.Answer)}</div><div class="small muted">${esc(g['Answered By'])}</div>` :
+        `<textarea dir="auto" class="edit" data-gap="${esc(g.ID)}" rows="2">${esc(dv.Answer ?? g.Answer)}</textarea>${g['Answered By'] && !dv.Answer ? `<div class="small muted">${esc(g['Answered By'])}</div>` : ''}`}</td>
+      <td>${closed ? 'Closed' : esc(dv.Status || g.Status)}</td></tr>`; }).join('') || `<tr><td colspan="5" class="muted">No questions match.</td></tr>`}
+    </tbody></table></div>
+    <div class="card" style="margin-top:14px"><h3 style="margin-top:0">Ask a question of your own</h3><div class="form">
+      <label>Question</label><textarea id="nq" dir="auto" rows="2"></textarea>
+      <label>About requirement(s)</label><input id="nqr" list="reqids" placeholder="e.g. REQ-${esc(S.module)}-003">
+      <label>Kind</label><select id="nqk"><option>Missing</option><option>Ambiguous</option><option>Conflict</option><option>Untestable</option><option>To confirm</option></select>
+      <label>Severity</label><select id="nqs"><option>Medium</option><option>High</option><option>Low</option></select>
+      <span></span><span><button id="nqadd">Add question</button></span></div>
+      <datalist id="reqids">${a.requirements.map(r => `<option value="${esc(r.ID)}">`).join('')}</datalist></div>
+    <details class="card"><summary><b>Requirements (${a.requirements.length})</b> <span class="small muted">read-only; the analyst maintains them</span></summary>
+      <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>ID</th><th>Priority</th><th>Type</th><th>Status</th><th>Requirement</th><th>Source</th></tr></thead><tbody>
+      ${a.requirements.map(r => `<tr class="${r.Status === 'Removed' ? 'removed' : ''}"><td class="id">${esc(r.ID)}</td><td>${esc(r.Priority)}</td><td>${esc(r.Type)}</td><td>${esc(r.Status)}</td><td dir="auto">${esc(r.Text)}</td><td class="small muted">${esc(r.Source)}</td></tr>`).join('')}
+      </tbody></table></div></details>`;
+  bindFilters(renderAnalysis); bindUploads();
+  document.querySelectorAll('[data-gap]').forEach(t => t.oninput = () => {
+    const g = gaps.find(x => x.ID === t.dataset.gap), v = t.value;
+    if (v.trim() === (g.Answer || '').trim()) delete S.dirty[g.ID]; else S.dirty[g.ID] = { Answer: v, Status: v.trim() ? 'Answered' : 'Open' };
+    t.closest('tr').classList.toggle('dirty', !!S.dirty[g.ID]); t.closest('tr').lastElementChild.textContent = S.dirty[g.ID]?.Status || g.Status; updateSavebar();
+  });
+  $('#nqadd').onclick = async () => {
+    const q = $('#nq').value.trim(); if (!q) return toast('Write the question first.', 'warn');
+    await saveAnswers([{ ID: '', Question: q, Requirement: $('#nqr').value.trim(), Kind: $('#nqk').value, Severity: $('#nqs').value }]);
+  };
+}
+async function saveAnswers(extra = []) {
+  if (!me()) return askName(() => saveAnswers(extra));
+  const rows = Object.entries(S.dirty).map(([ID, v]) => ({ ID, Answer: v.Answer.trim(), 'Answered By': v.Answer.trim() ? me() : '', Status: v.Status })).concat(extra);
+  const r = await api('/api/answers', { method: 'POST', body: JSON.stringify({ module: S.module, version: S.data.analysis.version, rows }) });
+  return afterSave(r);
+}
+
+/* ---------- Design ---------- */
+const TAGS = ['smoke', 'sanity', 'regression', 'e2e'];
+function renderDesign() {
+  const d = S.data.design;
+  if (!d.baseline) return $('#tab').innerHTML = `<div class="card"><p>Test design starts when the analysis is approved (see the Approvals tab).</p></div>`;
+  if (!d.cases.length) return $('#tab').innerHTML = `<div class="card"><p>No test cases yet. In Claude Code: <code>/th-manual ${esc(S.module)}</code></p></div>`;
+  const act = d.cases.filter(c => c.Status !== 'Removed'), covered = d.coverage.filter(r => r.Cases.length).length;
+  const reviewed = act.filter(c => c.Review).length;
+  $('#tab').innerHTML = `<div class="card"><div class="stats">
+      <div class="stat"><b>${act.length}</b>active cases</div><div class="stat"><b>${covered}/${d.coverage.length}</b>requirements covered</div>
+      ${['P0', 'P1', 'P2', 'P3'].map(p => `<div class="stat"><b>${act.filter(c => c.Priority === p).length}</b>${p}</div>`).join('')}
+      <div class="stat"><b>${reviewed}</b>reviewed</div><div class="stat"><b>${d.requests.filter(q => q.Status === 'Open').length}</b>open requests</div></div>
+      <p class="small muted">Designed from analysis baseline ${esc(d.baseline)}. Review each case: Accepted, Change (say what) or Remove. Prefer Excel? <a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=design&t=${encodeURIComponent(TOKEN)}">Download the workbook</a> · <label class="crumb">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="design"></label></p></div>
+    <div class="tabs">${[['cases', 'Cases'], ['coverage', 'Coverage'], ['assumptions', 'Open questions'], ['requests', 'Requests and new cases']].map(([k, l]) => `<button data-dtab="${k}" class="${S.dtab === k ? 'on' : ''}">${l}</button>`).join('')}</div><div id="dtab"></div>`;
+  document.querySelectorAll('[data-dtab]').forEach(b => b.onclick = () => { S.dtab = b.dataset.dtab; renderDesign(); updateSavebar(); });
+  bindUploads();
+  ({ cases: renderCases, coverage: renderCoverage, assumptions: renderAssumptions, requests: renderRequests })[S.dtab]();
+}
+function renderCases() {
+  const cases = S.data.design.cases, f = (S.filters.cases = S.filters.cases || { state: 'Active' });
+  const shown = cases.filter(c => matches(c, f, ['ID', 'Title', 'Steps', 'Expected Result', 'Requirements']) && (!f.priority || c.Priority === f.priority) &&
+    (!f.tag || c.Tags.split(/[;,]/).map(x => x.trim()).includes(f.tag)) && (!f.platform || c.Platform === f.platform) &&
+    (!f.review || (f.review === 'Not reviewed' ? !c.Review : c.Review === f.review)) && (f.state !== 'Active' || c.Status !== 'Removed') && (f.state !== 'Removed' || c.Status === 'Removed'));
+  $('#dtab').innerHTML = filterBar('cases', [['priority', 'Priority', ['P0', 'P1', 'P2', 'P3']], ['tag', 'Tag', TAGS], ['platform', 'Platform', ['Web', 'API', 'Android', 'iOS', 'Both']],
+      ['review', 'Review', ['Not reviewed', 'Accepted', 'Change', 'Remove', 'Updated']], ['state', 'Cases', ['Active', 'Removed']]]) +
+    `<p class="small muted">${shown.length} shown. Click a title for steps and expected result.</p>
+    <div class="table-wrap"><table><thead><tr><th>ID</th><th>P</th><th style="min-width:280px">Title</th><th>Type · technique</th><th>Tags</th><th>Review</th><th style="min-width:220px">Comment</th></tr></thead><tbody>
+    ${shown.map(c => { const dv = S.dirty[c.ID] || {}; const rev = dv.Review ?? c.Review; const locked = c.Status === 'Removed';
+      return `<tr class="${S.dirty[c.ID] ? 'dirty' : ''} ${locked ? 'removed' : ''}"><td class="id">${esc(c.ID)}</td><td>${esc(c.Priority)}</td>
+        <td><span class="crumb" data-open="${esc(c.ID)}" dir="auto">${esc(c.Title)}</span><div class="small muted">${esc(c.Platform)} · ${esc(c.Requirements)}${c.Origin !== 'Designed' ? ' · added by ' + (c.Origin === 'Human' ? 'a person' : 'request') : ''}</div></td>
+        <td class="small">${esc(c.Type)}<br><span class="muted">${esc(c.Technique)} · risk ${esc(c.Risk)}</span></td><td class="small">${esc(c.Tags)}</td>
+        <td>${locked ? 'Removed' : `<select class="edit" data-rev="${esc(c.ID)}"><option value="">—</option>${['Accepted', 'Change', 'Remove'].map(o => `<option ${rev === o ? 'selected' : ''}>${o}</option>`).join('')}${c.Review === 'Updated' ? `<option ${rev === 'Updated' ? 'selected' : ''} value="Updated">Updated by designer</option>` : ''}</select>`}</td>
+        <td>${locked ? `<span class="small muted">${esc(c['Review Comment'])}</span>` : `<textarea dir="auto" class="edit" rows="1" data-com="${esc(c.ID)}" placeholder="${rev === 'Change' ? 'What should change? (required)' : ''}">${esc(dv['Review Comment'] ?? c['Review Comment'])}</textarea>`}</td></tr>
+        ${S.open.has(c.ID) ? `<tr class="detail"><td></td><td colspan="6"><dl>
+          <dt>Preconditions</dt><dd dir="auto">${esc(c.Preconditions)}</dd><dt>Steps</dt><dd dir="auto">${esc(c.Steps).replace(/; (\d+\.)/g, '<br>$1')}</dd>
+          <dt>Expected result</dt><dd dir="auto"><b>${esc(c['Expected Result'])}</b></dd><dt>Test data</dt><dd dir="auto">${esc(c['Test Data'])}</dd>
+          <dt>Depends on open questions</dt><dd>${esc(c.Assumption) || '—'}</dd><dt>Status</dt><dd>${esc(c.Status)}</dd></dl></td></tr>` : ''}`; }).join('') || `<tr><td colspan="7" class="muted">No cases match.</td></tr>`}
+    </tbody></table></div>`;
+  bindFilters(renderCases);
+  document.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { S.open.has(el.dataset.open) ? S.open.delete(el.dataset.open) : S.open.add(el.dataset.open); renderCases(); });
+  const mark = id => { const c = cases.find(x => x.ID === id), v = S.dirty[id] || {};
+    const rev = v.Review ?? c.Review, com = v['Review Comment'] ?? c['Review Comment'];
+    if (rev === c.Review && com === c['Review Comment']) delete S.dirty[id]; updateSavebar();
+    document.querySelector(`[data-rev="${id}"]`)?.closest('tr').classList.toggle('dirty', !!S.dirty[id]); };
+  document.querySelectorAll('[data-rev]').forEach(s => s.onchange = () => { S.dirty[s.dataset.rev] = { ...(S.dirty[s.dataset.rev] || {}), Review: s.value }; mark(s.dataset.rev);
+    const t = document.querySelector(`[data-com="${s.dataset.rev}"]`); if (t) { t.placeholder = s.value === 'Change' ? 'What should change? (required)' : ''; if (s.value === 'Change') t.focus(); } });
+  document.querySelectorAll('[data-com]').forEach(t => t.oninput = () => { S.dirty[t.dataset.com] = { ...(S.dirty[t.dataset.com] || {}), 'Review Comment': t.value }; mark(t.dataset.com); });
+}
+function renderCoverage() {
+  const cov = S.data.design.coverage;
+  $('#dtab').innerHTML = `<p class="small muted">Each approved requirement and the active cases that test it. "NO" means a negative or boundary case is required and missing.</p>
+    <div class="table-wrap"><table><thead><tr><th>Requirement</th><th>P</th><th style="min-width:320px">Text</th><th>Cases</th><th>Negative</th><th>Boundary</th></tr></thead><tbody>
+    ${cov.map(r => `<tr><td class="id">${esc(r.ID)}</td><td>${esc(r.Priority)}</td><td dir="auto">${esc(r.Text)}</td>
+      <td class="small"><b>${r.Cases.length}</b> ${esc(r.Cases.map(x => x.replace(/^TC-[A-Z0-9]+-/, '')).join(', '))}</td>
+      <td>${r.Negative === 'NO' ? '<span class="chip sev-High">missing</span>' : esc(r.Negative)}</td><td>${r.Boundary === 'NO' ? '<span class="chip sev-High">missing</span>' : esc(r.Boundary)}</td></tr>`).join('')}
+    </tbody></table></div>`;
+}
+function renderAssumptions() {
+  const a = S.data.design.assumptions;
+  $('#dtab').innerHTML = `<p class="small muted">Open questions the expected results depend on. Answer them in the Analysis tab; the analyst takes them into the next analysis round.</p>
+    <div class="table-wrap"><table><thead><tr><th>Question</th><th>Severity</th><th style="min-width:360px">Text</th><th>Cases relying on it</th></tr></thead><tbody>
+    ${a.map(g => `<tr><td class="id">${esc(g.ID)}</td><td><span class="chip sev-${esc(g.Severity)}">${esc(g.Severity)}</span></td><td dir="auto">${esc(g.Question)}</td>
+      <td class="small">${g.Cases.length ? esc(g.Cases.map(x => x.replace(/^TC-[A-Z0-9]+-/, '')).join(', ')) : '<span class="muted">none</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No open questions.</td></tr>'}
+    </tbody></table></div>`;
+}
+function renderRequests() {
+  const d = S.data.design, reqs = d.requirements || [];
+  $('#dtab').innerHTML = `<div class="card"><h3 style="margin-top:0">Ask TestHive for more cases</h3><div class="form">
+      <label>What is missing?</label><textarea id="rq" dir="auto" rows="2" placeholder="e.g. Add cases for pasting the code into the first box"></textarea>
+      <label>Requirement (optional)</label><input id="rqr" list="dreq"><span></span><span><button id="rqadd">Send request</button></span></div></div>
+    <div class="card"><h3 style="margin-top:0">Add a case yourself</h3><div class="form">
+      <label>Title</label><input id="nc-title" dir="auto">
+      <label>Requirement(s)</label><input id="nc-req" list="dreq" placeholder="REQ-${esc(S.module)}-001; REQ-${esc(S.module)}-002">
+      <label>Platform</label><select id="nc-plat"><option></option>${['Web', 'API', 'Android', 'iOS', 'Both'].map(p => `<option>${p}</option>`).join('')}</select>
+      <label>Preconditions</label><input id="nc-pre" dir="auto">
+      <label>Steps</label><textarea id="nc-steps" dir="auto" rows="3" placeholder="1. ...; 2. ...; 3. ..."></textarea>
+      <label>Expected result</label><textarea id="nc-exp" dir="auto" rows="2" placeholder="Exactly what is seen"></textarea>
+      <label>Test data</label><input id="nc-data" dir="auto">
+      <label>Tags</label><span>${TAGS.map(t => `<label style="margin-inline-end:10px"><input type="checkbox" value="${t}" class="nc-tag" ${t === 'regression' ? 'checked' : ''}> ${t}</label>`).join('')}</span>
+      <span></span><span><button id="ncadd">Add case</button> <span class="small muted">The manual-tester completes the rest (type, technique, risk) at its re-check.</span></span></div>
+      <datalist id="dreq">${reqs.map(r => `<option value="${esc(r.ID)}">${esc(r.Text.slice(0, 80))}</option>`).join('')}</datalist></div>
+    <div class="table-wrap"><table><thead><tr><th>Request</th><th style="min-width:300px">Text</th><th>By</th><th>Status</th><th style="min-width:240px">Answer</th></tr></thead><tbody>
+    ${d.requests.map(q => `<tr><td class="id">${esc(q.ID)}</td><td dir="auto">${esc(q.Request)}</td><td>${esc(q['Requested By'])}</td><td>${esc(q.Status)}</td><td dir="auto" class="small">${esc(q.Response)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No requests yet.</td></tr>'}
+    </tbody></table></div>`;
+  $('#rqadd').onclick = () => { const t = $('#rq').value.trim(); if (!t) return toast('Write the request first.', 'warn');
+    saveReview([], [{ ID: '', Request: t, Requirement: $('#rqr').value.trim(), 'Requested By': me() }]); };
+  $('#ncadd').onclick = () => {
+    const c = { ID: '', Title: $('#nc-title').value, Requirements: $('#nc-req').value, Platform: $('#nc-plat').value, Preconditions: $('#nc-pre').value,
+      Steps: $('#nc-steps').value, 'Expected Result': $('#nc-exp').value, 'Test Data': $('#nc-data').value,
+      Tags: [...document.querySelectorAll('.nc-tag:checked')].map(x => x.value).join(';'), 'Review Comment': `Added by ${me()}` };
+    if (!c.Title.trim() || !c.Steps.trim() || !c['Expected Result'].trim()) return toast('A new case needs a title, steps and an expected result.', 'warn');
+    saveReview([c], []);
+  };
+}
+async function saveReview(extraCases = [], extraAsks = []) {
+  if (!me()) return askName(() => saveReview(extraCases, extraAsks));
+  const cases = Object.entries(S.dirty).map(([ID, v]) => { const c = S.data.design.cases.find(x => x.ID === ID);
+    return { ID, Review: v.Review ?? c.Review, 'Review Comment': v['Review Comment'] ?? c['Review Comment'] }; });
+  const missing = cases.filter(c => c.Review === 'Change' && !c['Review Comment'].trim());
+  if (missing.length) return toast(`Say what should change for ${missing.map(c => c.ID).join(', ')}.`, 'warn');
+  const r = await api('/api/review', { method: 'POST', body: JSON.stringify({ module: S.module, version: S.data.design.version, cases: cases.concat(extraCases), requests: extraAsks }) });
+  return afterSave(r);
+}
+
+/* ---------- Approvals ---------- */
+function renderApprovals() {
+  const d = S.data, st = Object.fromEntries(d.stages.map(s => [s.stage, s]));
+  const block = (name, chk) => { const s = st[name]; if (!chk) return '';
+    return `<div class="card"><h3 style="margin-top:0">${STAGE_LABEL[name]} ${chip(name, s.status)} ${s.status === 'approved' ? `<span class="small muted">by ${esc(s.by)} ${esc(s.at)}</span>` : ''}</h3>
+      ${s.status === 'approved' ? (chk.ok ? '' : `<div class="msg warn"><b>${chk.errors.length} items came up after the approval.</b> They are handled when this stage is reopened (for example when the requirements change):<ul class="plain">${chk.errors.slice(0, 25).map(e => `<li>${esc(e)}</li>`).join('')}</ul></div>`) :
+        chk.ok ? `<div class="msg ok">Ready for approval: every rule passes.</div>` : `<div class="msg bad"><b>Not ready (${chk.errors.length}):</b><ul class="plain">${chk.errors.slice(0, 25).map(e => `<li>${esc(e)}</li>`).join('')}${chk.errors.length > 25 ? `<li>… ${chk.errors.length - 25} more</li>` : ''}</ul></div>`}
+      ${chk.warnings.length ? `<details><summary class="small">${chk.warnings.length} warnings</summary><ul class="plain small">${chk.warnings.map(w => `<li>${esc(w)}</li>`).join('')}</ul></details>` : ''}
+      <div class="bar" style="margin-top:10px"><input class="grow" id="c-${name}" placeholder="Comment (required to reject or reopen)">
+        ${s.status === 'awaiting_approval' ? `<button class="primary" data-act="approve" data-st="${name}" ${chk.ok ? '' : 'disabled'}>Approve</button><button class="danger" data-act="reject" data-st="${name}">Reject</button>` : ''}
+        ${s.status === 'approved' ? `<button data-act="reopen" data-st="${name}">Reopen (requirements changed)</button>` : ''}
+        ${s.status === 'in_progress' || s.status === 'pending' ? `<span class="small muted">Approval becomes possible when the agent submits this stage.</span>` : ''}</div></div>`; };
+  $('#tab').innerHTML = block('analysis', d.analysis.check) + block('design', d.design.check || (d.design.baseline ? null : { ok: false, errors: ['The analysis must be approved first.'], warnings: [] })) +
+    `<h3>Decisions</h3><div class="table-wrap"><table><thead><tr><th>When (UTC)</th><th>Stage</th><th>Decision</th><th>By</th><th>Comment</th></tr></thead><tbody>
+    ${d.approvals.map(a => `<tr><td class="small">${esc(a.When)}</td><td>${esc(a.Stage)}</td><td>${esc(a.Decision)}</td><td>${esc(a.By)}</td><td dir="auto">${esc(a.Comment)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No decisions yet.</td></tr>'}
+    </tbody></table></div>`;
+  document.querySelectorAll('[data-act]').forEach(b => b.onclick = async () => {
+    if (!me()) return askName();
+    const act = b.dataset.act, stg = b.dataset.st, comment = $('#c-' + stg).value.trim();
+    if (act !== 'approve' && !comment) return toast('Write a comment: say why.', 'warn');
+    const what = { approve: `Approve the ${stg} of ${S.module} as ${me()}? This freezes a baseline.`, reject: `Send the ${stg} back to the agent?`,
+      reopen: `Reopen the ${stg}? Later stages go back to in progress and need a new approval.` }[act];
+    if (!confirm(what)) return;
+    const r = await api('/api/stage', { method: 'POST', body: JSON.stringify({ module: S.module, stage: stg, action: act, by: me(), comment }) });
+    toast(r.message || r.error || 'Done', r.ok ? 'ok' : 'bad'); openModule(S.module, true);
+  });
+}
+
+/* ---------- saving ---------- */
+function bindUploads() {
+  document.querySelectorAll('[data-upload]').forEach(inp => inp.onchange = async () => {
+    const kind = inp.dataset.upload, file = inp.files[0]; if (!file) return;
+    const ver = S.data[kind].version;
+    const r = await api(`/api/upload?m=${encodeURIComponent(S.module)}&kind=${kind}&version=${ver}`, { method: 'POST', body: file, headers: { 'Content-Type': 'application/octet-stream' } });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(S.module, true);
+  });
+}
+async function afterSave(r) {
+  if (r.status === 409) { toast(r.error, 'warn'); return openModule(S.module, true); }
+  if (!r.ok) return toast('Not saved, nothing changed:\n' + (r.errors || [r.error]).join('\n'), 'bad');
+  toast(r.message); S.dirty = {}; openModule(S.module, true);
+}
+function updateSavebar() {
+  const n = Object.keys(S.dirty).length, bar = $('#savebar');
+  bar.classList.toggle('show', n > 0 && S.view === 'module');
+  $('#savetext').textContent = `${n} unsaved ${S.tab === 'analysis' ? 'answer' : 'review'}${n === 1 ? '' : 's'}`;
+}
+$('#save').onclick = () => S.tab === 'analysis' ? saveAnswers() : saveReview();
+$('#discard').onclick = () => { S.dirty = {}; render(); };
+
+$('#who').textContent = me() || 'set your name';
+if (!TOKEN) $('#main').innerHTML = '<div class="msg bad">Open Studio with the address printed in its window (it contains an access key).</div>';
+else home();

@@ -12,7 +12,7 @@ from analysis import read_csv, refs
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 HERE = os.path.dirname(os.path.abspath(__file__))
-PAGE = os.path.join(HERE, "..", "..", "studio", "index.html")
+PAGE_DIR = os.path.join(HERE, "..", "..", "studio")
 STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 STATE = os.environ.get("TH_STATE", "workflow/state.json")
 LOG = os.path.join(os.path.dirname(STATE) or ".", "APPROVALS.md")
@@ -231,6 +231,11 @@ def readiness(module, m, info):
     return {"ready": all(i["ok"] for i in items), "items": items, "notes": notes}
 
 
+def agents_mode():
+    """'recorded' when the Run buttons replay recorded runs (demos, CI), else 'live' (Claude Code for real)."""
+    return "recorded" if os.environ.get("TH_CLAUDE_FAKE") else "live"
+
+
 def busy(module):
     return f"{jobs.running(module)['title']} is working on {module}: saving is paused until it finishes (or stop it)."
 
@@ -250,6 +255,183 @@ def run_stage(args):
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
+# ---------- API ----------
+# Each route is a function f(h, q, body, module) registered with @api. The dispatcher (Handler.handle_api) checks the token,
+# reads the body, refuses an unknown module and, for writes, holds the write lock and refuses while an agent works on the module.
+ROUTES = {}
+STATIC = {"/": ("index.html", "text/html; charset=utf-8"), "/app.js": ("app.js", "text/javascript; charset=utf-8")}
+CSP = ("default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; img-src 'self' data:; "
+       "frame-ancestors 'none'; base-uri 'none'; form-action 'self'")
+
+
+def api(method, path, module=None, lock=False, busy_check=False, raw=False):
+    """module: 'query' (?m=) or 'body' ("module") holds the module code, which must exist. lock: hold the write lock.
+    busy_check: refuse (423) while an agent works on the module. raw: the POST body is passed as bytes, not JSON."""
+    def reg(fn):
+        ROUTES[(method, path)] = (fn, {"module": module, "lock": lock or busy_check, "busy": busy_check, "raw": raw})
+        return fn
+    return reg
+
+
+def arg(q, name): return q.get(name, [""])[0]
+
+
+@api("GET", "/api/overview")
+def get_overview(h, q, body, module):
+    mods = []
+    for name in load_state()["modules"]:
+        info = module_info(name)
+        mods.append({"module": name, "title": info["meta"].get("title", ""), "stages": info["stages"], "next": info["next"],
+                     "open_gaps": sum(1 for g in info["analysis"]["gaps"] if g["Status"] == "Open"),
+                     "cases": sum(1 for c in info["design"]["cases"] if design.active(c)),
+                     "job": info["job"]["title"] if info["job"] else ""})
+    return h.send(200, {"project": project_name(), "setup": intake.project(), "modules": mods, "command": RUN, "agents": agents_mode()})
+
+
+@api("GET", "/api/project")
+def get_project(h, q, body, module): return h.send(200, intake.project())
+
+
+@api("GET", "/api/job")
+def get_job(h, q, body, module):
+    j = next((x for x in jobs.listing() if x["id"] == arg(q, "id")), None)
+    return h.send(200, dict(j, lines=jobs.progress(j["id"]))) if j else h.send(404, {"error": "unknown job"})
+
+
+@api("GET", "/api/jobs", module="query")
+def get_jobs(h, q, body, module):
+    job = jobs.running(module)
+    return h.send(200, {"job": dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None,
+                        "last": (jobs.listing(module) or [None])[0]})
+
+
+@api("GET", "/api/mask-preview", module="query")
+def get_mask_preview(h, q, body, module): return h.send(200, intake.mask_preview(module))
+
+
+@api("GET", "/api/module", module="query")
+def get_module(h, q, body, module): return h.send(200, module_info(module))
+
+
+@api("GET", "/api/workbook", module="query")
+def get_workbook(h, q, body, module):
+    kind = arg(q, "kind")
+    if kind not in ("analysis", "design"): return h.send(400, {"error": "bad request"})
+    lib = analysis if kind == "analysis" else design
+    with tempfile.TemporaryDirectory() as tmp:
+        out = os.path.join(tmp, f"{module}-{kind}.xlsx")
+        try: lib.cmd_workbook([module, out])
+        except SystemExit: return h.send(400, {"error": f"no {kind} workbook for {module} yet"})
+        data = open(out, "rb").read()
+    return h.send(200, data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                  {"Content-Disposition": f'attachment; filename="{module}-{kind}.xlsx"'})
+
+
+@api("POST", "/api/shutdown", raw=True)
+def post_shutdown(h, q, body, module):
+    h.send(200, {"ok": True}); threading.Thread(target=h.server.shutdown, daemon=True).start()
+
+
+@api("POST", "/api/upload", module="query", busy_check=True, raw=True)
+def post_upload(h, q, body, module):  # a filled workbook, read with the normal import scripts
+    kind = arg(q, "kind")
+    if kind not in ("analysis", "design"): return h.send(400, {"error": "bad request"})
+    if arg(q, "version") != version(kind): return h.send(409, {"error": "the files changed since you opened the page; reload"})
+    with tempfile.TemporaryDirectory() as tmp:
+        path = os.path.join(tmp, "upload.xlsx"); open(path, "wb").write(body)
+        lib = os.path.join(HERE, "analysis.py" if kind == "analysis" else "design.py")
+        r = subprocess.run([sys.executable, lib, "import", module, path], capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return h.send(200 if r.returncode == 0 else 400, {"ok": r.returncode == 0, "message": (r.stdout + r.stderr).strip()})
+
+
+@api("POST", "/api/source", module="query", busy_check=True, raw=True)
+def post_source(h, q, body, module):  # one uploaded document or APK as raw bytes; its name comes in the address
+    ok, msg = intake.save_upload(module, arg(q, "name"), body, arg(q, "kind") or "source")
+    return h.send(200 if ok else 400, {"ok": ok, "message": msg})
+
+
+@api("POST", "/api/project", lock=True)
+def post_project(h, q, body, module):
+    ok, msg = intake.save_project(body)
+    return h.send(200 if ok else 400, {"ok": ok, "message": msg})
+
+
+@api("POST", "/api/module-new", lock=True)
+def post_module_new(h, q, body, module):
+    code = str(body.get("module", "")).strip().upper()
+    if not re.fullmatch(r"[A-Z][A-Z0-9]{1,19}", code):
+        return h.send(400, {"ok": False, "message": "Module code: 2 to 20 letters and digits, starting with a letter (for example SIGNUP)."})
+    if code in load_state()["modules"]: return h.send(400, {"ok": False, "message": f"{code} already exists."})
+    m, err = intake.clean_meta(code, body)
+    if err: return h.send(400, {"ok": False, "message": err})
+    rc, out = run_stage(["init", code])
+    if rc: return h.send(400, {"ok": False, "message": out})
+    intake.save_meta(code, m); os.makedirs(os.path.join(intake.SOURCES, code), exist_ok=True)
+    return h.send(200, {"ok": True, "module": code, "message": f"Module {code} added. Now add its documents, or the URL or APK to explore."})
+
+
+@api("POST", "/api/run", module="body", lock=True)
+def post_run(h, q, body, module):  # under the lock: no save can slip in between the checks and the start
+    job, err = start_action(module, str(body.get("action", "")), module_info(module))
+    if err: return h.send(400 if "unknown" in err else 409, {"ok": False, "message": err})
+    return h.send(200, {"ok": True, "message": f"{job['title']} started.", "job": {k: v for k, v in job.items() if not k.startswith("_")}})
+
+
+@api("POST", "/api/stop", module="body")
+def post_stop(h, q, body, module):
+    ok = jobs.stop(str(body.get("id", "")))
+    return h.send(200 if ok else 400, {"ok": ok, "message": "Stopped. Files the agent already wrote stay as they are." if ok else "That job is not running."})
+
+
+@api("POST", "/api/answers", module="body", busy_check=True)
+def post_answers(h, q, body, module):
+    if body.get("version") != version("analysis"): return h.send(409, {"error": "the questions changed since you opened the page (an agent or Excel saved them); reload and try again"})
+    rows = [("question" if r.get("ID") else "new question", r) for r in body.get("rows", [])]
+    changed, added, errors = analysis.apply_answers(module, rows)
+    if errors: return h.send(400, {"ok": False, "errors": errors})
+    return h.send(200, {"ok": True, "message": f"Saved: {changed} answer(s), {added} new question(s).", "version": version("analysis")})
+
+
+@api("POST", "/api/review", module="body", busy_check=True)
+def post_review(h, q, body, module):
+    if body.get("version") != version("design"): return h.send(409, {"error": "the cases changed since you opened the page (an agent or Excel saved them); reload and try again"})
+    cases = [("case" if r.get("ID") else "new case", r) for r in body.get("cases", [])]
+    asks = [(f"request '{str(r.get('Request', ''))[:30]}'", r) for r in body.get("requests", [])]
+    decided, edited, new_cases, new_asks, errors = design.apply_review(module, cases, asks, source="Studio")
+    if errors: return h.send(400, {"ok": False, "errors": errors})
+    return h.send(200, {"ok": True, "version": version("design"), "message":
+                        f"Saved: {decided['Accepted']} accepted, {decided['Change']} to change, {decided['Remove']} to remove, {new_cases} new cases, {new_asks} new requests."})
+
+
+@api("POST", "/api/module-meta", module="body", busy_check=True)
+def post_module_meta(h, q, body, module):
+    m, err = intake.clean_meta(module, body)
+    if err: return h.send(400, {"ok": False, "message": err})
+    intake.save_meta(module, m); return h.send(200, {"ok": True, "message": "Saved."})
+
+
+@api("POST", "/api/ingest", module="body", busy_check=True)
+def post_ingest(h, q, body, module):
+    code, out = intake.ingest(module, bool(body.get("mask")))
+    return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
+
+
+@api("POST", "/api/mask-lists", module="body", busy_check=True)
+def post_mask_lists(h, q, body, module):
+    t, a = intake.save_mask_lists(body.get("terms") or [], body.get("allow") or [])
+    return h.send(200, {"ok": True, "message": f"Saved: {t} names to hide, {a} values to leave as they are. Read the documents again to apply."})
+
+
+@api("POST", "/api/stage", module="body", busy_check=True)
+def post_stage(h, q, body, module):
+    action, st, by, comment = body.get("action"), body.get("stage"), str(body.get("by", "")).strip(), str(body.get("comment", "")).strip()
+    if action not in ("approve", "reject", "reopen") or st not in STAGES: return h.send(400, {"error": "bad request"})
+    if not by: return h.send(400, {"error": "your name is needed: decisions are signed"})
+    if re.search(r"[\r\n|]", by + comment): return h.send(400, {"ok": False, "message": "Name and comment cannot contain line breaks or |"})
+    code, out = run_stage([action, module, st, "--by", by] + (["--comment", comment] if comment else []))
+    return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "TestHiveStudio"
 
@@ -264,154 +446,49 @@ class Handler(BaseHTTPRequestHandler):
         for k, v in (extra or {}).items(): self.send_header(k, v)
         self.end_headers(); self.wfile.write(data)
 
+    def local(self): return (self.headers.get("Host") or "").split(":")[0] in ("127.0.0.1", "localhost")  # blocks DNS-rebinding pages
+
     def allowed(self, q):
-        host = (self.headers.get("Host") or "").split(":")[0]
-        if host not in ("127.0.0.1", "localhost"): return False  # blocks DNS-rebinding pages
-        given = (self.headers.get("X-TestHive-Token") or q.get("t", [""])[0]).encode("utf-8", "replace")
+        if not self.local(): return False
+        given = (self.headers.get("X-TestHive-Token") or arg(q, "t")).encode("utf-8", "replace")
         return secrets.compare_digest(given, TOKEN.encode())
 
-    def do_GET(self):
-        u = urlparse(self.path); q = parse_qs(u.query)
-        if u.path == "/":
-            host = (self.headers.get("Host") or "").split(":")[0]
-            if host not in ("127.0.0.1", "localhost"): return self.send(403, {"error": "forbidden"})
-            return self.send(200, open(PAGE, "rb").read(), "text/html; charset=utf-8",
-                             {"Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"})
-        if not self.allowed(q): return self.send(403, {"error": "missing or wrong token: open the address printed by studio"})
-        if u.path == "/api/overview":
-            s = load_state()
-            mods = []
-            for name, m in s["modules"].items():
-                info = module_info(name)
-                mods.append({"module": name, "stages": info["stages"], "next": info["next"],
-                             "open_gaps": sum(1 for g in info["analysis"]["gaps"] if g["Status"] == "Open"),
-                             "cases": sum(1 for c in info["design"]["cases"] if design.active(c)),
-                             "job": info["job"]["title"] if info["job"] else ""})
-            return self.send(200, {"project": project_name(), "setup": intake.project(), "modules": mods, "command": RUN})
-        if u.path == "/api/project":
-            return self.send(200, intake.project())
-        if u.path == "/api/job":
-            jid = q.get("id", [""])[0]
-            j = next((x for x in jobs.listing() if x["id"] == jid), None)
-            return self.send(200, dict(j, lines=jobs.progress(jid))) if j else self.send(404, {"error": "unknown job"})
-        if u.path == "/api/jobs":
-            module = q.get("m", [""])[0].upper()
-            job = jobs.running(module)
-            return self.send(200, {"job": dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None,
-                                   "last": (jobs.listing(module) or [None])[0]})
-        if u.path == "/api/mask-preview":
-            module = q.get("m", [""])[0].upper()
-            if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
-            return self.send(200, intake.mask_preview(module))
-        if u.path == "/api/module":
-            info = module_info((q.get("m", [""])[0]).upper())
-            return self.send(200, info) if info else self.send(404, {"error": "unknown module"})
-        if u.path == "/api/workbook":
-            module, kind = q.get("m", [""])[0].upper(), q.get("kind", [""])[0]
-            if kind not in ("analysis", "design") or module not in load_state()["modules"]: return self.send(400, {"error": "bad request"})
-            lib = analysis if kind == "analysis" else design
-            with tempfile.TemporaryDirectory() as tmp:
-                out = os.path.join(tmp, f"{module}-{kind}.xlsx")
-                try: lib.cmd_workbook([module, out])
-                except SystemExit: return self.send(400, {"error": f"no {kind} workbook for {module} yet"})
-                data = open(out, "rb").read()
-            return self.send(200, data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                             {"Content-Disposition": f'attachment; filename="{module}-{kind}.xlsx"'})
-        self.send(404, {"error": "not found"})
+    def do_GET(self): self.handle_api("GET")
 
-    def do_POST(self):
+    def do_POST(self): self.handle_api("POST")
+
+    def handle_api(self, method):
         u = urlparse(self.path); q = parse_qs(u.query)
-        if not self.allowed(q): return self.send(403, {"error": "missing or wrong token"})
-        try: n = int(self.headers.get("Content-Length") or 0)
-        except ValueError: n = -1
-        if n < 0: return self.send(400, {"ok": False, "message": "bad Content-Length"})
-        limit = intake.MAX_APK if u.path == "/api/source" and q.get("kind", [""])[0] == "apk" else intake.MAX_DOC
-        if n > limit:  # read and drop the body first, so the browser receives the message instead of a broken connection
-            while n > 0: n -= len(self.rfile.read(min(n, 1 << 20)) or b"x" * n)
-            return self.send(413, {"ok": False, "message": f"The file is larger than {limit // 1_000_000} MB."})
-        raw = self.rfile.read(n)
-        if u.path == "/api/shutdown":
-            self.send(200, {"ok": True}); threading.Thread(target=self.server.shutdown, daemon=True).start(); return
-        if u.path == "/api/upload":  # a filled workbook, read with the normal import scripts
-            module, kind = q.get("m", [""])[0].upper(), q.get("kind", [""])[0]
-            if kind not in ("analysis", "design") or module not in load_state()["modules"]: return self.send(400, {"error": "bad request"})
-            with WRITE, tempfile.TemporaryDirectory() as tmp:
-                if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
-                if q.get("version", [""])[0] != version(kind): return self.send(409, {"error": "the files changed since you opened the page; reload"})
-                path = os.path.join(tmp, "upload.xlsx"); open(path, "wb").write(raw)
-                lib = os.path.join(HERE, "analysis.py" if kind == "analysis" else "design.py")
-                r = subprocess.run([sys.executable, lib, "import", module, path], capture_output=True, text=True, encoding="utf-8", errors="replace")
-            return self.send(200 if r.returncode == 0 else 400, {"ok": r.returncode == 0, "message": (r.stdout + r.stderr).strip()})
-        if u.path == "/api/source":  # one uploaded document or APK as raw bytes; its name comes in the address
-            module = q.get("m", [""])[0].upper()
+        if method == "GET" and u.path in STATIC:  # the page itself carries no data: no token needed, but only on this PC
+            if not self.local(): return self.send(403, {"error": "forbidden"})
+            name, ctype = STATIC[u.path]
+            return self.send(200, open(os.path.join(PAGE_DIR, name), "rb").read(), ctype, {"Content-Security-Policy": CSP})
+        if not self.allowed(q): return self.send(403, {"error": "missing or wrong token: open the address printed by studio"})
+        fn, o = ROUTES.get((method, u.path), (None, None))
+        body = None
+        if method == "POST":
+            try: n = int(self.headers.get("Content-Length") or 0)
+            except ValueError: n = -1
+            if n < 0: return self.send(400, {"ok": False, "message": "bad Content-Length"})
+            limit = intake.MAX_APK if u.path == "/api/source" and arg(q, "kind") == "apk" else intake.MAX_DOC
+            if n > limit:  # read and drop the body first, so the browser receives the message instead of a broken connection
+                while n > 0: n -= len(self.rfile.read(min(n, 1 << 20)) or b"x" * n)
+                return self.send(413, {"ok": False, "message": f"The file is larger than {limit // 1_000_000} MB."})
+            body = self.rfile.read(n)
+            if fn and not o["raw"]:
+                if (self.headers.get("Content-Type") or "").split(";")[0] != "application/json": return self.send(415, {"error": "JSON only"})
+                try: body = json.loads(body or b"{}")
+                except ValueError: return self.send(400, {"error": "bad JSON"})
+                if not isinstance(body, dict): return self.send(400, {"error": "bad JSON"})
+        if not fn: return self.send(404, {"error": "not found"})
+        module = None
+        if o["module"]:
+            module = (arg(q, "m") if o["module"] == "query" else str(body.get("module", ""))).strip().upper()
             if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
-            with WRITE:
-                if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
-                ok, msg = intake.save_upload(module, q.get("name", [""])[0], raw, q.get("kind", ["source"])[0])
-            return self.send(200 if ok else 400, {"ok": ok, "message": msg})
-        if (self.headers.get("Content-Type") or "").split(";")[0] != "application/json": return self.send(415, {"error": "JSON only"})
-        try: body = json.loads(raw or b"{}")
-        except ValueError: return self.send(400, {"error": "bad JSON"})
-        if u.path == "/api/project":
-            with WRITE: ok, msg = intake.save_project(body)
-            return self.send(200 if ok else 400, {"ok": ok, "message": msg})
-        if u.path == "/api/module-new":
-            code = str(body.get("module", "")).strip().upper()
-            if not re.fullmatch(r"[A-Z][A-Z0-9]{1,19}", code):
-                return self.send(400, {"ok": False, "message": "Module code: 2 to 20 letters and digits, starting with a letter (for example SIGNUP)."})
-            if code in load_state()["modules"]: return self.send(400, {"ok": False, "message": f"{code} already exists."})
-            m, err = intake.clean_meta(code, body)
-            if err: return self.send(400, {"ok": False, "message": err})
-            with WRITE:
-                rc, out = run_stage(["init", code])
-                if rc: return self.send(400, {"ok": False, "message": out})
-                intake.save_meta(code, m); os.makedirs(os.path.join(intake.SOURCES, code), exist_ok=True)
-            return self.send(200, {"ok": True, "module": code, "message": f"Module {code} added. Now add its documents, or the URL or APK to explore."})
-        module = str(body.get("module", "")).upper()
-        if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
-        if u.path == "/api/run":
-            with WRITE:  # no save can slip in between the checks and the start
-                job, err = start_action(module, str(body.get("action", "")), module_info(module))
-            if err: return self.send(400 if "unknown" in err else 409, {"ok": False, "message": err})
-            return self.send(200, {"ok": True, "message": f"{job['title']} started.", "job": {k: v for k, v in job.items() if not k.startswith("_")}})
-        if u.path == "/api/stop":
-            ok = jobs.stop(str(body.get("id", "")))
-            return self.send(200 if ok else 400, {"ok": ok, "message": "Stopped. Files the agent already wrote stay as they are." if ok else "That job is not running."})
+        if not o["lock"]: return fn(self, q, body, module)
         with WRITE:
-            if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
-            if u.path == "/api/answers":
-                if body.get("version") != version("analysis"): return self.send(409, {"error": "the questions changed since you opened the page (an agent or Excel saved them); reload and try again"})
-                rows = [("question" if r.get("ID") else "new question", r) for r in body.get("rows", [])]
-                changed, added, errors = analysis.apply_answers(module, rows)
-                if errors: return self.send(400, {"ok": False, "errors": errors})
-                return self.send(200, {"ok": True, "message": f"Saved: {changed} answer(s), {added} new question(s).", "version": version("analysis")})
-            if u.path == "/api/review":
-                if body.get("version") != version("design"): return self.send(409, {"error": "the cases changed since you opened the page (an agent or Excel saved them); reload and try again"})
-                cases = [("case" if r.get("ID") else "new case", r) for r in body.get("cases", [])]
-                asks = [(f"request '{str(r.get('Request', ''))[:30]}'", r) for r in body.get("requests", [])]
-                decided, edited, new_cases, new_asks, errors = design.apply_review(module, cases, asks, source="Studio")
-                if errors: return self.send(400, {"ok": False, "errors": errors})
-                return self.send(200, {"ok": True, "version": version("design"), "message":
-                                       f"Saved: {decided['Accepted']} accepted, {decided['Change']} to change, {decided['Remove']} to remove, {new_cases} new cases, {new_asks} new requests."})
-            if u.path == "/api/module-meta":
-                m, err = intake.clean_meta(module, body)
-                if err: return self.send(400, {"ok": False, "message": err})
-                intake.save_meta(module, m); return self.send(200, {"ok": True, "message": "Saved."})
-            if u.path == "/api/ingest":
-                code, out = intake.ingest(module, bool(body.get("mask")))
-                return self.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
-            if u.path == "/api/mask-lists":
-                t, a = intake.save_mask_lists(body.get("terms") or [], body.get("allow") or [])
-                return self.send(200, {"ok": True, "message": f"Saved: {t} names to hide, {a} values to leave as they are. Read the documents again to apply."})
-            if u.path == "/api/stage":
-                action, st, by, comment = body.get("action"), body.get("stage"), str(body.get("by", "")).strip(), str(body.get("comment", "")).strip()
-                if action not in ("approve", "reject", "reopen") or st not in STAGES: return self.send(400, {"error": "bad request"})
-                if not by: return self.send(400, {"error": "your name is needed: decisions are signed"})
-                if re.search(r"[\r\n|]", by + comment): return self.send(400, {"ok": False, "message": "Name and comment cannot contain line breaks or |"})
-                args = [action, module, st, "--by", by] + (["--comment", comment] if comment else [])
-                code, out = run_stage(args)
-                return self.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
-        self.send(404, {"error": "not found"})
+            if o["busy"] and module and jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
+            return fn(self, q, body, module)
 
 
 def main():
