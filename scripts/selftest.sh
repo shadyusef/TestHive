@@ -232,16 +232,16 @@ unset TH_ANALYSIS TH_STATE TH_CASES
 H=$(mktemp -d); HW=$(cygpath -m "$H" 2>/dev/null || echo "$H")
 printf 'echo "unclosed\n' > "$H/bad.sh"; printf 'x = (\n' > "$H/bad.py"; printf 'echo ok\n' > "$H/good.sh"; printf 'x = 1%b\n' '\r' > "$H/cr.py"
 P=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")   # Claude Code passes native paths; so does this test
-hook() { printf '{"tool_input":{"file_path":"%s"}}' "$2" | CLAUDE_PROJECT_DIR="$P" bash scripts/hooks/run.sh "$1" 2>/dev/null; echo $?; }
-[ "$(hook check_edit "$HW/bad.sh")$(hook check_edit "$HW/bad.py")$(hook check_edit "$HW/cr.py")$(hook check_edit "$HW/good.sh")" = "2220" ] || { echo "the edit-check hook missed a broken file or refused a good one"; exit 1; }
+hook() { local r=0; printf '{"tool_input":{"file_path":"%s"}}' "$2" | CLAUDE_PROJECT_DIR="$P" bash scripts/hooks/run.sh "$1" 2>/dev/null || r=$?; echo $r; }
+HK="$(hook check_edit "$HW/bad.sh")$(hook check_edit "$HW/bad.py")$(hook check_edit "$HW/cr.py")$(hook check_edit "$HW/good.sh")"; [ "$HK" = "2220" ] || { echo "the edit-check hook is wrong: exit codes $HK for bad.sh bad.py cr.py good.sh (expected 2220)"; printf '{"tool_input":{"file_path":"%s"}}' "$HW/good.sh" | bash scripts/hooks/run.sh check_edit; exit 1; }
 [ "$(hook guard_records "$P/workflow/APPROVALS.md")$(hook guard_records "$P/test-cases/baseline/X/v1/TestCases.csv")$(hook guard_records "$P/analysis/gaps.csv")" = "220" ] || { echo "the approval-records guard is wrong"; exit 1; }
 bash scripts/check-private.sh >/dev/null || { bash scripts/check-private.sh; exit 1; }
 PR=$(mktemp -d); mkdir -p "$PR/scripts"; cp scripts/check-private.sh scripts/_py.sh "$PR/scripts/"   # a planted name must fail
 (cd "$PR" && git init -q && printf 'Acme-Secret\n' > .private-names && printf 'see acme-secret here\n' > notes.txt && printf '.private-names\n' > .gitignore)
 bash "$PR/scripts/check-private.sh" >/dev/null 2>&1 && { echo "check-private missed a planted private name"; exit 1; }
 # phase 2d: Run buttons with the recorded agents (jobs, progress, Stop, lock, every step to an approved design)
-D_OUT=$(bash demo/phase2d/run.sh --check 2>&1); echo "$D_OUT" | grep -q "STUDIO RUN CHECK PASS" || { echo "$D_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio run check failed"; exit 1; }
-C_OUT=$(bash demo/phase2c/run.sh --check 2>&1); echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio intake check failed"; exit 1; }
+D_OUT=$(bash demo/phase2d/run.sh --check 2>&1 || true); echo "$D_OUT" | grep -q "STUDIO RUN CHECK PASS" || { echo "$D_OUT" | tail -25; echo "studio run check failed"; exit 1; }
+C_OUT=$(bash demo/phase2c/run.sh --check 2>&1 || true); echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | tail -25; echo "studio intake check failed"; exit 1; }
 $PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then

@@ -16,8 +16,9 @@ if ext in LF_ONLY and b"\r" in raw:
     problems.append(f"contains a carriage-return byte (line {raw[:raw.index(b'\r')].count(b'\n') + 1}); "
                     "this file must use LF only. A \\r was probably written as a real character: write it as an escape or use [:cntrl:]")
 try:
-    if ext == ".sh" and shutil.which("bash"):
-        r = subprocess.run(["bash", "-n", path], capture_output=True, text=True)
+    bash = os.environ.get("TH_BASH") or shutil.which("bash")  # TH_BASH from run.sh: on Windows "bash" may be WSL's launcher
+    if ext == ".sh" and bash:
+        r = subprocess.run([bash, "-n", path], capture_output=True, text=True)
         if r.returncode: problems.append("bash syntax error: " + r.stderr.strip()[:400])
     elif ext == ".py":
         compile(raw.decode("utf-8-sig"), path, "exec")  # syntax only, nothing written
