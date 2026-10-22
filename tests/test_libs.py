@@ -171,6 +171,8 @@ class StudioApi(Project):
     def setUp(self):
         super().setUp()
         os.environ["TH_BASH"] = BASH
+        os.environ["TH_STUDIO_CONFIG"] = os.path.join(self.dir, "studio-config.json")  # never the user's own settings
+        studio.PROJECT["path"] = self.dir
         self.srv = studio.ThreadingHTTPServer(("127.0.0.1", 0), studio.Handler)
         threading.Thread(target=self.srv.serve_forever, daemon=True).start()
         self.base = f"http://127.0.0.1:{self.srv.server_address[1]}"
@@ -226,6 +228,21 @@ class StudioApi(Project):
         self.assertEqual(self.js("/api/module-restore", {"archive": "../../x", "by": "Sara"})[0], 400)
         self.assertEqual(self.js("/api/module-restore", {"archive": a["name"], "by": "Sara"})[0], 200)
         self.assertEqual([m["module"] for m in self.js("/api/overview")[1]["modules"]], ["SIGNUP"])
+
+
+class StudioProjects(StudioApi):
+    """One Studio program for any project: until a project folder is open only the project routes answer."""
+
+    def test_open_a_project(self):
+        studio.PROJECT["path"] = None
+        code, r = self.js("/api/overview"); self.assertEqual((code, r.get("no_project")), (409, True))
+        self.assertEqual(self.js("/api/open-project", {"path": os.path.join(self.dir, "nothing")})[0], 400)
+        other = os.path.join(self.dir, "other"); os.makedirs(os.path.join(other, "templates")); shutil.copytree("scripts", os.path.join(other, "scripts"))
+        code, r = self.js("/api/open-project", {"path": other}); self.assertEqual(code, 200, r)
+        self.assertEqual(os.path.realpath(os.getcwd()), os.path.realpath(other))
+        self.assertEqual(self.js("/api/overview")[0], 200)
+        self.assertIn(os.path.realpath(other), self.js("/api/projects")[1]["recent"])
+        os.chdir(self.dir)
 
 
 class StudioWithoutBash(StudioApi):

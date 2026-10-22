@@ -7,7 +7,7 @@ import sys, os, re, glob, json, time, hashlib, secrets, shutil, subprocess, temp
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, intake, jobs
+import analysis, design, intake, jobs, projects
 import modules as archive
 from analysis import read_csv, refs
 
@@ -306,6 +306,32 @@ def api(method, path, module=None, lock=False, busy_check=False, raw=False):
 def arg(q, name): return q.get(name, [""])[0]
 
 
+# ---------- which project: one Studio program serves any project folder ----------
+PROJECT = {"path": None}  # set at start (projects.choose) or by /api/open-project; Studio works in that folder
+NO_PROJECT_OK = {"/api/projects", "/api/open-project", "/api/shutdown"}
+
+
+def open_project(path):
+    os.chdir(path); PROJECT["path"] = os.path.realpath(path); projects.remember(path)
+
+
+@api("GET", "/api/projects")
+def get_projects(h, q, body, module):
+    return h.send(200, {"current": PROJECT["path"], "recent": projects.recent()})
+
+
+@api("POST", "/api/open-project", lock=True)
+def post_open_project(h, q, body, module):
+    p = os.path.expanduser(str(body.get("path", "")).strip().strip('"'))
+    if not projects.is_project(p):
+        return h.send(400, {"ok": False, "message": "That folder is not a TestHive project: it needs the scripts and templates folders of TestHive "
+                                                     "(clone your team's project repository, then open its folder)."})
+    if any(j["status"] == "running" for j in jobs.JOBS.values()):
+        return h.send(409, {"ok": False, "message": "An agent is working: wait until it finishes (or stop it) before opening another project."})
+    open_project(p)
+    return h.send(200, {"ok": True, "message": f"Opened {os.path.basename(PROJECT['path'])}.", "current": PROJECT["path"]})
+
+
 @api("GET", "/api/overview")
 def get_overview(h, q, body, module):
     mods = []
@@ -566,6 +592,8 @@ class Handler(BaseHTTPRequestHandler):
             return self.send(200, read_bytes(p), PAGE_TYPES[os.path.splitext(p)[1]], {"Content-Security-Policy": CSP})
         if not self.allowed(q): return self.send(403, {"error": "missing or wrong token: open the address printed by studio"})
         fn, o = ROUTES.get((method, u.path), (None, None))
+        if fn and not PROJECT["path"] and u.path not in NO_PROJECT_OK:
+            return self.send(409, {"no_project": True, "error": "Open a TestHive project first."})
         body = None
         if method == "POST":
             try: n = int(self.headers.get("Content-Length") or 0)
@@ -598,7 +626,10 @@ def main():
     try: srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
     except OSError: srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)  # port in use: take a free one
     url = f"http://127.0.0.1:{srv.server_address[1]}/?t={TOKEN}"
+    p = projects.choose(a, os.getcwd())
+    if p: open_project(p)
     print(f"STUDIO {url}", flush=True)
+    print(f"Project: {PROJECT['path']}" if PROJECT["path"] else "No project yet: choose its folder in the browser.", flush=True)
     print("TestHive Studio is running on this PC only. Keep this window open; press Ctrl+C to stop.", flush=True)
     if "--no-browser" not in a: webbrowser.open(url)
     try: srv.serve_forever()
