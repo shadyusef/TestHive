@@ -170,6 +170,39 @@ def cmd_workbook(a):
     print(f"WORKBOOK {out.replace(os.sep, '/')}: {len(reqs)} requirements, {len(gaps)} gaps ({open_high} High not closed)")
 
 
+def apply_answers(module, rows):
+    """Applies the human's answers and new questions to gaps.csv, all or nothing. rows: [(label, {column: value})] with
+    ID, Answer, Answered By, Status (and Question, Kind, Severity, Requirement for a new question with an empty ID).
+    Used by the Excel import and by TestHive Studio. Returns (changed, added, errors); nothing is written if errors."""
+    gaps = read_csv(GAP_FILE, GAP_COLS)
+    by_id = {g["ID"]: g for g in gaps}
+    nums = [int(g["ID"].rsplit("-", 1)[1]) for g in gaps if re.fullmatch(rf"GAP-{module}-\d{{3}}", g["ID"])]
+    changed, added, errors = 0, 0, []
+    for n, v in rows:
+        val = lambda h: str(v.get(h) or "").strip()
+        gid, status = val("ID"), val("Status") or "Open"
+        answer, by = val("Answer"), val("Answered By")
+        if status not in GAP_STATUS: errors.append(f"{n}: Status '{status}' must be Open, Answered or Closed"); continue
+        if answer and status == "Open": status = "Answered"
+        if status == "Answered" and not answer: errors.append(f"{n} ({gid or 'new'}): Status Answered but Answer is empty"); continue
+        if status == "Answered" and not by: errors.append(f"{n} ({gid or 'new'}): Answered By is empty"); continue
+        if not gid:
+            q = val("Question")
+            if not q: continue
+            kind, sev = val("Kind") or "Missing", val("Severity") or "Medium"
+            if kind not in GAP_KINDS or sev not in SEVERITY: errors.append(f"{n}: new question needs Kind ({', '.join(GAP_KINDS)}) and Severity (High/Medium/Low)"); continue
+            nums.append(max(nums, default=0) + 1)
+            gaps.append({"ID": f"GAP-{module}-{nums[-1]:03d}", "Module": module, "Requirement": val("Requirement"), "Kind": kind,
+                         "Severity": sev, "Question": q, "Answer": answer, "Answered By": by, "Status": status}); added += 1; continue
+        g = by_id.get(gid)
+        if g is None or g["Module"].upper() != module: errors.append(f"{n}: {gid} is not a gap of {module}"); continue
+        if (g["Answer"], g["Answered By"], g["Status"]) != (answer, by, status):
+            if g["Status"] == "Closed" and status != "Closed": errors.append(f"{n}: {gid} is Closed; reopen it with the analyst"); continue
+            g["Answer"], g["Answered By"], g["Status"] = answer, by, status; changed += 1
+    if not errors: write_csv(GAP_FILE, GAP_COLS, gaps)
+    return changed, added, errors
+
+
 def cmd_import(a):
     import openpyxl
     if not a: die("Usage: import-answers.sh <MODULE> [workbook.xlsx]")
@@ -182,36 +215,10 @@ def cmd_import(a):
     head = [str(h or "").strip() for h in rows[0]]
     need = ["ID", "Question", "Answer", "Answered By", "Status"]
     if any(h not in head for h in need): die("The 'Gaps' sheet is missing a column: " + ", ".join(h for h in need if h not in head))
-    col = {h: head.index(h) for h in head}
-    val = lambda row, h: ("" if h not in col or row[col[h]] is None else str(row[col[h]]).strip())
-    gaps = read_csv(GAP_FILE, GAP_COLS)
-    by_id = {g["ID"]: g for g in gaps}
-    nums = [int(g["ID"].rsplit("-", 1)[1]) for g in gaps if re.fullmatch(rf"GAP-{module}-\d{{3}}", g["ID"])]
-    changed, added, errors = 0, 0, []
-    for n, row in enumerate(rows[1:], 2):
-        if not any(row): continue
-        gid, status = val(row, "ID"), val(row, "Status") or "Open"
-        answer, by = val(row, "Answer"), val(row, "Answered By")
-        if status not in GAP_STATUS: errors.append(f"row {n}: Status '{status}' must be Open, Answered or Closed"); continue
-        if answer and status == "Open": status = "Answered"
-        if status == "Answered" and not answer: errors.append(f"row {n} ({gid or 'new'}): Status Answered but Answer is empty"); continue
-        if status == "Answered" and not by: errors.append(f"row {n} ({gid or 'new'}): Answered By is empty"); continue
-        if not gid:
-            q = val(row, "Question")
-            if not q: continue
-            kind, sev = val(row, "Kind") or "Missing", val(row, "Severity") or "Medium"
-            if kind not in GAP_KINDS or sev not in SEVERITY: errors.append(f"row {n}: new question needs Kind ({', '.join(GAP_KINDS)}) and Severity (High/Medium/Low)"); continue
-            nums.append(max(nums, default=0) + 1)
-            g = {"ID": f"GAP-{module}-{nums[-1]:03d}", "Module": module, "Requirement": val(row, "Requirement"), "Kind": kind,
-                 "Severity": sev, "Question": q, "Answer": answer, "Answered By": by, "Status": status}
-            gaps.append(g); added += 1; continue
-        g = by_id.get(gid)
-        if g is None or g["Module"].upper() != module: errors.append(f"row {n}: {gid} is not a gap of {module}"); continue
-        if (g["Answer"], g["Answered By"], g["Status"]) != (answer, by, status):
-            if g["Status"] == "Closed" and status != "Closed": errors.append(f"row {n}: {gid} is Closed; reopen it with the analyst, not in Excel"); continue
-            g["Answer"], g["Answered By"], g["Status"] = answer, by, status; changed += 1
+    table = [(f"row {n}", {h: ("" if row[i] is None else str(row[i]).strip()) for i, h in enumerate(head) if h})
+             for n, row in enumerate(rows[1:], 2) if any(row)]
+    changed, added, errors = apply_answers(module, table)
     if errors: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in errors))
-    write_csv(GAP_FILE, GAP_COLS, gaps)
     print(f"IMPORTED {path.replace(os.sep, '/')}: {changed} gaps updated, {added} new questions added. Next: the analyst reviews the answers.")
 
 

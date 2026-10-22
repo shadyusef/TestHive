@@ -195,8 +195,37 @@ I_OUT=$(bash scripts/design-impact.sh DEMO --apply); echo "$I_OUT" | grep -q "an
 bash scripts/check-design.sh DEMO --for-approval | grep -q "TC-DEMO-001: Needs update" || { echo "Needs update did not block approval"; exit 1; }
 printf 'Key,Condition,Requirement,Keywords\nK1,Seven,REQ-DEMO-001,password;7 char\nK2,Seventeen,,password;17\nK3,Help,REQ-DEMO-002,help\n' > "$A/key.csv"
 S_OUT=$(TH_SCORE_TARGET=60 bash scripts/score-design.sh DEMO "$A/key.csv"); echo "$S_OUT" | grep -q "2 of 3 required test conditions" || { echo "score-design counted wrong (7 must not match 17): $S_OUT"; exit 1; }
+# phase 2b: Studio on the same fixture (token, host check, JSON only, stale page refused, answer saved, gate kept)
+bash scripts/studio.sh --no-browser --port 0 > "$A/studio.log" 2>&1 &
+for i in $(seq 1 50); do grep -q "^STUDIO " "$A/studio.log" 2>/dev/null && break; sleep 0.2; done
+U=$(sed -n 's/^STUDIO //p' "$A/studio.log"); [ -n "$U" ] || { cat "$A/studio.log"; echo "studio did not start"; exit 1; }
+$PY - "$U" <<'PY' || exit 1
+import sys, json, http.client
+from urllib.parse import urlparse, parse_qs
+u = urlparse(sys.argv[1]); tok = parse_qs(u.query)["t"][0]; bad = []
+def call(path, body=None, token=tok, host=None, ctype="application/json"):
+    c = http.client.HTTPConnection(u.hostname, u.port, timeout=30)
+    h = {"X-TestHive-Token": token, "Host": host or u.netloc}
+    if body is not None: h["Content-Type"] = ctype
+    c.request("GET" if body is None else "POST", path, body=None if body is None else (body if isinstance(body, str) else json.dumps(body)), headers=h)
+    r = c.getresponse(); raw = r.read()
+    try: return r.status, json.loads(raw)
+    except ValueError: return r.status, {}
+s, o = call("/api/overview"); s == 200 and o["modules"][0]["module"] == "DEMO" or bad.append(f"overview {s}")
+call("/api/overview", token="x")[0] == 403 or bad.append("no token accepted")
+call("/api/overview", host="evil.example:80")[0] == 403 or bad.append("foreign Host accepted")
+s, m = call("/api/module?m=DEMO"); s == 200 and m["design"]["baseline"] == "v2" or bad.append(f"module {s}")
+call("/api/answers", "module=DEMO", ctype="application/x-www-form-urlencoded")[0] == 415 or bad.append("form post accepted")
+row = {"ID": "GAP-DEMO-001", "Answer": "The /help page", "Answered By": "tester", "Status": "Answered"}
+s, r = call("/api/answers", {"module": "DEMO", "version": m["analysis"]["version"], "rows": [row]}); s == 200 or bad.append(f"answer not saved {r}")
+call("/api/answers", {"module": "DEMO", "version": m["analysis"]["version"], "rows": [row]})[0] == 409 or bad.append("stale page accepted")
+s, r = call("/api/stage", {"module": "DEMO", "stage": "design", "action": "approve", "by": "tester"}); s == 400 or bad.append("approve of an unsubmitted design accepted")
+call("/api/shutdown", {})
+if bad: print("studio: " + "; ".join(bad)); sys.exit(1)
+PY
+grep -q "^GAP-DEMO-001,DEMO,REQ-DEMO-002,Missing,Medium,Which help page does the link open?,The /help page,tester,Answered" "$TH_ANALYSIS/gaps.csv" || { echo "studio did not write the answer"; exit 1; }
 unset TH_ANALYSIS TH_STATE TH_CASES
-$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py
+$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then
   for f in scripts/*.ps1; do

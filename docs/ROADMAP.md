@@ -12,8 +12,8 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 1 | Business analysis: read text, PDF, Word, Excel, images, Swagger; explore a built web app (URL) or Android app (APK); `business-analyst` agent; requirements and gap registers; Excel Q&A loop; approval gate and baselines; benchmark with planted gaps | Done (v0.3.0) |
 | 1b | Jira / Azure DevOps / Figma connectors (read, then write-back) | When access is provided; samples only until then |
 | 2 | Test design: cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review and re-import, cases added by hand or on request, stage reopen and change impact; benchmark with 46 expert conditions | Done (v0.4.0) |
-| 2b | TestHive Studio lite: local web page to see stage status, answer gaps, approve stages, open the workbooks (for people who do not use a terminal) | Next |
-| 3 | Tool advice: decision matrix per test type, human choice | Planned |
+| 2b | TestHive Studio lite: local web page to see stage status, answer gaps, approve stages, open the workbooks (for people who do not use a terminal) | Done (v0.5.0) |
+| 3 | Tool advice: decision matrix per test type, human choice | Next |
 | 4 | Automation: framework scaffolds, reusable steps, E2E journeys, tags (smoke, sanity, regression, e2e), environments, test data, contract tests | Planned |
 | 5 | Execution: run picker (type, suite, environment, device, BrowserStack), video and step screenshots, API request/response logs, retest after fix, flaky quarantine | Planned |
 | 6 | Reporting: interactive HTML bug and test reports, management summary, trends, cost per stage, write-back to Jira / Azure | Planned |

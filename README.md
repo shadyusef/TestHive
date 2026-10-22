@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.4.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) and phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact). Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.5.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio lite, a local web page for people who do not use a terminal. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -85,6 +85,15 @@ See it end to end with a fictional app: `.\hive demo/phase1/run.sh` (recorded ag
 
 See it with the fictional app: `.\hive demo/phase2/run.sh` (recorded agents, free) or `--live`.
 
+## TestHive Studio (no terminal needed)
+`.\hive studio` opens a page in your browser, on this PC only. On it you can:
+- see every module and its six stages, with what to do next (and the exact agent command to copy);
+- **Analysis:** answer the analyst's questions, or ask your own;
+- **Design:** review the test cases (Accepted, Change with a comment, Remove), see each case's steps and expected result, see coverage and the open questions the cases rely on, add a case, or ask for more cases;
+- **Approvals:** see whether a stage passes its rules, then approve, reject or reopen it, signed with your name; the decision log is there too.
+
+Studio writes the same files with the same rules as the Excel workbooks (which still work: download and upload them from the page) and as the `stage` script. If an agent or Excel saved in the meantime, Studio refuses to overwrite and reloads. It does not run agents: it shows the command to run in Claude Code. Keep its window open while you use it; Ctrl+C stops it. Try it on the fictional project: `.\hive demo/phase2b/run.sh`.
+
 ## Scripts
 Run `.\hive` with no arguments for the full list with one-line descriptions. The main ones:
 
@@ -103,6 +112,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `design-workbook` / `import-review` | Excel workbook for reviewing the cases, and reading your decisions, edits, new cases and requests back |
 | `design-impact` | Lists (and with `--apply` flags) the cases affected when approved requirements change |
 | `score-design` | Benchmark: how many expert test conditions the cases cover |
+| `studio` | Opens TestHive Studio in the browser (local only) |
 | `run-mobile` / `run-api` / `run-web` | Run a module's tests; each run is stored in `runs/` |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |
 | `gate` | Definition-of-done check on the case sheet |
@@ -131,7 +141,7 @@ CLAUDE.md            rules every Claude session in this folder follows
 scripts/             all scripts (lib/ holds their Python code)
 templates/           files init-project copies: brief, CONTEXT, intake, board, case sheet, registers, reports, env
 docs/                FORMATS, TROUBLESHOOTING, MAINTAINING, ROADMAP
-demo/                one runnable demo per phase
+demo/                one runnable demo per phase       studio/  the Studio page (served by scripts/lib/studio.py)
 mobile/ api/ web/    test code per platform
 requirements/sources/  your input documents          analysis/  requirements and gap registers
 workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv, requests.csv, baseline/

@@ -23,6 +23,8 @@ You do not need the original author or any chat history; everything is in this r
 | `scripts/_py.sh` | Finds a Python 3 that really runs (Windows `python3` is often a Store stub) | Never, unless Python lookup breaks |
 | `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline) | Behaviour changes |
 | `web/explore.mjs` | Web exploration with Playwright (Edge on Windows) | Exploration behaviour changes |
+| `scripts/lib/studio.py`, `studio/index.html` | TestHive Studio lite: a local server (Python standard library, 127.0.0.1 only, token per start) and one page with no libraries or build step. Writes only through `analysis.apply_answers`, `design.apply_review` and `stage.sh` | A screen or an action changes; keep every rule in the shared functions, never in the page |
+| `web/studio-smoke.mjs`, `demo/phase2b/` | Studio click-through (Playwright) and the Studio demo; `run.sh --check` drives the API (`walkthrough.py`) and, with web tools, the screens | When Studio changes |
 | `.claude/agents/business-analyst.md` | The analyst's procedure and checklist; the quality of the gaps depends on it | After a benchmark shows misses; re-run `demo/phase1/run.sh --live` and `score-analysis` |
 | `.claude/agents/manual-tester.md` | The designer's procedure (techniques, risk, tags, review loop); the coverage of the cases depends on it | After a design benchmark shows misses; re-run `demo/phase2/run.sh --live` and `score-design` |
 | `demo/phase2/` | Design demo from the phase 1 result: condition key, `CONTEXT.md` of the fictional app, recorded agent runs (`recorded/`), the script that plays the reviewer (`make/review-workbook.py`) | When the designer or the case format changes: re-record (see below) |
@@ -62,6 +64,7 @@ You do not need the original author or any chat history; everything is in this r
 | `TH_CASES` | design scripts, `stage` | Test case folder (default `test-cases`) |
 | `TH_SCORE_TARGET` | `score-analysis`, `score-design` | Pass mark in percent (default 80) |
 | `TH_BROWSER_CHANNEL` | `explore-web`, web tests | `msedge` (Windows default), `chrome` or `chromium` |
+| `TH_BASH` | `studio` (set by `studio.sh`) | The bash that runs `stage.sh` for approvals from Studio |
 | `TH_SCRIPTS` | `stage` (set by itself) | Where the scripts are, to call `lib/analysis.py` |
 | `PLATFORM`, `INCLUDE_TAGS`, `EXCLUDE_TAGS` | `run-mobile` | iOS instead of Android; tag filters |
 | `TEST_ENV` and every other `.env` key | `run-*` | Environment name recorded with each run; all keys are passed to Maestro flows |
@@ -87,7 +90,7 @@ You do not need the original author or any chat history; everything is in this r
 
 ## Testing
 - `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped.
-- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos.
+- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` (Studio API; the browser click-through runs where the web tools are installed).
 - CI runs the selftest on Linux, Windows and macOS for every push and pull request (GitHub, Actions tab).
 - Not covered by automated tests: real installs (`setup --install`), real Maestro/Newman/Playwright runs against an app, the agents' own work. Check those by hand when they change.
 

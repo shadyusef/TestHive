@@ -56,6 +56,9 @@ Put the module's documents in `requirements/sources/<MODULE>/`, or have a URL / 
 ## 8b. Design its tests
 After you approve the analysis, follow **Design the tests** in the README: the manual-tester writes cases linked to the approved requirements, the reviewer checks them, you review them in `test-cases/<MODULE>-design.xlsx` (accept, change, remove, add your own, request more), it re-checks, and you approve. To see it first: `.\hive demo/phase2/run.sh`.
 
+## 8c. Prefer a browser to a terminal?
+`.\hive studio` opens TestHive Studio: answer questions, review cases and approve stages on a web page (local to your PC). Agents still run in Claude Code; Studio shows the command to copy. See it first with `.\hive demo/phase2b/run.sh`.
+
 ## 9. Mask personal data (when documents contain it)
 ```
 .\hive mask suggest requirements/sources/prd.txt     lists likely names; put the real ones in .mask-terms

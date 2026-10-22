@@ -2,6 +2,11 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.5.0 (2026-10-22)
+- Phase 2b, TestHive Studio lite: `.\hive studio` opens a local web page (127.0.0.1, access token per start) to see the stages of every module and what comes next, answer and ask questions, review cases (Accepted / Change / Remove, add cases, request cases), see coverage and open questions, and approve, reject or reopen stages; workbooks can be downloaded and uploaded from it. Python standard library and one HTML page: nothing new to install.
+- Studio and the Excel imports share the same code (`analysis.apply_answers`, `design.apply_review`); approvals go through `stage.sh`. A save from an out-of-date page is refused.
+- Demo `demo/phase2b/run.sh` (opens Studio on the fictional project; `--check` drives it without a browser and, with web tools, clicks through the screens with `web/studio-smoke.mjs`); selftest and CI cover Studio.
+
 ## 0.4.0 (2026-10-22)
 - Phase 2, test design: the `manual-tester` designs cases from the approved analysis baseline with named techniques (equivalence, boundary, decision table, state transition, error guessing, use case, checklist), Risk, Tags (smoke, sanity, regression, e2e), requirement links and assumptions on open gaps; `qa-reviewer` adds a design pre-review (on Sonnet) before the human sees the cases.
 - `check-design` (coverage of every requirement, negative cases for P0 rules, boundary cases for limits, allowed values, vague results; `--set-priority` applies the risk rule; `--for-approval`), `design-workbook` and `import-review` (Excel review: Accepted / Change / Remove, direct edits, new cases, requests), `design-impact` (cases affected by changed requirements), `score-design`.

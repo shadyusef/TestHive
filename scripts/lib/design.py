@@ -234,6 +234,63 @@ def cmd_workbook(a):
     print(f"WORKBOOK {out.replace(os.sep, '/')}: {len(act)} active cases, {covered} of {len(cov)} requirements covered, {len(asks)} requests")
 
 
+def apply_review(module, case_rows, ask_rows, source="Excel"):
+    """Applies the human's review to TestCases.csv and requests.csv, all or nothing. case_rows / ask_rows: [(label, {column: value})].
+    A case row: ID with Review / Review Comment (and any EDITABLE column the human changed), or an empty ID for a new case.
+    A request row: an empty ID with Request and Requested By. Used by the Excel import and by TestHive Studio.
+    Returns (decided, edited, new_cases, new_asks, errors); nothing is written if errors."""
+    rows = read_csv(CASE_FILE, CASE_COLS)
+    by_id = {c["ID"]: c for c in rows}
+    nums = [int(c["ID"].rsplit("-", 1)[1]) for c in rows if re.fullmatch(rf"TC-{module}-\d{{3}}", c["ID"])]
+    allowed = {"Priority": ["P0", "P1", "P2", "P3"], "Type": TYPES + ["Functional"], "Technique": TECHNIQUES, "Risk": RISKS, "Platform": PLATFORMS}
+    errors, decided, edited, new_cases = [], {r: 0 for r in REVIEWS}, 0, 0
+    for n, v in case_rows:
+        v = {h: str(x or "").strip() for h, x in v.items()}
+        cid, review, note = v.get("ID", ""), v.get("Review", ""), v.get("Review Comment", "")
+        bad = [f"{h} '{v[h]}'" for h, vals in allowed.items() if v.get(h) and v[h] not in vals]
+        bad += [f"tag '{t}'" for t in refs(v.get("Tags", "")) if t not in TAGS]
+        if bad: errors.append(f"{n} ({cid or 'new'}): not allowed: {', '.join(bad)}"); continue
+        unchanged = cid in by_id and review == by_id[cid]["Review"]  # e.g. "Updated", written by the designer
+        if review and review not in REVIEWS[:3] and not unchanged: errors.append(f"{n} ({cid or 'new'}): Review must be Accepted, Change or Remove"); continue
+        if review == "Change" and not note: errors.append(f"{n} ({cid}): Change needs a Review Comment saying what to change"); continue
+        if not cid:
+            if not v.get("Title"): continue
+            if not (v.get("Steps") and v.get("Expected Result")): errors.append(f"{n}: a new case needs Title, Steps and Expected Result"); continue
+            nums.append(max(nums, default=0) + 1)
+            c = {k: "" for k in CASE_COLS}
+            c.update({h: v.get(h, "") for h in EDITABLE})
+            c.update({"ID": f"TC-{module}-{nums[-1]:03d}", "Module": module, "Origin": "Human", "Status": "Draft", "Automation": "Candidate",
+                      "Review": "Accepted", "Review Comment": note})
+            rows.append(c); new_cases += 1; continue
+        c = by_id.get(cid)
+        if c is None or not module_rows([c], module): errors.append(f"{n}: {cid} is not a case of {module}"); continue
+        changes = [h for h in EDITABLE if h in v and v[h] != c[h]]
+        if changes:  # the human's own edit; a Change or Remove decision on the same row still counts
+            for h in changes: c[h] = v[h]
+            edited += 1
+            c["Review"] = review if review in ("Change", "Remove") else "Updated"
+            if review in ("Change", "Remove"): decided[review] += 1
+            c["Review Comment"] = (note + " " if note else "") + f"[edited in {source}: {', '.join(changes)}]"
+            continue
+        if review and (review, note) != (c["Review"], c["Review Comment"]):
+            c["Review"], c["Review Comment"] = review, note; decided[review] += 1
+        elif note != c["Review Comment"]: c["Review Comment"] = note
+    asks = read_csv(ASK_FILE, ASK_COLS)
+    anums = [int(q["ID"].rsplit("-", 1)[1]) for q in asks if re.fullmatch(rf"ASK-{module}-\d{{3}}", q["ID"])]
+    new_asks = 0
+    for n, v in ask_rows:
+        v = {h: str(x or "").strip() for h, x in v.items()}
+        if v.get("ID") or not v.get("Request"): continue
+        if not v.get("Requested By"): errors.append(f"{n}: Requested By is empty"); continue
+        anums.append(max(anums, default=0) + 1)
+        asks.append({"ID": f"ASK-{module}-{anums[-1]:03d}", "Module": module, "Requirement": v.get("Requirement", ""), "Request": v["Request"],
+                     "Requested By": v["Requested By"], "Status": "Open", "Response": ""}); new_asks += 1
+    if not errors:
+        write_csv(CASE_FILE, CASE_COLS, rows)
+        if new_asks: write_csv(ASK_FILE, ASK_COLS, asks)
+    return decided, edited, new_cases, new_asks, errors
+
+
 def cmd_import(a):
     import openpyxl
     if not a: die("Usage: import-review.sh <MODULE> [workbook.xlsx]")
@@ -244,60 +301,17 @@ def cmd_import(a):
     for s in ("Cases", "Requests"):
         if s not in wb.sheetnames: die(f"The workbook has no '{s}' sheet. Do not rename sheets.")
 
-    def table(name, need):
+    def table(name, need, label):
         rows = list(wb[name].iter_rows(values_only=True))
         head = [str(h or "").strip() for h in rows[0]]
         if any(h not in head for h in need): die(f"The '{name}' sheet is missing a column: " + ", ".join(h for h in need if h not in head))
-        col = {h: head.index(h) for h in head}
-        return [(n, {h: ("" if row[col[h]] is None else str(row[col[h]]).strip()) for h in head}) for n, row in enumerate(rows[1:], 2) if any(row)]
+        return [(f"{label} {n}", {h: ("" if row[i] is None else str(row[i]).strip()) for i, h in enumerate(head) if h})
+                for n, row in enumerate(rows[1:], 2) if any(row)]
 
-    rows = read_csv(CASE_FILE, CASE_COLS)
-    by_id = {c["ID"]: c for c in rows}
-    nums = [int(c["ID"].rsplit("-", 1)[1]) for c in rows if re.fullmatch(rf"TC-{module}-\d{{3}}", c["ID"])]
-    allowed = {"Priority": ["P0", "P1", "P2", "P3"], "Type": TYPES + ["Functional"], "Technique": TECHNIQUES, "Risk": RISKS, "Platform": PLATFORMS}
-    errors, decided, edited, new_cases = [], {r: 0 for r in REVIEWS}, 0, 0
-    for n, v in table("Cases", ["ID", "Title", "Steps", "Expected Result", "Review", "Review Comment"]):
-        cid, review, note = v.get("ID", ""), v.get("Review", ""), v.get("Review Comment", "")
-        bad = [f"{h} '{v[h]}'" for h, vals in allowed.items() if v.get(h) and v[h] not in vals]
-        bad += [f"tag '{t}'" for t in refs(v.get("Tags", "")) if t not in TAGS]
-        if bad: errors.append(f"row {n} ({cid or 'new'}): not allowed: {', '.join(bad)}"); continue
-        unchanged = cid in by_id and review == by_id[cid]["Review"]  # e.g. "Updated", written by the designer
-        if review and review not in REVIEWS[:3] and not unchanged: errors.append(f"row {n} ({cid or 'new'}): Review must be Accepted, Change or Remove"); continue
-        if review == "Change" and not note: errors.append(f"row {n} ({cid}): Change needs a Review Comment saying what to change"); continue
-        if not cid:
-            if not v.get("Title"): continue
-            if not (v.get("Steps") and v.get("Expected Result")): errors.append(f"row {n}: a new case needs Title, Steps and Expected Result"); continue
-            nums.append(max(nums, default=0) + 1)
-            c = {k: "" for k in CASE_COLS}
-            c.update({h: v.get(h, "") for h in EDITABLE})
-            c.update({"ID": f"TC-{module}-{nums[-1]:03d}", "Module": module, "Origin": "Human", "Status": "Draft", "Automation": "Candidate",
-                      "Review": "Accepted", "Review Comment": note})
-            rows.append(c); new_cases += 1; continue
-        c = by_id.get(cid)
-        if c is None or not module_rows([c], module): errors.append(f"row {n}: {cid} is not a case of {module}"); continue
-        changes = [h for h in EDITABLE if h in v and v[h] != c[h]]
-        if changes:  # the human's own edit; a Change or Remove decision on the same row still counts
-            for h in changes: c[h] = v[h]
-            edited += 1
-            c["Review"] = review if review in ("Change", "Remove") else "Updated"
-            if review in ("Change", "Remove"): decided[review] += 1
-            c["Review Comment"] = (note + " " if note else "") + f"[edited in Excel: {', '.join(changes)}]"
-            continue
-        if review and (review, note) != (c["Review"], c["Review Comment"]):
-            c["Review"], c["Review Comment"] = review, note; decided[review] += 1
-        elif note != c["Review Comment"]: c["Review Comment"] = note
-    asks = read_csv(ASK_FILE, ASK_COLS)
-    anums = [int(q["ID"].rsplit("-", 1)[1]) for q in asks if re.fullmatch(rf"ASK-{module}-\d{{3}}", q["ID"])]
-    new_asks = 0
-    for n, v in table("Requests", ["ID", "Request", "Requested By"]):
-        if v.get("ID") or not v.get("Request"): continue
-        if not v.get("Requested By"): errors.append(f"Requests row {n}: Requested By is empty"); continue
-        anums.append(max(anums, default=0) + 1)
-        asks.append({"ID": f"ASK-{module}-{anums[-1]:03d}", "Module": module, "Requirement": v.get("Requirement", ""), "Request": v["Request"],
-                     "Requested By": v["Requested By"], "Status": "Open", "Response": ""}); new_asks += 1
+    decided, edited, new_cases, new_asks, errors = apply_review(
+        module, table("Cases", ["ID", "Title", "Steps", "Expected Result", "Review", "Review Comment"], "row"),
+        table("Requests", ["ID", "Request", "Requested By"], "Requests row"))
     if errors: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in errors))
-    write_csv(CASE_FILE, CASE_COLS, rows)
-    if new_asks: write_csv(ASK_FILE, ASK_COLS, asks)
     print(f"IMPORTED {path.replace(os.sep, '/')}: {decided['Accepted']} accepted, {decided['Change']} to change, {decided['Remove']} to remove, "
           f"{edited} edited in Excel, {new_cases} new cases, {new_asks} new requests. Next: the designer re-checks.")
 
