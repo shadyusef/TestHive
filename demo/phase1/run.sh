@@ -7,7 +7,8 @@
 set -e
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"; D="$SRC/demo/phase1"; REC="$D/recorded"
 LIVE=0; [ "$1" = "--live" ] && LIVE=1
-W=$(mktemp -d); cd "$SRC"; tar --exclude=.git --exclude=./runs/R-* --exclude=./demo/phase0/output --exclude=./demo/phase1/output -cf - . | (cd "$W" && tar -xf -); cd "$W"
+. "$SRC/demo/_lib.sh"
+demo_copy
 rm -rf analysis/* workflow/state.json workflow/APPROVALS.md .testhive-ready
 . scripts/_py.sh
 step() { printf '\n=== %s\n' "$1"; }

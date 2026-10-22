@@ -7,8 +7,8 @@
 set -e
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"; D="$SRC/demo/phase2"; REC="$D/recorded"; P1="$SRC/demo/phase1/recorded"
 LIVE=0; [ "$1" = "--live" ] && LIVE=1
-W=$(mktemp -d); cd "$SRC"  # copy without the project's own work: analysis, cases, reviews, stage state
-tar --exclude=.git --exclude=./runs/R-* --exclude='./demo/*/output' --exclude=./analysis --exclude=./test-cases --exclude=./reviews   --exclude=./workflow/state.json --exclude=./workflow/APPROVALS.md --exclude=./.testhive-ready -cf - . | (cd "$W" && tar -xf -); cd "$W"
+. "$SRC/demo/_lib.sh"
+demo_copy --exclude=./analysis --exclude=./test-cases --exclude=./reviews --exclude=./workflow/state.json --exclude=./workflow/APPROVALS.md --exclude=./.testhive-ready  # without the project's own work: analysis, cases, reviews, stage state
 . scripts/_py.sh
 step() { printf '\n=== %s\n' "$1"; }
 show() { printf '$ %s\n' "$*"; "$@" || true; }

@@ -4,30 +4,37 @@
 set -eE
 # a failing line names itself (otherwise "set -e" exits silently, e.g. inside VAR=$(...))
 trap 'echo "SELFTEST FAIL at scripts/selftest.sh line $LINENO: $BASH_COMMAND" >&2' ERR
+TROOT=$(mktemp -d)  # every temporary folder lives here and goes at the end, after any Studio started here has closed
+cleanup() {
+  trap - ERR; cd /; for p in $(jobs -p); do for i in $(seq 1 30); do kill -0 "$p" 2>/dev/null || break; sleep 0.5; done; kill "$p" 2>/dev/null || true; done
+  for i in 1 2 3 4 5; do rm -rf "$TROOT" 2>/dev/null; [ -d "$TROOT" ] || break; sleep 1; done
+}
+trap cleanup EXIT
+tmpd() { mktemp -d "$TROOT/t.XXXXXX"; }
 . scripts/_py.sh
 for f in scripts/*.sh; do bash -n "$f"; done
 bash scripts/setup.sh --help >/dev/null
 for f in api/collections/*.json api/environments/*.json .claude/settings.json web/package.json; do $PY -c "import json,sys;json.load(open(sys.argv[1], encoding='utf-8'))" "$f"; done
 # gate: template passes; API-style IDs and Excel's BOM are accepted; bad IDs, bad priorities and unproven "Done" are rejected
 bash scripts/gate.sh templates/TestCases.csv
-G=$(mktemp -d)
+G=$(tmpd)
 sed 's/^TC-EXAMPLE-001/TC-EXAMPLE-API-001/' templates/TestCases.csv > "$G/api.csv"; bash scripts/gate.sh "$G/api.csv" >/dev/null
 { printf '\xef\xbb\xbf'; cat templates/TestCases.csv; } > "$G/bom.csv"; bash scripts/gate.sh "$G/bom.csv" >/dev/null
 sed 's/^TC-EXAMPLE-001/EXAMPLE-1/' templates/TestCases.csv > "$G/id.csv"; ! bash scripts/gate.sh "$G/id.csv" >/dev/null
 sed 's/,P0,/,High,/' templates/TestCases.csv > "$G/pr.csv"; ! bash scripts/gate.sh "$G/pr.csv" >/dev/null
 sed 's/,Draft$/,Done/' templates/TestCases.csv > "$G/done.csv"; ! bash scripts/gate.sh "$G/done.csv" >/dev/null
 # intake
-T0=$(mktemp -d); printf '## 1. Scope\n- Module: X\n- Platforms: [x] Android [ ] iOS\n## 2. Business rules\n1. Rule one\n## 4. Expected results\n| Situation | Expected |\n|---|---|\n| ok | fine |\n## 6. Priorities\n- P0: a\n' > "$T0/i.md"
+T0=$(tmpd); printf '## 1. Scope\n- Module: X\n- Platforms: [x] Android [ ] iOS\n## 2. Business rules\n1. Rule one\n## 4. Expected results\n| Situation | Expected |\n|---|---|\n| ok | fine |\n## 6. Priorities\n- P0: a\n' > "$T0/i.md"
 bash scripts/check-intake.sh "$T0/i.md"
 ! bash scripts/check-intake.sh templates/MODULE_INTAKE.md >/dev/null
 # digest
-T=$(mktemp -d); mkdir -p "$T/r"
+T=$(tmpd); mkdir -p "$T/r"
 cat > "$T/r/a.xml" <<'X'
 <testsuite><testcase classname="s" name="ok"/><testcase classname="s" name="bad"><failure message="boom"/></testcase></testsuite>
 X
 bash scripts/digest-failures.sh "$T/r" | grep -q "boom"
 # stable: A passes 3 of 3, B fails once -> only A gets a stable file
-S=$(mktemp -d); mkdir -p "$S/runs" "$S/out"; echo old > "$S/out/stable-TC-B-002.txt"
+S=$(tmpd); mkdir -p "$S/runs" "$S/out"; echo old > "$S/out/stable-TC-B-002.txt"
 for i in 1 2 3; do
   F=""; [ "$i" = 2 ] && F='<failure message="x"/>'
   echo "<testsuites><testsuite name=\"m\"><testcase name=\"TC-A-001_ok\"/><testcase name=\"TC-B-002_flaky\">$F</testcase></testsuite></testsuites>" > "$S/runs/run-$i.xml"
@@ -43,7 +50,7 @@ for a in .claude/agents/*.md; do n=$(sed -n 's/^name: //p' "$a" | head -1); [ "$
 bash scripts/th.sh nope >/dev/null 2>&1 && { echo "th.sh accepted bad agent"; exit 1; }
 bash scripts/gen-user.sh | grep -Eq '^qa\+[0-9]+@example\.com$' || { echo "gen-user.sh output is wrong"; exit 1; }
 # stage gates: order enforced, named approver required, reject needs a comment, decisions logged
-W=$(mktemp -d); export TH_STATE="$W/state.json"
+W=$(tmpd); export TH_STATE="$W/state.json"
 bash scripts/stage.sh init demo >/dev/null
 bash scripts/stage.sh start DEMO design >/dev/null && { echo "stage.sh started design before analysis was approved"; exit 1; }
 bash scripts/stage.sh start DEMO analysis >/dev/null; bash scripts/stage.sh submit DEMO analysis >/dev/null
@@ -57,14 +64,14 @@ bash scripts/stage.sh status DEMO | grep -q "design      in progress" || { echo 
 [ "$(grep -c '^| 20' "$W/APPROVALS.md")" = 2 ] || { echo "APPROVALS.md does not have 2 decisions"; exit 1; }
 unset TH_STATE
 # collect-run: common results format, case IDs and evidence linked
-R=$(mktemp -d); export TH_RUNS="$R/runs"; mkdir -p "$R/ev"; echo x > "$R/ev/TC-DEMO-002_fail.png"
+R=$(tmpd); export TH_RUNS="$R/runs"; mkdir -p "$R/ev"; echo x > "$R/ev/TC-DEMO-002_fail.png"
 echo '<testsuites><testsuite name="demo"><testcase name="TC-DEMO-001_ok" time="1.5"/><testcase name="TC-DEMO-002_fail"><failure message="Expected Welcome"/></testcase></testsuite></testsuites>' > "$R/j.xml"
 bash scripts/collect-run.sh mobile demo --junit "$R/j.xml" --evidence "$R/ev" | grep -q "2 cases, 1 passed, 1 failed" || { echo "collect-run.sh totals are wrong"; exit 1; }
 bash scripts/collect-run.sh mobile demo --junit "$R/j.xml" | grep -Eq "R-[0-9]{8}-02" || { echo "collect-run.sh run numbering is wrong"; exit 1; }
 $PY -c "import json,sys,glob;r=json.load(open(sorted(glob.glob(sys.argv[1]+'/R-*-01/results.json'))[0],encoding='utf-8'));c=r['cases'][1];sys.exit(not(c['id']=='TC-DEMO-002' and c['status']=='failed' and len(c['evidence'])==1))" "$TH_RUNS" || { echo "collect-run.sh results.json is wrong"; exit 1; }
 unset TH_RUNS
 # masking: Arabic + English, round trip restores the original exactly
-M=$(mktemp -d); export TH_MASK_MAP="$M/map.json" TH_MASK_TERMS="$M/terms" TH_MASK_ALLOW="$M/allow"
+M=$(tmpd); export TH_MASK_MAP="$M/map.json" TH_MASK_TERMS="$M/terms" TH_MASK_ALLOW="$M/allow"
 printf 'أحمد الحربي\nAcme Bank\n' > "$TH_MASK_TERMS"; printf '+966 11 000 0000\n' > "$TH_MASK_ALLOW"
 printf 'العميل أحمد الحربي من Acme Bank\nEmail: ahmed.h@example.com Phone: +966 55 123 4567 / 0551234567 Office: +966 11 000 0000\nID: 1012345672 Order: 1012345678 Card: 4111 1111 1111 1111 Ref: 4111 1111 1111 1112\nIBAN: SA03 8000 0000 6080 1016 7519\n' > "$M/in.txt"
 bash scripts/mask.sh mask "$M/in.txt" "$M/masked.txt" >/dev/null
@@ -89,7 +96,7 @@ H_OUT=$(bash scripts/hive.sh 2>&1 || true); echo "$H_OUT" | grep -q "stage" || {
 H_OUT=$(bash scripts/hive.sh gen-user); echo "$H_OUT" | grep -q "@example.com" || { echo "hive.sh did not run gen-user"; exit 1; }
 bash scripts/hive.sh nope >/dev/null 2>&1 && { echo "hive.sh accepted an unknown script"; exit 1; }
 # phase 1: ingest, analysis registers, workbook round trip, approval gate + baseline, score, Android screen parser
-A=$(mktemp -d); export TH_ANALYSIS="$A/analysis" TH_STATE="$A/state.json"
+A=$(tmpd); export TH_ANALYSIS="$A/analysis" TH_STATE="$A/state.json"
 mkdir -p "$A/src"; cp demo/phase1/sources/openapi.yaml demo/phase1/sources/user-stories.docx "$A/src/"; printf 'R1 Full name is required.\n' > "$A/src/notes.txt"
 (cd "$A" && mkdir -p requirements/sources && mv src requirements/sources/SIGNUP && TH_ANALYSIS="$A/analysis" bash "$OLDPWD/scripts/ingest.sh" SIGNUP) | grep -q "INGESTED 3 sources" || { echo "ingest.sh did not convert the sources"; exit 1; }
 grep -q "minLength=6" "$A/analysis/sources-text/SIGNUP/openapi.yaml.md" && grep -q "US-2" "$A/analysis/sources-text/SIGNUP/user-stories.docx.md" || { echo "ingest.sh output is wrong"; exit 1; }
@@ -136,7 +143,7 @@ unset TH_ANALYSIS TH_STATE
 $PY scripts/lib/uiscreen.py find demo/phase1/samples/android-signup.xml sign_up | grep -q "540 960" || { echo "uiscreen.py could not find the button"; exit 1; }
 $PY scripts/lib/uiscreen.py summary demo/phase1/samples/android-signup.xml s | grep -q "input (password)" || { echo "uiscreen.py summary is wrong"; exit 1; }
 # phase 2: design check (coverage, negatives, boundaries), risk priority, review workbook round trip, design gate + baseline, reopen + impact, score
-A=$(mktemp -d); export TH_ANALYSIS="$A/analysis" TH_STATE="$A/state.json" TH_CASES="$A/tc"; mkdir -p "$TH_ANALYSIS" "$TH_CASES"
+A=$(tmpd); export TH_ANALYSIS="$A/analysis" TH_STATE="$A/state.json" TH_CASES="$A/tc"; mkdir -p "$TH_ANALYSIS" "$TH_CASES"
 cat > "$TH_ANALYSIS/requirements.csv" <<'X'
 ID,Module,Source,Section,Text,Type,Priority,Version,Status,Notes
 REQ-DEMO-001,DEMO,prd R4,3,Password must be at least 8 characters,Business rule,P0,1,Confirmed,
@@ -229,14 +236,14 @@ grep -q "^GAP-DEMO-001,DEMO,REQ-DEMO-002,Missing,Medium,Which help page does the
 unset TH_ANALYSIS TH_STATE TH_CASES
 # phase 2c: Studio from an empty project (setup, module, uploads and refusals, masking preview, read, readiness), in a temporary copy
 # Claude Code hooks: the edit check catches broken files, the guard refuses direct edits of the approval records
-H=$(mktemp -d); HW=$(cygpath -m "$H" 2>/dev/null || echo "$H")
+H=$(tmpd); HW=$(cygpath -m "$H" 2>/dev/null || echo "$H")
 printf 'echo "unclosed\n' > "$H/bad.sh"; printf 'x = (\n' > "$H/bad.py"; printf 'echo ok\n' > "$H/good.sh"; printf 'x = 1%b\n' '\r' > "$H/cr.py"
 P=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")   # Claude Code passes native paths; so does this test
 hook() { local r=0; printf '{"tool_input":{"file_path":"%s"}}' "$2" | CLAUDE_PROJECT_DIR="$P" bash scripts/hooks/run.sh "$1" 2>/dev/null || r=$?; echo $r; }
 HK="$(hook check_edit "$HW/bad.sh")$(hook check_edit "$HW/bad.py")$(hook check_edit "$HW/cr.py")$(hook check_edit "$HW/good.sh")"; [ "$HK" = "2220" ] || { echo "the edit-check hook is wrong: exit codes $HK for bad.sh bad.py cr.py good.sh (expected 2220)"; printf '{"tool_input":{"file_path":"%s"}}' "$HW/good.sh" | bash scripts/hooks/run.sh check_edit; exit 1; }
 [ "$(hook guard_records "$P/workflow/APPROVALS.md")$(hook guard_records "$P/test-cases/baseline/X/v1/TestCases.csv")$(hook guard_records "$P/analysis/gaps.csv")" = "220" ] || { echo "the approval-records guard is wrong"; exit 1; }
 bash scripts/check-private.sh >/dev/null || { bash scripts/check-private.sh; exit 1; }
-PR=$(mktemp -d); mkdir -p "$PR/scripts"; cp scripts/check-private.sh scripts/_py.sh "$PR/scripts/"   # a planted name must fail
+PR=$(tmpd); mkdir -p "$PR/scripts"; cp scripts/check-private.sh scripts/_py.sh "$PR/scripts/"   # a planted name must fail
 (cd "$PR" && git init -q && printf 'Acme-Secret\n' > .private-names && printf 'see acme-secret here\n' > notes.txt && printf '.private-names\n' > .gitignore)
 bash "$PR/scripts/check-private.sh" >/dev/null 2>&1 && { echo "check-private missed a planted private name"; exit 1; }
 # phase 2d: Run buttons with the recorded agents (jobs, progress, Stop, lock, every step to an approved design)

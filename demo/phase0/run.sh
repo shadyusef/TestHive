@@ -4,7 +4,8 @@
 # Works in a temporary copy; the project is not touched.
 set -e
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"; D="$SRC/demo/phase0"
-W=$(mktemp -d); cp -r "$SRC/scripts" "$SRC/templates" "$SRC/mobile" "$W/"; cd "$W"
+. "$SRC/demo/_lib.sh"
+W=$(mktemp -d); trap demo_cleanup EXIT; cp -r "$SRC/scripts" "$SRC/templates" "$SRC/mobile" "$W/"; cd "$W"
 . scripts/_py.sh
 step() { printf '\n=== %s\n' "$1"; }
 show() { printf '$ %s\n' "$*"; "$@" || true; }

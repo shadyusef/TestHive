@@ -6,8 +6,8 @@
 # Your project is not touched.
 set -e
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"; P1="$SRC/demo/phase1/recorded"; P2="$SRC/demo/phase2/recorded"
-W=$(mktemp -d); cd "$SRC"  # copy without the project's own work: analysis, cases, reviews, stage state
-tar --exclude=.git --exclude=./runs/R-* --exclude='./demo/*/output' --exclude=./analysis --exclude=./test-cases --exclude=./reviews --exclude=./workflow/state.json --exclude=./workflow/APPROVALS.md --exclude=./.testhive-ready -cf - . | (cd "$W" && tar -xf -); cd "$W"
+. "$SRC/demo/_lib.sh"
+demo_copy --exclude=./analysis --exclude=./test-cases --exclude=./reviews --exclude=./workflow/state.json --exclude=./workflow/APPROVALS.md --exclude=./.testhive-ready  # without the project's own work: analysis, cases, reviews, stage state
 . scripts/_py.sh
 bash scripts/init-project.sh "Nakhla Rewards" >/dev/null; cp demo/phase2/CONTEXT.md CONTEXT.md
 cp "$P1"/recheck-2/requirements.csv "$P1"/recheck-2/gaps.csv analysis/
@@ -20,7 +20,7 @@ echo "Demo project ready in $W: SIGNUP analysis approved, 123 test cases waiting
 
 if [ "$1" != "--check" ]; then
   echo "Starting Studio. In the browser: answer a question (Analysis), review cases (Design), approve the design (Approvals)."
-  exec bash scripts/studio.sh "$@"
+  bash scripts/studio.sh "$@"; exit
 fi
 
 LOGF="$W/studio.log"

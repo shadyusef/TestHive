@@ -8,7 +8,7 @@
 if [ "$1" = "--from" ]; then
   RUNS="${2:?dir with junit xml files}"; OUT="${3:-reports}"; N=0
 else
-  K="${1:?mobile|api|web}"; MOD="${2:?module}"; N="${3:-3}"; OUT=reports; RUNS=$(mktemp -d)
+  K="${1:?mobile|api|web}"; MOD="${2:?module}"; N="${3:-3}"; OUT=reports; RUNS=$(mktemp -d); trap 'rm -rf "$RUNS"' EXIT
   [ -f "$(dirname "$0")/run-$K.sh" ] || { echo "Unknown kind: $K (mobile|api|web)" >&2; exit 1; }
   for i in $(seq 1 "$N"); do
     echo "== run $i/$N"; rm -f "reports/$K-$MOD.xml"
