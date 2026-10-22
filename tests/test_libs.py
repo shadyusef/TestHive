@@ -248,6 +248,17 @@ class StudioWithoutBash(StudioApi):
         code, r = self.js("/api/stage", {"module": "LOGIN", "stage": "analysis", "action": "approve", "by": "Sara", "comment": ""})
         self.assertEqual(code, 400); self.assertIn("not waiting for approval", r.get("message", "") + r.get("error", ""))
 
+    def test_review_mode(self):
+        fake = os.environ.pop("TH_CLAUDE_FAKE", None)
+        try:
+            o = self.js("/api/overview")[1]
+            self.assertEqual(o["agents"], "review"); self.assertIn("Git Bash", o["agents_missing"])
+            self.js("/api/project", {"project": "Demo", "app": "Demo", "platforms": ["Web"]}); self.js("/api/module-new", {"module": "LOGIN"})
+            code, r = self.js("/api/run", {"module": "LOGIN", "action": "analyse"})
+            self.assertEqual(code, 409); self.assertIn("Review mode", r["message"])
+        finally:
+            if fake: os.environ["TH_CLAUDE_FAKE"] = fake
+
 
 if __name__ == "__main__":
     unittest.main()

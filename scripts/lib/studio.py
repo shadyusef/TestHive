@@ -3,7 +3,7 @@ Started by scripts/studio.sh. Serves studio/index.html and a small JSON API on 1
 Every write goes through the same code as the Excel imports (analysis.apply_answers, design.apply_review) or through
 scripts/lib/stage.py (what scripts/stage.sh runs), so the rules are identical. Every API call needs the random token printed at start.
 A save is refused (409) when the files changed since the page read them (an agent or Excel wrote in between)."""
-import sys, os, re, glob, json, time, hashlib, secrets, subprocess, tempfile, threading, webbrowser
+import sys, os, re, glob, json, time, hashlib, secrets, shutil, subprocess, tempfile, threading, webbrowser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -159,6 +159,8 @@ ACTIONS = {
 def start_action(module, action, info):
     """Starts the Run button's job. Returns (job, error)."""
     if action not in ACTIONS: return None, "unknown action"
+    if agents_missing(): return None, (f"Review mode: {' and '.join(agents_missing())} {'is' if len(agents_missing()) == 1 else 'are'} not on this PC, "
+                                       "so agents cannot run here. Someone with Claude Code runs the command shown; everything else works here.")
     a, mt = ACTIONS[action], info["meta"]
     if action == "explore-web":
         if not mt.get("url"): return None, "Give the web address of the built product first (Sources tab)."
@@ -205,7 +207,7 @@ def module_info(module):
     info["readiness"] = readiness(module, m, info)
     info["next"] = next_step(module, m, info)
     if info["next"]["run"]: info["next"].update(title=ACTIONS[info["next"]["run"]]["title"], minutes=ACTIONS[info["next"]["run"]]["minutes"])
-    info["jobs"], info["agents"] = jobs.listing(module)[:15], agents_mode()
+    info["jobs"], info["agents"], info["agents_missing"] = jobs.listing(module)[:15], agents_mode(), agents_missing()
     job = jobs.running(module)
     info["job"] = dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None
     return info
@@ -243,9 +245,17 @@ def readiness(module, m, info):
     return {"ready": all(i["ok"] for i in items) and not changed, "items": items, "notes": notes}
 
 
+def agents_missing():
+    """What this PC lacks to run the agents from Studio: Claude Code, and the bash their scripts run in (Git Bash on Windows)."""
+    if os.environ.get("TH_CLAUDE_FAKE"): return []
+    b = intake.bash()
+    return [name for name, ok in (("Claude Code", shutil.which("claude")), ("Git Bash", os.path.isfile(b) or shutil.which(b))) if not ok]
+
+
 def agents_mode():
-    """'recorded' when the Run buttons replay recorded runs (demos, CI), else 'live' (Claude Code for real)."""
-    return "recorded" if os.environ.get("TH_CLAUDE_FAKE") else "live"
+    """'recorded' when the Run buttons replay recorded runs (demos, CI); 'live' when they start Claude Code for real;
+    'review' when this PC cannot run agents: everything else works (documents, answers, reviews, approvals, Excel)."""
+    return "recorded" if os.environ.get("TH_CLAUDE_FAKE") else "review" if agents_missing() else "live"
 
 
 def busy(module):
@@ -305,7 +315,7 @@ def get_overview(h, q, body, module):
                      "open_gaps": sum(1 for g in info["analysis"]["gaps"] if g["Status"] == "Open"),
                      "cases": sum(1 for c in info["design"]["cases"] if design.active(c)),
                      "job": info["job"]["title"] if info["job"] else ""})
-    return h.send(200, {"project": project_name(), "setup": intake.project(), "modules": mods, "command": RUN, "agents": agents_mode()})
+    return h.send(200, {"project": project_name(), "setup": intake.project(), "modules": mods, "command": RUN, "agents": agents_mode(), "agents_missing": agents_missing()})
 
 
 @api("GET", "/api/project")

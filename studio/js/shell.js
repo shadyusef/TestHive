@@ -23,7 +23,8 @@ export async function renderSide(ov, arch) {
       <span class="s">${esc(waits(m))}</span></a>`).join('') || '<p class="s none">No modules yet.</p>';
   const n = (arch.archived || []).length;
   $('#archbtn').hidden = !n; $('#archn').textContent = n;
-  $('#mode').textContent = ov.agents === 'recorded' ? 'Agents: recorded runs (demo)' : '';
+  $('#mode').textContent = { recorded: 'Agents: recorded runs (demo)', review: 'Review mode' }[ov.agents] || '';
+  $('#mode').title = ov.agents === 'review' ? `${ov.agents_missing.join(' and ')} not found on this PC: the Run buttons are off. Documents, answers, reviews, approvals and Excel all work.` : '';
   document.querySelectorAll('[data-side]').forEach(a => a.onclick = e => { e.preventDefault(); closeMenu(); confirmLeave(() => openModule(a.dataset.side)); });
 }
 
