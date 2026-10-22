@@ -26,7 +26,7 @@ fi
 export TH_FAKE_DELAY=0.4
 LOGF="$W/studio.log"
 bash scripts/studio.sh --no-browser --port 0 > "$LOGF" 2>&1 &
-for i in $(seq 1 50); do grep -q "^STUDIO " "$LOGF" 2>/dev/null && break; sleep 0.2; done
+for i in $(seq 1 150); do grep -q "^STUDIO " "$LOGF" 2>/dev/null && break; sleep 0.2; done
 URL=$(sed -n 's/^STUDIO //p' "$LOGF"); [ -n "$URL" ] || { cat "$LOGF"; echo "Studio did not start"; exit 1; }
 echo "Studio started at ${URL%%\?*} (address with access key hidden); agents: recorded"
 if [ -d web/node_modules/@playwright/test ]; then

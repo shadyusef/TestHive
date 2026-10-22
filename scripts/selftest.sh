@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Proves TestHive itself works on this machine (run it after setup and after every change).
 # Usage: bash scripts/selftest.sh   Proves the template itself is healthy.
-set -e
+set -eE
+# a failing line names itself (otherwise "set -e" exits silently, e.g. inside VAR=$(...))
+trap 'echo "SELFTEST FAIL at scripts/selftest.sh line $LINENO: $BASH_COMMAND" >&2' ERR
 . scripts/_py.sh
 for f in scripts/*.sh; do bash -n "$f"; done
 bash scripts/setup.sh --help >/dev/null
@@ -197,7 +199,7 @@ printf 'Key,Condition,Requirement,Keywords\nK1,Seven,REQ-DEMO-001,password;7 cha
 S_OUT=$(TH_SCORE_TARGET=60 bash scripts/score-design.sh DEMO "$A/key.csv"); echo "$S_OUT" | grep -q "2 of 3 required test conditions" || { echo "score-design counted wrong (7 must not match 17): $S_OUT"; exit 1; }
 # phase 2b: Studio on the same fixture (token, host check, JSON only, stale page refused, answer saved, gate kept)
 bash scripts/studio.sh --no-browser --port 0 > "$A/studio.log" 2>&1 &
-for i in $(seq 1 50); do grep -q "^STUDIO " "$A/studio.log" 2>/dev/null && break; sleep 0.2; done
+for i in $(seq 1 150); do grep -q "^STUDIO " "$A/studio.log" 2>/dev/null && break; sleep 0.2; done
 U=$(sed -n 's/^STUDIO //p' "$A/studio.log"); [ -n "$U" ] || { cat "$A/studio.log"; echo "studio did not start"; exit 1; }
 $PY - "$U" <<'PY' || exit 1
 import sys, json, http.client
