@@ -83,8 +83,8 @@ unset TH_MASK_MAP TH_MASK_TERMS TH_MASK_ALLOW
 $PY -m py_compile scripts/lib/mask.py
 # launcher: maps a short name to scripts/<name>.sh and lists scripts when called bare
 bash scripts/hive.sh >/dev/null 2>&1 && { echo "hive.sh with no arguments should fail"; exit 1; }
-bash scripts/hive.sh | grep -q "stage" || { echo "hive.sh does not list the scripts"; exit 1; }
-bash scripts/hive.sh gen-user | grep -q "@example.com" || { echo "hive.sh did not run gen-user"; exit 1; }
+H_OUT=$(bash scripts/hive.sh 2>&1 || true); echo "$H_OUT" | grep -q "stage" || { echo "hive.sh does not list the scripts"; exit 1; }
+H_OUT=$(bash scripts/hive.sh gen-user); echo "$H_OUT" | grep -q "@example.com" || { echo "hive.sh did not run gen-user"; exit 1; }
 bash scripts/hive.sh nope >/dev/null 2>&1 && { echo "hive.sh accepted an unknown script"; exit 1; }
 # phase 1: ingest, analysis registers, workbook round trip, approval gate + baseline, score, Android screen parser
 A=$(mktemp -d); export TH_ANALYSIS="$A/analysis" TH_STATE="$A/state.json"
@@ -119,7 +119,7 @@ PY
 bash scripts/import-answers.sh DEMO | grep -q "2 gaps updated, 1 new" || { echo "import-answers did not read the workbook"; exit 1; }
 grep -q "GAP-DEMO-003,DEMO,,Missing,Medium,Is the password case-sensitive" "$TH_ANALYSIS/gaps.csv" || { echo "import-answers did not add the new question"; exit 1; }
 bash scripts/check-analysis.sh DEMO --for-approval >/dev/null && { echo "approval allowed with answered-but-unreviewed gaps"; exit 1; }
-sed -i 's/,Answered$/,Closed/; s/,Observed,$/,Confirmed,/' "$TH_ANALYSIS/gaps.csv" "$TH_ANALYSIS/requirements.csv"
+for f in "$TH_ANALYSIS/gaps.csv" "$TH_ANALYSIS/requirements.csv"; do sed 's/,Answered$/,Closed/; s/,Observed,$/,Confirmed,/' "$f" > "$f.tmp" && mv "$f.tmp" "$f"; done  # no sed -i: BSD sed (macOS) differs
 bash scripts/stage.sh init DEMO >/dev/null; bash scripts/stage.sh start DEMO analysis >/dev/null; bash scripts/stage.sh submit DEMO analysis >/dev/null
 S_OUT=$(bash scripts/stage.sh approve DEMO analysis --by tester); echo "$S_OUT" | grep -q "BASELINE DEMO v1" || { echo "approving analysis did not create the baseline: $S_OUT"; exit 1; }
 [ -s "$TH_ANALYSIS/baseline/DEMO/v1/requirements.csv" ] && [ -s "$TH_ANALYSIS/baseline/DEMO/v1/meta.json" ] || { echo "baseline files missing"; exit 1; }
@@ -137,7 +137,7 @@ $PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uisc
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then
   for f in scripts/*.ps1; do
-    r=$(powershell.exe -NoProfile -Command "\$e=\$null; [void][System.Management.Automation.Language.Parser]::ParseFile('$(cygpath -w "$PWD/$f")',[ref]\$null,[ref]\$e); if(\$e){\$e[0].Extent.StartLineNumber.ToString() + ': ' + \$e[0].Message}else{'ok'}" | tr -d '')
+    r=$(powershell.exe -NoProfile -Command "\$e=\$null; [void][System.Management.Automation.Language.Parser]::ParseFile('$(cygpath -w "$PWD/$f")',[ref]\$null,[ref]\$e); if(\$e){\$e[0].Extent.StartLineNumber.ToString() + ': ' + \$e[0].Message}else{'ok'}" | tr -d '[:cntrl:]')
     [ "$r" = ok ] || { echo "$f does not parse: line $r"; exit 1; }
   done
 fi
