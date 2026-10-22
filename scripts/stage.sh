@@ -7,11 +7,15 @@
 #   submit  <MODULE> <stage>             output is ready: the stage now waits for a human
 #   approve <MODULE> <stage> --by <name> [--comment "..."]
 #   reject  <MODULE> <stage> --by <name> --comment "why"      sends the stage back to in progress
+#   reopen  <MODULE> <stage> --by <name> --comment "why"      an approved stage changes again (e.g. new requirements);
+#                                        later stages that were started go back to in progress and need a new approval
 #   check   <MODULE> <stage>             exit 0 if the stage may start, 2 if not
 # Stages, in order: analysis design tools automation execution reporting
 # State lives in workflow/state.json; every decision is appended to workflow/APPROVALS.md.
 # Submitting or approving "analysis" first runs check-analysis --for-approval (when analysis/requirements.csv exists) and then
 # freezes the module's registers as a baseline in analysis/baseline/<MODULE>/v<n>/.
+# Submitting or approving "design" first runs check-design --for-approval (when test-cases/TestCases.csv exists) and then
+# freezes the module's cases as a baseline in test-cases/baseline/<MODULE>/v<n>/.
 . "$(dirname "$0")/_py.sh"
 export TH_SCRIPTS="$(dirname "$0")"
 $PY - "$@" <<'PY'
@@ -21,7 +25,7 @@ STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 SF = os.environ.get("TH_STATE", "workflow/state.json")
 LOG = os.path.join(os.path.dirname(SF) or ".", "APPROVALS.md")
 RUN = os.environ["TH_CMD"] + " stage" if os.environ.get("TH_CMD") else "bash scripts/stage.sh"  # how the user types it
-USAGE = f"Usage: {RUN} init|status|start|submit|approve|reject|check ...  (see the top of scripts/stage.sh)"
+USAGE = f"Usage: {RUN} init|status|start|submit|approve|reject|reopen|check ...  (see the top of scripts/stage.sh)"
 
 def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 def die(msg, code=1): print(msg); sys.exit(code)
@@ -32,6 +36,14 @@ def save(s):
     os.makedirs(os.path.dirname(SF) or ".", exist_ok=True)
     with open(SF + ".tmp", "w", encoding="utf-8", newline="\n") as f: json.dump(s, f, indent=2, ensure_ascii=False)
     os.replace(SF + ".tmp", SF)
+LIBS = {"analysis": ("analysis.py", os.path.join(os.environ.get("TH_ANALYSIS", "analysis"), "requirements.csv")),
+        "design": ("design.py", os.path.join(os.environ.get("TH_CASES", "test-cases"), "TestCases.csv"))}
+def ready(name, st):
+    """Runs the stage's own --for-approval check when the stage has one and its files exist. True if fine."""
+    if st not in LIBS or not os.path.exists(LIBS[st][1]): return True
+    sys.stdout.flush()
+    lib = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", LIBS[st][0])
+    return subprocess.run([sys.executable, lib, "check", name, "--for-approval"]).returncode == 0
 def log(module, st, decision, by, comment):
     new = not os.path.exists(LOG)
     with open(LOG, "a", encoding="utf-8", newline="\n") as f:
@@ -101,10 +113,10 @@ elif cmd == "submit":
     if len(pos) != 2: die("Usage: stage.sh submit <MODULE> <stage>")
     m, st = module(pos[0]), stage(pos[1])
     if m["stages"][st]["status"] != "in_progress": die(f"{st} must be in progress to submit (it is {m['stages'][st]['status']})", 2)
-    lib = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", "analysis.py")
-    if st == "analysis" and os.path.exists(os.path.join(os.environ.get("TH_ANALYSIS", "analysis"), "requirements.csv")):
-        if subprocess.run([sys.executable, lib, "check", pos[0].upper(), "--for-approval"]).returncode != 0:
-            die("BLOCKED: not ready to submit. Give the workbook to the human, import the answers, re-check, then submit.", 2)
+    i = STAGES.index(st)
+    if i and m["stages"][STAGES[i - 1]]["status"] != "approved": die(f"BLOCKED: {STAGES[i - 1]} is not approved (it was reopened); approve it first", 2)
+    if not ready(pos[0].upper(), st):
+        die("BLOCKED: not ready to submit. Give the workbook to the human, import the review, re-check, then submit.", 2)
     mark(m, st, "awaiting_approval"); save(s); print(f"{pos[0].upper()} {st}: waiting for human approval")
 elif cmd in ("approve", "reject"):
     if len(pos) != 2: die(f"Usage: stage.sh {cmd} <MODULE> <stage> --by <name> [--comment ...]")
@@ -112,18 +124,25 @@ elif cmd in ("approve", "reject"):
     if "by" not in opt: die(f"{cmd} needs --by <name>: decisions are made by a named human")
     if cmd == "reject" and "comment" not in opt: die("reject needs --comment saying what to change")
     if m["stages"][st]["status"] != "awaiting_approval": die(f"{st} is not waiting for approval (it is {m['stages'][st]['status']})", 2)
-    lib = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", "analysis.py")
-    has_registers = os.path.exists(os.path.join(os.environ.get("TH_ANALYSIS", "analysis"), "requirements.csv"))
-    if cmd == "approve" and st == "analysis" and has_registers:
-        sys.stdout.flush(); r = subprocess.run([sys.executable, lib, "check", pos[0].upper(), "--for-approval"])
-        if r.returncode != 0: die("BLOCKED: the analysis is not ready for approval (see above)", 2)
+    has_files = st in LIBS and os.path.exists(LIBS[st][1])
+    if cmd == "approve" and not ready(pos[0].upper(), st): die(f"BLOCKED: the {st} is not ready for approval (see above)", 2)
     status = "approved" if cmd == "approve" else "in_progress"
     mark(m, st, status, opt["by"], opt.get("comment")); save(s)
     log(pos[0].upper(), st, "Approved" if cmd == "approve" else "Rejected", opt["by"], opt.get("comment"))
     print(f"{pos[0].upper()} {st}: {'approved' if cmd == 'approve' else 'rejected, back to in progress'} by {opt['by']}")
-    if cmd == "approve" and st == "analysis" and has_registers:
+    if cmd == "approve" and has_files:
         sys.stdout.flush()
-        subprocess.run([sys.executable, lib, "baseline", pos[0].upper(), opt["by"]])
+        subprocess.run([sys.executable, os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", LIBS[st][0]), "baseline", pos[0].upper(), opt["by"]])
+elif cmd == "reopen":
+    if len(pos) != 2: die("Usage: stage.sh reopen <MODULE> <stage> --by <name> --comment \"why\"")
+    m, st = module(pos[0]), stage(pos[1])
+    if "by" not in opt or "comment" not in opt: die("reopen needs --by <name> and --comment saying what changes")
+    if m["stages"][st]["status"] != "approved": die(f"{st} is not approved (it is {m['stages'][st]['status'].replace('_', ' ')}); nothing to reopen", 2)
+    mark(m, st, "in_progress", opt["by"], "reopened: " + opt["comment"])
+    later = [x for x in STAGES[STAGES.index(st) + 1:] if m["stages"][x]["status"] in ("awaiting_approval", "approved")]
+    for x in later: mark(m, x, "in_progress", opt["by"], f"{st} reopened")
+    save(s); log(pos[0].upper(), st, "Reopened", opt["by"], opt["comment"])
+    print(f"{pos[0].upper()} {st}: reopened by {opt['by']}" + (f"; {', '.join(later)} back to in progress (needs a new approval)" if later else ""))
 else:
     die(USAGE)
 PY

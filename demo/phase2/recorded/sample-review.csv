@@ -1,0 +1,18 @@
+Kind,ID,Review,Review Comment,Edit Column,Edit Value,Title,Steps,Expected Result,Requirements,Tags,Request,Requested By
+case,TC-SIGNUP-001,Accepted,,,,,,,,,,
+case,TC-SIGNUP-022,Accepted,,,,,,,,,,
+case,TC-SIGNUP-034,Accepted,,,,,,,,,,
+case,TC-SIGNUP-037,Accepted,,,,,,,,,,
+case,TC-SIGNUP-048,Accepted,,,,,,,,,,
+case,TC-SIGNUP-049,Accepted,,,,,,,,,,
+case,TC-SIGNUP-051,Accepted,,,,,,,,,,
+case,TC-SIGNUP-072,Accepted,,,,,,,,,,
+case,TC-SIGNUP-087,Accepted,,,,,,,,,,
+case,TC-SIGNUP-089,Accepted,,,,,,,,,,
+case,TC-SIGNUP-098,Accepted,,,,,,,,,,
+case,TC-SIGNUP-011,Change,Also check that the welcome page shows the name exactly as typed (Arabic and English parts in the right order).,,,,,,,,,
+case,TC-SIGNUP-053,Change,"Split it in two: one case for letters in a box, one for typing two digits in one box.",,,,,,,,,
+case,TC-SIGNUP-036,Remove,Trimming is not a requirement; wait for the answer to GAP-SIGNUP-044 before testing it.,,,,,,,,,
+case,TC-SIGNUP-002,,,Expected Result,"Fields in order: Full name; Mobile number; Password; Date of birth; Language (العربية and English); checkbox 'I accept the terms and conditions'; button 'Sign up'. No email field is present. The password field hides what is typed.",,,,,,,
+new,,,Added by Sara (QA lead),,,Mobile number with Arabic-Indic digits and spaces together is accepted,"1. Enter Full name 'Sara Test'; 2. Enter Mobile number '٠٥ ٠٠٠٠ ٠١٢١'; 3. Enter Password 'Pass1234'; 4. Enter Date of birth '1990-01-15'; 5. Select language English; 6. Tick the terms checkbox; 7. Click Sign up",The OTP page opens; no mobile error is shown,REQ-SIGNUP-003,regression,,
+request,,,,,,,,,,,Add cases for pasting the 6-digit code from the SMS into the first box of the web verify page.,Sara (QA lead)

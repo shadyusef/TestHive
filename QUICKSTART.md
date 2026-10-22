@@ -43,8 +43,8 @@ This creates `PROJECT_BRIEF.md`, `CONTEXT.md`, `.env`, `workflow/BOARD.md`, `tes
 ```
 claude --agent testhive-lead
 ```
-The first start asks you to sign in to Claude and whether you **trust this folder**: answer yes (TestHive's allowed-commands list only works in a trusted folder). Copy `templates/MODULE_INTAKE.md` to `workflow/intake/<module>.md`, fill in the business rules, then tell the Lead for example:
-> Module: Signup. Platform: Android. The intake is in workflow/intake/signup.md.
+The first start asks you to sign in to Claude and whether you **trust this folder**: answer yes (TestHive's allowed-commands list only works in a trusted folder). Put the module's documents in `requirements/sources/<MODULE>/`, then tell the Lead for example:
+> Module SIGNUP, web and API. The documents are in requirements/sources/SIGNUP/.
 
 The Lead shows a plan and waits for your approval. Follow the stages with `.\hive stage status SIGNUP`; approve with `.\hive stage approve SIGNUP <stage> --by "<your name>"`.
 
@@ -52,6 +52,9 @@ To call one agent only, type in Claude Code `/th-mobile <task>` (also `/th-manua
 
 ## 8. Analyse your first module
 Put the module's documents in `requirements/sources/<MODULE>/`, or have a URL / APK of the built app ready. Then follow **Analyse a module** in the README: the analyst writes the requirements and its questions, you answer them in `analysis/<MODULE>-analysis.xlsx`, it re-checks, and you approve. To see the whole loop first: `.\hive demo/phase1/run.sh`.
+
+## 8b. Design its tests
+After you approve the analysis, follow **Design the tests** in the README: the manual-tester writes cases linked to the approved requirements, the reviewer checks them, you review them in `test-cases/<MODULE>-design.xlsx` (accept, change, remove, add your own, request more), it re-checks, and you approve. To see it first: `.\hive demo/phase2/run.sh`.
 
 ## 9. Mask personal data (when documents contain it)
 ```
@@ -62,7 +65,7 @@ Put the module's documents in `requirements/sources/<MODULE>/`, or have a URL / 
 Screenshots work the same way (`.png`, `.jpg`) once Tesseract is installed. `.mask-terms`, `.mask-allow` and `.mask-map.json` stay on your PC.
 
 ## 10. Add more modules later
-Repeat step 7 with a new intake file. Each module gets its own stages, case IDs and test folder; existing work is not touched.
+Repeat steps 7 to 8b with a new module. Each module gets its own stages, case IDs and test folder; existing work is not touched.
 
 ## Handy commands
 ```

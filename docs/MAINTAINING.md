@@ -21,9 +21,11 @@ You do not need the original author or any chat history; everything is in this r
 | `hive.cmd`, `scripts/hive.sh` | Launcher: `.\hive <name>` runs `scripts/<name>.sh` | Rarely |
 | `scripts/*.sh` | One script per job. Line 2 is its one-line description (shown by `.\hive`); then `# Usage:` lines | Behaviour changes |
 | `scripts/_py.sh` | Finds a Python 3 that really runs (Windows `python3` is often a Store stub) | Never, unless Python lookup breaks |
-| `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps) | Behaviour changes |
+| `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline) | Behaviour changes |
 | `web/explore.mjs` | Web exploration with Playwright (Edge on Windows) | Exploration behaviour changes |
 | `.claude/agents/business-analyst.md` | The analyst's procedure and checklist; the quality of the gaps depends on it | After a benchmark shows misses; re-run `demo/phase1/run.sh --live` and `score-analysis` |
+| `.claude/agents/manual-tester.md` | The designer's procedure (techniques, risk, tags, review loop); the coverage of the cases depends on it | After a design benchmark shows misses; re-run `demo/phase2/run.sh --live` and `score-design` |
+| `demo/phase2/` | Design demo from the phase 1 result: condition key, `CONTEXT.md` of the fictional app, recorded agent runs (`recorded/`), the script that plays the reviewer (`make/review-workbook.py`) | When the designer or the case format changes: re-record (see below) |
 | `demo/phase1/` | Fictional sources with planted gaps (`sources/`, generators in `make/`), the answer key, a local demo site, a recorded agent run (`recorded/`) | When the analyst or formats change: re-record (see below) |
 | `scripts/setup.sh`, `setup.ps1` | Prerequisite check/installer for macOS/Linux and Windows | A tool is added or its install changes; keep both in step |
 | `scripts/selftest.sh` | Tests TestHive itself; also run by CI | Every change: add a test for it |
@@ -57,7 +59,8 @@ You do not need the original author or any chat history; everything is in this r
 | `TH_PERMISSION_MODE`, `TH_CLAUDE_ARGS` | `th` | Claude Code options for one-shot agent runs |
 | `NO_COLLECT` | `run-*` | `1` = do not store the run in `runs/` |
 | `TH_ANALYSIS` | `ingest`, analysis scripts, `stage` | Analysis folder (default `analysis`) |
-| `TH_SCORE_TARGET` | `score-analysis` | Pass mark in percent (default 80) |
+| `TH_CASES` | design scripts, `stage` | Test case folder (default `test-cases`) |
+| `TH_SCORE_TARGET` | `score-analysis`, `score-design` | Pass mark in percent (default 80) |
 | `TH_BROWSER_CHANNEL` | `explore-web`, web tests | `msedge` (Windows default), `chrome` or `chromium` |
 | `TH_SCRIPTS` | `stage` (set by itself) | Where the scripts are, to call `lib/analysis.py` |
 | `PLATFORM`, `INCLUDE_TAGS`, `EXCLUDE_TAGS` | `run-mobile` | iOS instead of Android; tag filters |
@@ -77,9 +80,14 @@ You do not need the original author or any chat history; everything is in this r
 
 **Re-recording the demo:** run the analyst live on a copy of the demo project (see `demo/phase1/run.sh --live`), check the pairings, then copy `analysis/requirements.csv` and `gaps.csv` after the first pass to `demo/phase1/recorded/first-pass/`, after the first re-check to `recorded/recheck-1/` and after the second to `recorded/recheck-2/`. The human's answers are `recorded/sample-answers.csv` (round 1) and `sample-answers-2.csv` (round 2): if the new run asks different questions, rewrite them so their IDs match.
 
+## The design benchmark
+`demo/phase2/condition-key.csv` lists 46 test conditions a QA expert expects for the SIGNUP baseline (boundaries, invalid classes, states and timers, messages in both languages, API codes). `score-design` checks that at least one active case linked to the right requirement mentions each condition. As with the analysis key, read the pairings: keywords are an approximation.
+
+**Re-recording the phase 2 demo:** run `demo/phase2/run.sh --live`, or run its agent steps by hand on a copy, and copy `test-cases/TestCases.csv` after the first pass to `demo/phase2/recorded/first-pass/`, the review file to `recorded/DESIGN-SIGNUP-1.md`, the cases and `analysis/gaps.csv` (it holds the designer's new questions) after the fixes to `recorded/after-review/`, and the cases, `requests.csv` and `gaps.csv` after the re-check to `recorded/recheck-1/`. Remove the template's `TC-EXAMPLE-001` row if an older project copy still has it. `recorded/sample-review.csv` is the human's review: if the case IDs changed, rewrite it so the IDs match.
+
 ## Testing
 - `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped.
-- `.\hive demo/phase0/run.sh`: the phase 0 demo; read the output top to bottom.
+- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos.
 - CI runs the selftest on Linux, Windows and macOS for every push and pull request (GitHub, Actions tab).
 - Not covered by automated tests: real installs (`setup --install`), real Maestro/Newman/Playwright runs against an app, the agents' own work. Check those by hand when they change.
 
@@ -96,5 +104,6 @@ You do not need the original author or any chat history; everything is in this r
 - iOS needs a Mac or a device farm.
 - `scripts/th.sh` one-shot runs cannot answer permission prompts; they accept file edits and run only allowed commands, and only after the folder was trusted once in an interactive `claude` session.
 - Exploration records what it can reach: the web explorer does not know real passwords or OTP codes, and `adb` cannot type Arabic. The analyst must treat explored behaviour as Observed and ask.
-- The analyst is an AI: its registers are a draft for a human, not a final answer. The approval gate and the benchmark exist for that reason.
+- The analyst and the designer are AI: their registers and cases are a draft for a human, not a final answer. The approval gates, the pre-review and the benchmarks exist for that reason.
+- `check-design` judges coverage by links and labels (Type, Technique), not by reading the steps: a case labelled Boundary that tests no boundary passes the check. The reviewer and the human catch that.
 - macOS and Linux are verified by CI only.

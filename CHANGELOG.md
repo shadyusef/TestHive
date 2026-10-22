@@ -2,6 +2,13 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.4.0 (2026-10-22)
+- Phase 2, test design: the `manual-tester` designs cases from the approved analysis baseline with named techniques (equivalence, boundary, decision table, state transition, error guessing, use case, checklist), Risk, Tags (smoke, sanity, regression, e2e), requirement links and assumptions on open gaps; `qa-reviewer` adds a design pre-review (on Sonnet) before the human sees the cases.
+- `check-design` (coverage of every requirement, negative cases for P0 rules, boundary cases for limits, allowed values, vague results; `--set-priority` applies the risk rule; `--for-approval`), `design-workbook` and `import-review` (Excel review: Accepted / Change / Remove, direct edits, new cases, requests), `design-impact` (cases affected by changed requirements), `score-design`.
+- Case sheet: new columns Requirements, Technique, Risk, Tags, Assumption, Origin, Review, Review Comment; Type is now Positive, Negative, Localization, Accessibility, Security or Performance (Functional still read). New `test-cases/requests.csv`. Older sheets stay readable.
+- Stage gate: submitting or approving the design runs `check-design --for-approval`; approval freezes `test-cases/baseline/<MODULE>/v<n>/`; a stage can be submitted only while the previous one is approved; new `stage reopen` for requirements that change after approval.
+- Demo `demo/phase2/run.sh` (recorded or `--live`), continuing the fictional Nakhla Rewards SIGNUP module; CI runs it. Docs: README design section, FORMATS (case sheet, requests, design workbook, design baselines, condition key), TROUBLESHOOTING, MAINTAINING.
+
 ## 0.3.0 (2026-10-22)
 - Phase 1, business analysis: `business-analyst` agent and `/th-analyst`; `ingest` (text, PDF, Word, Excel, CSV, OpenAPI/Swagger, images; optional masking); `explore-web` (Playwright with Edge, no browser download) and `explore-android` (adb + UI dumps) record a built product as Observed behaviour; `check-analysis`, `analysis-workbook`, `import-answers`, `score-analysis`.
 - Stage gate: submitting or approving the analysis requires every High gap closed and no unreviewed answer; approval freezes the registers as `analysis/baseline/<MODULE>/v<n>/`.

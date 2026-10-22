@@ -1,0 +1,47 @@
+Key,Condition,Requirement,Keywords
+C01,Full name empty is refused,REQ-SIGNUP-001|REQ-SIGNUP-029,name;empty|blank|without|missing|leave
+C02,Full name of 1 character is refused (min-1),REQ-SIGNUP-001|REQ-SIGNUP-029,name;1 char|1-char|one char|single|1 letter|one letter
+C03,Full name of 2 characters is accepted (min),REQ-SIGNUP-001|REQ-SIGNUP-029,name;2 char|2-char|two char|2 letters|two letters
+C04,Full name of 50 characters is accepted (max),REQ-SIGNUP-001|REQ-SIGNUP-002|REQ-SIGNUP-029,name;50
+C05,Full name of 51 characters is refused (max+1),REQ-SIGNUP-001|REQ-SIGNUP-002|REQ-SIGNUP-029,name;51
+C06,Full name with digits or symbols is refused,REQ-SIGNUP-001|REQ-SIGNUP-029,name;digit|symbol|special
+C07,Full name in Arabic letters is accepted,REQ-SIGNUP-001|REQ-SIGNUP-029,name;arabic
+C08,Mobile of 9 digits is refused,REQ-SIGNUP-003|REQ-SIGNUP-029,9 digit|9-digit|nine digit|too short|less than 10
+C09,Mobile of 11 digits is refused,REQ-SIGNUP-003|REQ-SIGNUP-029,11 digit|11-digit|eleven digit|too long|more than 10
+C10,Mobile not starting with 05 is refused (e.g. +966 or 06),REQ-SIGNUP-003|REQ-SIGNUP-029,+966|966|prefix|not start|does not start|start with|starting with|starts with
+C11,Mobile typed with spaces is accepted (spaces removed),REQ-SIGNUP-003,space
+C12,Mobile in Arabic-Indic digits is converted and accepted,REQ-SIGNUP-003,arabic-indic|arabic indic|eastern arabic|indic|٠|٥
+C13,Mobile with letters is refused,REQ-SIGNUP-003|REQ-SIGNUP-029,letter|alpha|non-numeric|non numeric
+C14,Already registered mobile shows the registered message (409),REQ-SIGNUP-011,already registered|409
+C15,Registered but pending mobile gets a new OTP to finish sign-up,REQ-SIGNUP-011,pending
+C16,Password of 7 characters is refused (min-1),REQ-SIGNUP-005|REQ-SIGNUP-006|REQ-SIGNUP-029,password;7 char|7-char|seven char
+C17,Password of 8 characters is accepted (min),REQ-SIGNUP-005|REQ-SIGNUP-006|REQ-SIGNUP-029,password;8 char|8-char|eight char
+C18,Password of 64 characters is accepted (max),REQ-SIGNUP-005,password;64
+C19,Password of 65 characters is refused (max+1),REQ-SIGNUP-005,password;65
+C20,Password without a digit is refused,REQ-SIGNUP-005,password;no digit|without digit|without a digit|only letters|letters only|missing digit|no number|without number|without a number
+C21,Password without a letter is refused,REQ-SIGNUP-005,password;no letter|without letter|without a letter|only digits|digits only|numbers only|only numbers|missing letter
+C22,Password equal to the mobile number is refused,REQ-SIGNUP-005,password;same as|equal|identical
+C23,API refuses a 7-character password with 400,REQ-SIGNUP-006,400;7|short|minlength
+C24,Customer who turns 18 today is accepted,REQ-SIGNUP-007|REQ-SIGNUP-025,18;today|exactly|turns|turning|birthday
+C25,Customer one day short of 18 (17) is refused,REQ-SIGNUP-007|REQ-SIGNUP-025,17|day before|tomorrow|under 18|younger|one day short
+C26,Empty date of birth shows 'Please enter your date of birth',REQ-SIGNUP-007|REQ-SIGNUP-029,please enter your date of birth
+C27,Sign-up without accepting the terms is refused,REQ-SIGNUP-010,terms;not accept|without accept|unchecked|not checked|not ticked|unticked|without ticking|without checking|leave
+C28,Arabic shows right-to-left screens,REQ-SIGNUP-009,rtl|right-to-left|right to left
+C29,Default language follows the device or browser language (otherwise Arabic),REQ-SIGNUP-009,default;device|browser
+C30,Correct OTP activates the account and logs the customer in,REQ-SIGNUP-013|REQ-SIGNUP-018|REQ-SIGNUP-019,correct|valid|right;otp|code;activ|logged|log in|logs in|200
+C31,Wrong OTP shows 'The code is incorrect.',REQ-SIGNUP-014|REQ-SIGNUP-033,the code is incorrect
+C32,Third wrong attempt shows 'Too many wrong attempts. Request a new code.',REQ-SIGNUP-014,too many wrong attempts
+C33,Correct code after 3 wrong attempts is refused (code invalid),REQ-SIGNUP-014,after;correct|right|valid;3|three|third
+C34,Code entered just before 5 minutes is accepted,REQ-SIGNUP-016,4:59|4 min|before 5|before the 5|just before|299
+C35,Code after 5 minutes is expired (410 / 'The code has expired'),REQ-SIGNUP-016,expired
+C36,Resend is not possible before 30 seconds,REQ-SIGNUP-017|REQ-SIGNUP-031,29|before 30|disabled|cooldown|countdown
+C37,Resend makes the old code invalid,REQ-SIGNUP-017,old code|previous code|first code|earlier code|old otp|previous otp|first otp
+C38,Fourth resend within an hour is refused (429 / too many codes),REQ-SIGNUP-017,too many codes|429|4th|fourth
+C39,Empty code shows 'Enter the 6-digit code.',REQ-SIGNUP-015|REQ-SIGNUP-028|REQ-SIGNUP-031|REQ-SIGNUP-033,enter the 6-digit code
+C40,Code of 5 digits is refused,REQ-SIGNUP-015|REQ-SIGNUP-028|REQ-SIGNUP-031|REQ-SIGNUP-033,5 digit|5-digit|five digit
+C41,New member gets 50 welcome points,REQ-SIGNUP-019,50;point
+C42,Welcome points are credited only once,REQ-SIGNUP-019,once|twice|again|second|duplicate|not credited
+C43,Messages appear in Arabic on an Arabic page,REQ-SIGNUP-009|REQ-SIGNUP-011|REQ-SIGNUP-014|REQ-SIGNUP-016|REQ-SIGNUP-017|REQ-SIGNUP-026|REQ-SIGNUP-029|REQ-SIGNUP-033,الرمز|محاولات|انتهت|طلبت|يرجى|هذا الرقم|أدخل
+C44,Sign-up speed is checked against a target,REQ-SIGNUP-023,time|second|response|fast
+C45,Password is never stored or shown in plain text,REQ-SIGNUP-022,hash|encrypt|plain|mask|secure
+C46,End-to-end: form to OTP to account with 50 points,,otp|code;50;point

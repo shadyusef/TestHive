@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.3.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking) and phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines). Still being built phase by phase: Excel test cases, tool advice, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.4.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) and phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact). Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -28,8 +28,8 @@ Commands are shown for **Windows PowerShell** (`.\hive ...`). On macOS/Linux typ
 4. **See it in action (optional, 1 minute):** `.\hive demo/phase0/run.sh`.
 5. **Create your project files:** `.\hive init-project "My Project"`.
 6. **Describe your app:** fill in `CONTEXT.md` (app name, platforms, environment, quirks) and `.env` (app id, URLs; never committed). Connect the phone and check it: `.\hive check-devices`.
-7. **Describe a module:** copy `templates/MODULE_INTAKE.md` to `workflow/intake/<module>.md` and fill in the business rules.
-8. **Start the team:** `claude --agent testhive-lead`, then tell it e.g. *"Module: Signup, Android. The intake is in workflow/intake/signup.md."* It shows a plan and waits for your approval.
+7. **Give it a module:** put the module's documents in `requirements/sources/<MODULE>/` (PDF, Word, Excel, text, OpenAPI, designs), or have a URL or APK of the built product ready.
+8. **Start the team:** `claude --agent testhive-lead`, then tell it e.g. *"Module SIGNUP, web and API. The documents are in requirements/sources/SIGNUP/."* It shows a plan and waits for your approval at every stage (below).
 
 Stuck? See [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md).
 
@@ -55,13 +55,13 @@ Each module goes through six stages. A stage cannot start until a named person a
 |---|---|---|
 | `testhive-lead` | Sonnet | Runs the pipeline, briefs the others, keeps the board, stops at every approval. Never writes tests. |
 | `business-analyst` | Sonnet | Reads documents, API specs and designs, or explores a built web/Android app; writes the requirement and gap registers; re-checks your answers. |
-| `manual-tester` | Sonnet | Explores the app, writes test cases with exact expected results. |
+| `manual-tester` | Sonnet | Designs test cases from the approved requirements (techniques, risk, tags, exact expected results); handles your review. |
 | `mobile-automation-engineer` | Sonnet | Maestro flows for Android and iOS. |
 | `api-backend-test-engineer` | Sonnet | Postman collections run with Newman. |
 | `web-automation-engineer` | Sonnet | Playwright + TypeScript. Idle until a web flow exists. |
 | `test-data-env-manager` | Haiku | Test users, resets, environment files. Scripts first. |
 | `defect-triage` | Sonnet | Runs on failures only: test defect, environment or real bug; writes bug reports. |
-| `qa-reviewer` | Opus | Independent audit and module sign-off. |
+| `qa-reviewer` | Opus | Independent audit and module sign-off; design pre-review (on Sonnet) before you see the cases. |
 
 Call one agent directly inside Claude Code with `/th-lead`, `/th-analyst`, `/th-manual`, `/th-mobile`, `/th-api`, `/th-web`, `/th-data`, `/th-triage`, `/th-review` followed by the task, or from a terminal with `.\hive th mobile "automate TC-SIGNUP-001"`. `/th-lead` makes the current session act as the Lead (a subagent cannot start other agents); for a full module `claude --agent testhive-lead` is the better start.
 
@@ -73,6 +73,17 @@ Call one agent directly inside Claude Code with `/th-lead`, `/th-analyst`, `/th-
 5. Approve: `.\hive stage approve SIGNUP analysis --by "<your name>"`. The requirements are frozen as `analysis/baseline/SIGNUP/v1/`.
 
 See it end to end with a fictional app: `.\hive demo/phase1/run.sh` (recorded agent, free) or `--live` (real agent, uses your Claude plan).
+
+## Design the tests (stage 2)
+1. After the analysis is approved: `/th-manual SIGNUP` (or ask the Lead). The manual-tester designs cases from `analysis/baseline/SIGNUP/v<latest>/`: every case names the requirements it tests, its technique (equivalence, boundary, decision table, state transition, error guessing, use case, checklist), its risk and its tags (`smoke`, `sanity`, `regression`, `e2e`). Priority comes from a fixed rule: the requirement's priority times the case's risk.
+2. `.\hive check-design SIGNUP` shows the counts and anything missing: a requirement without a case, a P0 rule without a negative case, a limit without a boundary case.
+3. The Lead asks the qa-reviewer for a pre-review (`reviews/DESIGN-SIGNUP-1.md`) and has the findings fixed before you see anything.
+4. Open `test-cases/SIGNUP-design.xlsx`. Sheet **Cases**: set **Review** to Accepted, Change (say what in Review Comment) or Remove, or edit a case directly; add your own case in an empty row. Sheet **Requests**: ask for more cases ("add cases for pasted mobile numbers"). Sheets **Coverage** and **Assumptions** show what each requirement is tested by and which open questions the cases rely on. Save.
+5. Ask the manual-tester to re-check (`/th-manual re-check SIGNUP`); it imports your review and handles every row. Repeat 4-5 as needed.
+6. Approve: `.\hive stage approve SIGNUP design --by "<your name>"`. The cases are frozen as `test-cases/baseline/SIGNUP/v1/`.
+7. Requirements changed later? `.\hive stage reopen SIGNUP analysis --by "<name>" --comment "<what>"`, let the analyst update them, approve again, then `.\hive design-impact SIGNUP --apply` marks the affected cases **Needs update** until they are fixed.
+
+See it with the fictional app: `.\hive demo/phase2/run.sh` (recorded agents, free) or `--live`.
 
 ## Scripts
 Run `.\hive` with no arguments for the full list with one-line descriptions. The main ones:
@@ -88,6 +99,10 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `check-analysis` | Checks the requirement and gap registers; `--for-approval` checks they are ready to approve |
 | `analysis-workbook` / `import-answers` | Excel workbook of questions for the business, and reading the answers back |
 | `score-analysis` | Benchmark: how many planted gaps the analyst found |
+| `check-design` | Checks a module's test cases against the approved requirements (coverage, negatives, boundaries); `--set-priority`, `--for-approval` |
+| `design-workbook` / `import-review` | Excel workbook for reviewing the cases, and reading your decisions, edits, new cases and requests back |
+| `design-impact` | Lists (and with `--apply` flags) the cases affected when approved requirements change |
+| `score-design` | Benchmark: how many expert test conditions the cases cover |
 | `run-mobile` / `run-api` / `run-web` | Run a module's tests; each run is stored in `runs/` |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |
 | `gate` | Definition-of-done check on the case sheet |
@@ -119,7 +134,7 @@ docs/                FORMATS, TROUBLESHOOTING, MAINTAINING, ROADMAP
 demo/                one runnable demo per phase
 mobile/ api/ web/    test code per platform
 requirements/sources/  your input documents          analysis/  requirements and gap registers
-workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv
+workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv, requests.csv, baseline/
 runs/                one folder per test run           reports/ reviews/  reports and reviews
 skills/testhive/     optional /testhive skill for the Claude app
 ```

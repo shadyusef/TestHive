@@ -18,6 +18,9 @@ jobs:
       - name: Phase 1 demo (recorded agent run)
         run: bash demo/phase1/run.sh
         shell: bash
+      - name: Phase 2 demo (recorded agent runs)
+        run: bash demo/phase2/run.sh
+        shell: bash
       - name: Windows launcher
         if: runner.os == 'Windows'
         shell: pwsh

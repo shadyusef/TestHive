@@ -7,7 +7,8 @@ SAFE=$(printf '%s' "$NAME" | sed 's/[\/&|]/\\&/g')
 mkdir -p workflow/intake test-cases reports reviews mobile/data requirements/sources analysis runs
 [ -f PROJECT_BRIEF.md ] || sed "s|<PROJECT_NAME>|$SAFE|" templates/PROJECT_BRIEF.md > PROJECT_BRIEF.md
 [ -f workflow/BOARD.md ] || cp templates/BOARD.md workflow/BOARD.md
-[ -f test-cases/TestCases.csv ] || cp templates/TestCases.csv test-cases/TestCases.csv
+[ -f test-cases/TestCases.csv ] || head -1 templates/TestCases.csv > test-cases/TestCases.csv  # the template's example row stays in templates/
+[ -f test-cases/requests.csv ] || cp templates/requests.csv test-cases/requests.csv
 [ -f .env ] || cp templates/env.example .env
 [ -f CONTEXT.md ] || cp templates/CONTEXT.md CONTEXT.md
 [ -f analysis/requirements.csv ] || head -1 templates/requirements.csv > analysis/requirements.csv

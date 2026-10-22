@@ -133,7 +133,70 @@ S_OUT=$(TH_SCORE_TARGET=0 bash scripts/score-analysis.sh DEMO "$A/key2.csv"); ec
 unset TH_ANALYSIS TH_STATE
 $PY scripts/lib/uiscreen.py find demo/phase1/samples/android-signup.xml sign_up | grep -q "540 960" || { echo "uiscreen.py could not find the button"; exit 1; }
 $PY scripts/lib/uiscreen.py summary demo/phase1/samples/android-signup.xml s | grep -q "input (password)" || { echo "uiscreen.py summary is wrong"; exit 1; }
-$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py
+# phase 2: design check (coverage, negatives, boundaries), risk priority, review workbook round trip, design gate + baseline, reopen + impact, score
+A=$(mktemp -d); export TH_ANALYSIS="$A/analysis" TH_STATE="$A/state.json" TH_CASES="$A/tc"; mkdir -p "$TH_ANALYSIS" "$TH_CASES"
+cat > "$TH_ANALYSIS/requirements.csv" <<'X'
+ID,Module,Source,Section,Text,Type,Priority,Version,Status,Notes
+REQ-DEMO-001,DEMO,prd R4,3,Password must be at least 8 characters,Business rule,P0,1,Confirmed,
+REQ-DEMO-002,DEMO,prd R5,3,The Help link opens the help page,UI,P2,1,Confirmed,
+REQ-DEMO-003,DEMO,prd R6,3,Old rule,Functional,P1,2,Removed,
+X
+printf 'ID,Module,Requirement,Kind,Severity,Question,Answer,Answered By,Status\nGAP-DEMO-001,DEMO,REQ-DEMO-002,Missing,Medium,Which help page does the link open?,,,Open\n' > "$TH_ANALYSIS/gaps.csv"
+printf 'ID,Module,Requirement,Request,Requested By,Status,Response\n' > "$TH_CASES/requests.csv"
+bash scripts/stage.sh init DEMO >/dev/null; bash scripts/stage.sh start DEMO analysis >/dev/null; bash scripts/stage.sh submit DEMO analysis >/dev/null; bash scripts/stage.sh approve DEMO analysis --by tester >/dev/null
+H='ID,Module,Platform,Title,Priority,Type,Requirements,Technique,Risk,Tags,Preconditions,Steps,Expected Result,Test Data,Assumption,Origin,Review,Review Comment,Automation,Automation Spec,Status'
+C1='TC-DEMO-001,DEMO,Web,Password of 8 characters is accepted,,Positive,REQ-DEMO-001,Boundary,Medium,smoke;regression,On sign-up,1. Enter Abcdefg1; 2. Submit,The OTP page opens,Abcdefg1,,Designed,,,Candidate,,Draft'
+C2='TC-DEMO-002,DEMO,Web,Password of 7 characters is refused,,Negative,REQ-DEMO-001,Boundary,High,regression,On sign-up,1. Enter Abcdef1; 2. Submit,Message: Password must be at least 8 characters,Abcdef1,,Designed,,,Candidate,,Draft'
+C3='TC-DEMO-003,DEMO,Web,Help link opens the help page,,Positive,REQ-DEMO-002,Use case,Low,regression,On sign-up,1. Tap Help,The help page opens,,GAP-DEMO-001,Designed,,,Candidate,,Draft'
+printf '%s\n' "$H" "$C1" > "$TH_CASES/TestCases.csv"
+D_OUT=$(bash scripts/check-design.sh DEMO --set-priority || true); echo "$D_OUT" | grep -q "REQ-DEMO-001: P0 business rule with no Negative case" && echo "$D_OUT" | grep -q "REQ-DEMO-002: no test case" || { echo "check-design missed a coverage gap: $D_OUT"; exit 1; }
+printf '%s\n' "$H" "$C1" "$C2" "$C3" > "$TH_CASES/TestCases.csv"
+D_OUT=$(bash scripts/check-design.sh DEMO --set-priority) || { echo "check-design rejected a complete design: $D_OUT"; exit 1; }
+grep -q "^TC-DEMO-001,DEMO,Web,[^,]*,P1," "$TH_CASES/TestCases.csv" && grep -q "^TC-DEMO-003,DEMO,Web,[^,]*,P3," "$TH_CASES/TestCases.csv" || { echo "risk rule set the wrong priority"; exit 1; }
+cp "$TH_CASES/TestCases.csv" "$A/good.csv"
+sed 's/,smoke;regression,/,smoke;nightly,/' "$A/good.csv" > "$TH_CASES/TestCases.csv"; bash scripts/check-design.sh DEMO >/dev/null && { echo "check-design accepted an unknown tag"; exit 1; }
+sed 's/^\(TC-DEMO-003,[^,]*,[^,]*,[^,]*,[^,]*,[^,]*,\)REQ-DEMO-002/\1REQ-DEMO-003/' "$A/good.csv" > "$TH_CASES/TestCases.csv"; bash scripts/check-design.sh DEMO | grep -q "Removed in baseline" || { echo "check-design accepted a case linked to a removed requirement"; exit 1; }
+cp "$A/good.csv" "$TH_CASES/TestCases.csv"
+bash scripts/design-workbook.sh DEMO | grep -q "WORKBOOK" || { echo "design-workbook failed"; exit 1; }
+review() { $PY - "$TH_CASES/DEMO-design.xlsx" "$1" <<'PY'
+import sys, openpyxl
+wb = openpyxl.load_workbook(sys.argv[1]); ws = wb["Cases"]; head = [c.value for c in ws[1]]; col = lambda h: head.index(h) + 1
+ws.cell(2, col("Review")).value = "Accepted"; ws.cell(3, col("Review")).value = "Change"
+if sys.argv[2] == "ok": ws.cell(3, col("Review Comment")).value = "Also check the message in Arabic"
+r = ws.max_row + 1; ws.cell(r, col("Title")).value = "Password with spaces"; ws.cell(r, col("Steps")).value = "1. Enter ' Abcdefg1 '"; ws.cell(r, col("Expected Result")).value = "Spaces are kept"
+rq = wb["Requests"]; h = [c.value for c in rq[1]]; rq.cell(2, h.index("Request") + 1).value = "Add a case for a pasted password"; rq.cell(2, h.index("Requested By") + 1).value = "Sara"
+wb.save(sys.argv[1])
+PY
+}
+review bad; bash scripts/import-review.sh DEMO | grep -q "IMPORT REFUSED" && cmp -s "$A/good.csv" "$TH_CASES/TestCases.csv" || { echo "import-review accepted a Change without a comment, or changed files"; exit 1; }
+bash scripts/design-workbook.sh DEMO >/dev/null; review ok
+I_OUT=$(bash scripts/import-review.sh DEMO); echo "$I_OUT" | grep -q "1 accepted, 1 to change, 0 to remove, 0 edited in Excel, 1 new cases, 1 new requests" || { echo "import-review counted wrong: $I_OUT"; exit 1; }
+grep -q "^TC-DEMO-004,DEMO,,Password with spaces,.*,Human,Accepted," "$TH_CASES/TestCases.csv" && grep -q "^ASK-DEMO-001,DEMO,,Add a case for a pasted password,Sara,Open," "$TH_CASES/requests.csv" || { echo "import-review did not add the new case or request"; exit 1; }
+bash scripts/stage.sh start DEMO design >/dev/null; bash scripts/stage.sh submit DEMO design >/dev/null && { echo "design submitted with an unhandled review"; exit 1; }
+$PY - "$TH_CASES" <<'PY'
+import sys, csv, os
+p = os.path.join(sys.argv[1], "TestCases.csv"); rows = list(csv.DictReader(open(p, encoding="utf-8")))
+for r in rows:
+    if r["ID"] == "TC-DEMO-002": r["Review"] = "Updated"
+    if r["ID"] == "TC-DEMO-004": r.update({"Platform": "Web", "Priority": "P1", "Type": "Positive", "Requirements": "REQ-DEMO-001", "Technique": "Error guessing", "Risk": "Medium", "Tags": "regression", "Expected Result": "The OTP page opens; the password is saved with its spaces"})
+w = csv.DictWriter(open(p, "w", encoding="utf-8", newline=""), rows[0].keys(), lineterminator="\n"); w.writeheader(); w.writerows(rows)
+q = os.path.join(sys.argv[1], "requests.csv"); txt = open(q, encoding="utf-8").read().replace(",Sara,Open,", ",Sara,Done,TC-DEMO-004 covers it")
+open(q, "w", encoding="utf-8", newline="").write(txt)
+PY
+bash scripts/design-workbook.sh DEMO >/dev/null; I_OUT=$(bash scripts/import-review.sh DEMO); echo "$I_OUT" | grep -q "0 accepted, 0 to change, 0 to remove, 0 edited in Excel, 0 new cases, 0 new requests" || { echo "re-importing an untouched workbook changed something: $I_OUT"; exit 1; }
+bash scripts/check-design.sh DEMO --for-approval >/dev/null || { echo "check-design refused a handled review: $(bash scripts/check-design.sh DEMO --for-approval)"; exit 1; }
+bash scripts/stage.sh submit DEMO design >/dev/null || { echo "stage refused a ready design"; exit 1; }
+S_OUT=$(bash scripts/stage.sh approve DEMO design --by tester); echo "$S_OUT" | grep -q "DESIGN BASELINE DEMO v1: 4 active cases (from analysis v1)" || { echo "approving design did not create the baseline: $S_OUT"; exit 1; }
+bash scripts/stage.sh reopen DEMO analysis --by tester --comment "8 becomes 10" | grep -q "design back to in progress" || { echo "reopen did not send design back"; exit 1; }
+sed 's/at least 8 characters,Business rule,P0,1,/at least 10 characters,Business rule,P0,2,/' "$TH_ANALYSIS/requirements.csv" > "$A/r.csv" && mv "$A/r.csv" "$TH_ANALYSIS/requirements.csv"
+bash scripts/stage.sh submit DEMO design >/dev/null && { echo "design submitted while the analysis is reopened"; exit 1; }
+bash scripts/stage.sh submit DEMO analysis >/dev/null; bash scripts/stage.sh approve DEMO analysis --by tester >/dev/null
+I_OUT=$(bash scripts/design-impact.sh DEMO --apply); echo "$I_OUT" | grep -q "analysis v1 -> v2: 1 changed, 0 removed, 0 new requirements; 3 cases affected" || { echo "design-impact is wrong: $I_OUT"; exit 1; }
+bash scripts/check-design.sh DEMO --for-approval | grep -q "TC-DEMO-001: Needs update" || { echo "Needs update did not block approval"; exit 1; }
+printf 'Key,Condition,Requirement,Keywords\nK1,Seven,REQ-DEMO-001,password;7 char\nK2,Seventeen,,password;17\nK3,Help,REQ-DEMO-002,help\n' > "$A/key.csv"
+S_OUT=$(TH_SCORE_TARGET=60 bash scripts/score-design.sh DEMO "$A/key.csv"); echo "$S_OUT" | grep -q "2 of 3 required test conditions" || { echo "score-design counted wrong (7 must not match 17): $S_OUT"; exit 1; }
+unset TH_ANALYSIS TH_STATE TH_CASES
+$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then
   for f in scripts/*.ps1; do

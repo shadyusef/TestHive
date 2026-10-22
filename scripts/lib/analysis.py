@@ -107,10 +107,33 @@ def cmd_check(a):
         print(f"  gaps by severity: {count(gaps, 'Severity', SEVERITY)}; by status: {count(gaps, 'Status', GAP_STATUS)}")
 
 
-def cmd_workbook(a):
+def add_sheet(ws, cols, rows, widths, editable=()):
+    """Header row, data rows, widths; wraps text, right-aligns Arabic, colours the human's columns yellow."""
     import openpyxl
     from openpyxl.styles import Alignment, Font, PatternFill
+    head, edit = PatternFill("solid", fgColor="284A8C"), PatternFill("solid", fgColor="FFF4CC")
+    ws.append(cols)
+    for c in ws[1]: c.font, c.fill = Font(bold=True, color="FFFFFF"), head
+    for r in rows: ws.append(r)
+    for i, w in enumerate(widths, 1): ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
+    for row in ws.iter_rows(min_row=2):
+        for c in row:
+            rtl = isinstance(c.value, str) and bool(ARABIC.search(c.value))
+            c.alignment = Alignment(wrap_text=True, vertical="top", horizontal="right" if rtl else "left", readingOrder=2 if rtl else 1)
+            if cols[c.column - 1] in editable: c.fill = edit
+            if isinstance(c.value, str) and c.value.startswith("="): c.data_type = "s"  # text, not an Excel formula
+    ws.freeze_panes = "A2"; ws.auto_filter.ref = ws.dimensions
+
+
+def dropdown(ws, col, values, last=1000):
     from openpyxl.worksheet.datavalidation import DataValidation
+    dv = DataValidation(type="list", formula1='"' + ",".join(values) + '"', allow_blank=True)
+    ws.add_data_validation(dv); dv.add(f"{col}2:{col}{last}")
+
+
+def cmd_workbook(a):
+    import openpyxl
+    from openpyxl.styles import Font
     if not a: die("Usage: analysis-workbook.sh <MODULE> [out.xlsx]")
     module = a[0].upper()
     out = a[1] if len(a) > 1 else os.path.join(DIR, f"{module}-analysis.xlsx")
@@ -118,21 +141,8 @@ def cmd_workbook(a):
     gaps = [g for g in read_csv(GAP_FILE, GAP_COLS) if g["Module"].upper() == module]
     if not reqs and not gaps: die(f"No requirements or gaps for {module} in {DIR}/")
     req_text = {r["ID"]: r["Text"] for r in read_csv(REQ_FILE, REQ_COLS)}
-    head, edit = PatternFill("solid", fgColor="284A8C"), PatternFill("solid", fgColor="FFF4CC")
     wb = openpyxl.Workbook()
-
-    def sheet(ws, cols, rows, widths, editable=()):
-        ws.append(cols)
-        for c in ws[1]: c.font, c.fill = Font(bold=True, color="FFFFFF"), head
-        for r in rows: ws.append(r)
-        for i, w in enumerate(widths, 1): ws.column_dimensions[openpyxl.utils.get_column_letter(i)].width = w
-        for row in ws.iter_rows(min_row=2):
-            for c in row:
-                rtl = isinstance(c.value, str) and bool(ARABIC.search(c.value))
-                c.alignment = Alignment(wrap_text=True, vertical="top", horizontal="right" if rtl else "left", readingOrder=2 if rtl else 1)
-                if cols[c.column - 1] in editable: c.fill = edit
-        ws.freeze_panes = "A2"; ws.auto_filter.ref = ws.dimensions
-
+    sheet = add_sheet
     ws = wb.active; ws.title = "Cover"
     open_high = sum(1 for g in gaps if g["Severity"] == "High" and g["Status"] != "Closed")
     for row in [("TestHive analysis workbook", ""), ("Module", module), ("Created", time.strftime("%Y-%m-%d %H:%M")),
@@ -148,10 +158,7 @@ def cmd_workbook(a):
           [[g["ID"], g["Requirement"], " | ".join(req_text.get(x, "") for x in refs(g["Requirement"])), g["Kind"], g["Severity"],
             g["Question"], g["Answer"], g["Answered By"], g["Status"]] for g in gaps],
           [16, 18, 45, 12, 10, 55, 45, 16, 11], editable=("Answer", "Answered By", "Status"))
-    gs = wb["Gaps"]
-    for col, values in (("I", GAP_STATUS), ("D", GAP_KINDS), ("E", SEVERITY)):
-        dv = DataValidation(type="list", formula1='"' + ",".join(values) + '"', allow_blank=True)
-        gs.add_data_validation(dv); dv.add(f"{col}2:{col}1000")
+    for col, values in (("I", GAP_STATUS), ("D", GAP_KINDS), ("E", SEVERITY)): dropdown(wb["Gaps"], col, values)
     sheet(wb.create_sheet("Requirements"), REQ_COLS[:1] + REQ_COLS[2:], [[r[c] for c in REQ_COLS if c != "Module"] for r in reqs],
           [16, 30, 10, 60, 14, 9, 8, 11, 30])
     src_idx = os.path.join(DIR, "sources-text", module, "index.csv")

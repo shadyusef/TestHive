@@ -1,0 +1,2 @@
+ID,Module,Requirement,Request,Requested By,Status,Response
+ASK-SIGNUP-001,SIGNUP,,Add cases for pasting the 6-digit code from the SMS into the first box of the web verify page.,Sara (QA lead),Done,TC-SIGNUP-123 (expected result depends on open GAP-SIGNUP-046)
