@@ -27,7 +27,7 @@ if (process.argv.includes('--welcome')) {  // before setup: the first-opening sc
   if (errors.length) { console.log('UI SMOKE FAIL\n- ' + errors.join('\n- ')); process.exit(1); }
   process.exit(0);
 }
-await check('home lists the module and the New module button', async () => { await page.getByRole('button', { name: 'New module' }).waitFor(); await page.locator('.module-card').first().waitFor(); });
+await check('home lists the module and the New module button', async () => { await page.getByRole('button', { name: 'New module', exact: true }).waitFor(); await page.locator('.module-card').first().waitFor(); await page.locator('#mods [data-side]').first().waitFor(); });
 await shot('1-home');
 await page.locator('.module-card').first().click();
 await check('the module opens on its readiness card and Sources tab', async () => { await page.getByText('Ready for automation:').waitFor(); await page.getByText('Requirement documents').waitFor(); });
@@ -64,7 +64,7 @@ await check('the Project page shows the saved facts', async () => { await page.g
   if ((await page.locator('#p-project').inputValue()) !== 'Nakhla Rewards') throw new Error('project name not shown'); });
 await shot('4-project');
 await page.getByRole('button', { name: 'Cancel' }).click();
-await page.getByRole('button', { name: 'New module' }).click();
+await page.getByRole('button', { name: 'New module', exact: true }).click();
 await check('the New module form opens', async () => { await page.getByRole('heading', { name: 'New module' }).waitFor(); });
 await shot('5-new-module');
 await browser.close();

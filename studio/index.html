@@ -10,14 +10,29 @@
 <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<header>
-  <h1>TestHive Studio</h1><span class="project" id="project"></span>
-  <span class="spacer"></span>
-  <button id="projbtn" title="Project details">Project</button> <span class="small muted">You are</span> <button id="who" title="Change your name"></button>
-  <button id="theme" title="Light or dark">◐</button>
-</header>
-<main id="main"><p class="muted">Loading…</p></main>
-<div class="savebar" id="savebar"><span id="savetext"></span><span class="spacer" style="flex:1"></span>
+<div class="app">
+  <aside class="side" id="side" aria-label="Project and modules">
+    <a class="brand" href="#/" id="brand">
+      <svg width="28" height="28" viewBox="0 0 28 28" aria-hidden="true"><path class="mark" d="M14 2l10.4 6v12L14 26 3.6 20V8z"/><path d="M14 8.5l5.2 3v6L14 20.5l-5.2-3v-6z" fill="none" stroke="#fff" stroke-width="1.6"/></svg>
+      <span><b>TestHive</b><span id="project">Studio</span></span></a>
+    <div class="group">Modules</div>
+    <nav id="mods" aria-label="Modules"></nav>
+    <button class="add" id="newmod-side">+ New module</button>
+    <div class="grow"></div>
+    <button class="nav" id="projbtn"><span class="n">Project</span></button>
+    <button class="nav" id="archbtn" hidden><span class="n">Archived <span class="count" id="archn"></span></span></button>
+    <button class="me" id="who" title="Change your name"><span class="avatar" id="avatar" aria-hidden="true"></span><span id="whoname"></span></button>
+  </aside>
+  <header class="top">
+    <button class="iconbtn menu" id="menu" aria-label="Menu" aria-controls="side" aria-expanded="false"><svg width="16" height="16" viewBox="0 0 16 16" aria-hidden="true"><path d="M2 4h12M2 8h12M2 12h12" stroke="currentColor" stroke-width="1.5"/></svg></button>
+    <nav class="crumbs" id="crumbs" aria-label="You are here"></nav>
+    <div class="grow"></div>
+    <span class="status small" id="mode"></span>
+    <button class="iconbtn" id="theme" aria-label="Light or dark" title="Light or dark"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="M8 2a6 6 0 010 12z" fill="currentColor"/></svg></button>
+  </header>
+  <main class="sheet" id="main"><p class="muted">Loading…</p></main>
+</div>
+<div class="savebar" id="savebar"><span id="savetext"></span><span class="grow"></span>
   <button id="discard">Discard</button><button class="primary" id="save">Save</button></div>
 <script type="module" src="app.js"></script>
 </body>

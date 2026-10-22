@@ -45,6 +45,7 @@
 
 /* ---------- base ---------- */
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
 body { margin: 0; background: var(--ground); color: var(--text); font: 14px/20px var(--font); font-variant-numeric: tabular-nums; }
 button, select, input, textarea { font: inherit; color: inherit; }
 button { height: var(--control-height); border: 1px solid var(--control); background: var(--surface); border-radius: var(--radius-control); padding: 0 12px; cursor: pointer; white-space: nowrap; }
@@ -65,11 +66,39 @@ h2, h3, h4 { font-weight: 600; }
 .crumb { cursor: pointer; color: var(--accent); }
 ul.plain { margin: 4px 0; padding-inline-start: 18px; }
 
-/* ---------- frame (header and main of the current layout; replaced by the sidebar shell in the next step) ---------- */
-header { display: flex; align-items: center; gap: 12px; height: var(--topbar); padding: 0 24px; position: sticky; top: 0; z-index: 5; background: var(--ground); }
-header h1 { font-size: 15px; font-weight: 600; margin: 0; } header .project { color: var(--muted); }
-header .spacer { flex: 1; }
-main { max-width: 1400px; margin: 0 8px 8px; padding: var(--pad) var(--pad) 80px; background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); min-height: calc(100vh - var(--topbar) - 8px); }
+/* ---------- frame: sidebar and top bar on the ground, the work on one sheet ---------- */
+.app { display: grid; grid-template-columns: var(--sidebar) minmax(0, 1fr); grid-template-rows: var(--topbar) 1fr; min-height: 100vh; }
+.side { grid-row: 1 / 3; display: flex; flex-direction: column; gap: 2px; padding: 12px 10px 14px; position: sticky; top: 0; height: 100vh; overflow-y: auto; }
+.side button { height: auto; border: 0; background: none; text-align: start; width: 100%; }
+.brand { display: flex; align-items: center; gap: 10px; padding: 6px 8px 14px; color: var(--text); text-decoration: none; }
+.brand svg { flex: none; } .brand .mark { fill: var(--accent); }
+.brand b { display: block; font-weight: 600; font-size: 15px; line-height: 18px; }
+.brand span span { display: block; color: var(--muted); font-size: 12px; line-height: 16px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px; }
+.group { color: var(--muted); font-size: 12px; padding: 18px 8px 6px; }
+.nav { display: block; padding: 6px 8px; border-radius: var(--radius-card); color: var(--text); text-decoration: none; }
+.nav:hover { background: var(--hover); }
+.nav.on { background: var(--active); }
+.nav .n { display: flex; justify-content: space-between; align-items: center; gap: 8px; font-weight: 500; }
+.nav .s, .side .none { display: block; color: var(--muted); font-size: 12px; line-height: 16px; margin: 0; }
+.side .none { padding: 0 8px; }
+.count { font-size: 12px; font-weight: 500; color: var(--text); background: var(--surface); border-radius: 999px; padding: 0 7px; line-height: 18px; }
+.side .add { color: var(--muted); padding: 6px 8px; border-radius: var(--radius-card); }
+.side .add:hover { background: var(--hover); color: var(--text); }
+.side .grow { flex: 1; min-height: 16px; }
+.me { display: flex; align-items: center; gap: 8px; padding: 8px; border-radius: var(--radius-card); }
+.me:hover { background: var(--hover); }
+.avatar { flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--accent-pale); color: var(--accent-ink); font-size: 12px; font-weight: 600; display: grid; place-items: center; }
+.top { display: flex; align-items: center; gap: 12px; padding: 0 20px 0 24px; min-width: 0; }
+.top .grow { flex: 1; }
+.crumbs { display: flex; align-items: center; gap: 6px; min-width: 0; white-space: nowrap; color: var(--muted); }
+.crumbs b { color: var(--text); font-weight: 500; overflow: hidden; text-overflow: ellipsis; }
+button.link { height: auto; border: 0; padding: 0; background: none; color: var(--muted); }
+button.link:hover { color: var(--text); text-decoration: underline; }
+.top .status { color: var(--muted); }
+.iconbtn { width: 32px; padding: 0; display: grid; place-items: center; color: var(--text); }
+.menu { display: none; }
+.sheet { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); margin: 0 8px 8px 0; padding: var(--pad) var(--pad) 96px; min-width: 0; }
+.grow { flex: 1; }
 
 /* ---------- components ---------- */
 .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-card); padding: 16px 18px; margin-bottom: 16px; }
@@ -83,7 +112,7 @@ main { max-width: 1400px; margin: 0 8px 8px; padding: var(--pad) var(--pad) 80px
 .sev-High { background: var(--bad-bg); color: var(--bad-ink); } .sev-Medium { background: var(--warn-bg); color: var(--warn-ink); } .sev-Low { background: var(--idle-bg); color: var(--idle-ink); }
 .next { background: var(--raised); border-radius: var(--radius-control); padding: 10px 12px; }
 .next code { background: var(--surface); border: 1px solid var(--border); padding: 1px 6px; border-radius: 4px; font-size: 12px; }
-.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border); margin: 20px 0 16px; overflow-x: auto; }
+.tabs { display: flex; gap: 22px; border-bottom: 1px solid var(--border); margin: 20px 0 16px; overflow-x: auto; overflow-y: hidden; scrollbar-width: none; }
 .tabs button { height: auto; border: none; border-bottom: 2px solid transparent; border-radius: 0; background: none; padding: 0 2px 10px; margin-bottom: -1px; color: var(--muted); }
 .tabs button.on { border-bottom-color: var(--text); color: var(--text); font-weight: 600; }
 .bar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin-bottom: 12px; }
@@ -116,4 +145,20 @@ td.id { white-space: nowrap; font-family: var(--mono); font-size: 13px; }
 .drop { border: 1px dashed var(--control); border-radius: var(--radius-card); padding: 18px; text-align: center; color: var(--muted); }
 .drop.over { border-color: var(--accent); background: var(--accent-pale); }
 pre.log { white-space: pre-wrap; max-height: 260px; overflow: auto; background: var(--raised); padding: 10px; border-radius: var(--radius-control); margin: 8px 0 0; font-size: 12px; }
-@media (max-width: 700px) { .cards { grid-template-columns: 1fr; } .form { grid-template-columns: 1fr; } main { margin: 0; border-radius: 0; border-left: 0; border-right: 0; padding: 16px 16px 80px; } }
+/* ---------- narrower screens: the sidebar folds into the menu; on a phone the sheet is the screen ---------- */
+@media (max-width: 1100px) {
+  .app { grid-template-columns: minmax(0, 1fr); }
+  .menu { display: grid; }
+  .side { position: fixed; inset: 0 auto 0 0; width: 280px; z-index: 20; background: var(--ground); border-right: 1px solid var(--border); transform: translateX(-100%); visibility: hidden; transition: transform .2s ease, visibility .2s; }
+  body.menu-open .side { transform: none; visibility: visible; }
+  body.menu-open::after { content: ""; position: fixed; inset: 0; background: var(--scrim); z-index: 19; }
+  .top { padding: 0 16px; }
+  .sheet { margin: 0 8px 8px; }
+}
+@media (max-width: 760px) {
+  .cards { grid-template-columns: 1fr; } .form { grid-template-columns: 1fr; }
+  .top { padding: 0 12px; } .crumbs .hide-s, .top .status { display: none; }
+  .sheet { margin: 0; border-radius: 0; border-left: 0; border-right: 0; padding: 18px 16px 96px; }
+  .side .nav, .side .add, .me { padding-top: 10px; padding-bottom: 10px; }
+}
+@media (prefers-reduced-motion: reduce) { .side { transition: none; } }

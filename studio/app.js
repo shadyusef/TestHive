@@ -1,9 +1,10 @@
 // TestHive Studio, loaded by studio/index.html as a module. Plain JS, no libraries, no build step.
 // All data comes from the JSON API (scripts/lib/studio.py); every save goes through the same rules as the Excel imports and stage.sh.
 // The screens are in studio/js/: core (shared), home, module (header, tabs, saving), sources, analysis, design, approvals.
-import { TOKEN, store, S, $, esc, api, toast, me, askName, ask, panel, refs, setTheme, confirmLeave } from './js/core.js';
+import { TOKEN, store, S, $, esc, api, toast, showMe, askName, ask, panel, refs, setTheme, confirmLeave } from './js/core.js';
 import { setHash, route, openModule, render } from './js/module.js';
 import { renderSetup } from './js/home.js';
+import { bindShell } from './js/shell.js';
 import { saveAnswers } from './js/analysis.js';
 import { saveReview } from './js/design.js';
 
@@ -46,6 +47,6 @@ window.addEventListener('beforeunload', e => { if (Object.keys(S.dirty).length) 
 $('#save').onclick = () => S.tab === 'analysis' ? saveAnswers() : saveReview();
 $('#discard').onclick = () => { S.dirty = {}; render(); };
 
-$('#who').textContent = me() || 'set your name';
+showMe(); bindShell();
 if (!TOKEN) $('#main').innerHTML = '<div class="msg bad">Open Studio with the address printed in its window (it contains an access key).</div>';
 else route();

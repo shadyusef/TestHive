@@ -22,6 +22,7 @@ export function toast(text, kind = 'ok') {
   setTimeout(() => d.remove(), kind === 'ok' ? 3500 : 9000);
 }
 export function me() { return store.get('th-name') || ''; }
+export function showMe() { const n = me(); $('#whoname').textContent = n || 'Set your name'; $('#avatar').textContent = (n.trim()[0] || '?').toUpperCase(); }
 export function askName(then) {
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="card"><h3 style="margin-top:0">Who are you?</h3>
@@ -29,7 +30,7 @@ export function askName(then) {
     <input id="nm" style="width:100%" placeholder="e.g. Sara (QA lead)" value="${esc(me())}">
     <p style="text-align:end;margin-bottom:0"><button class="primary" id="nmok">Continue</button></p></div>`;
   document.body.appendChild(m); const inp = m.querySelector('#nm'); inp.focus();
-  const done = () => { const v = inp.value.trim(); if (!v) return inp.focus(); store.set('th-name', v); m.remove(); $('#who').textContent = v; then && then(); };
+  const done = () => { const v = inp.value.trim(); if (!v) return inp.focus(); store.set('th-name', v); m.remove(); showMe(); then && then(); };
   m.querySelector('#nmok').onclick = done; inp.onkeydown = e => { if (e.key === 'Enter') done(); };
 }
 /* In-page confirmation (instead of the browser's confirm()): resolves to true, false, or the typed text when opts.input is set.

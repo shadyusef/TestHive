@@ -1,6 +1,7 @@
 // A module's page: the header, the tabs, agent jobs, and saving (afterSave) for every tab.
 import { S, $, esc, api, toast, ask, chip, pipeline, nextBox, confirmLeave } from './core.js';
 import { home } from './home.js';
+import { renderSide, setCrumbs } from './shell.js';
 import { renderSources } from './sources.js';
 import { renderAnalysis } from './analysis.js';
 import { renderDesign } from './design.js';
@@ -24,7 +25,7 @@ export async function openModule(mod, keepTab) {
   const push = !(S.view === 'module' && S.module === mod);
   S.view = 'module'; S.module = mod; S.data = d; S.dirty = {}; S.agents = d.agents;
   if (!keepTab) { S.tab = d.stages[0].status === 'pending' ? 'sources' : 'analysis'; S.open.clear(); }
-  render(); setHash(push);
+  render(); setHash(push); renderSide();
 }
 export const TABS = [['sources', 'Sources'], ['analysis', 'Analysis (questions)'], ['design', 'Design (test cases)'], ['approvals', 'Approvals'], ['activity', 'Activity']];
 let POLL = null;
@@ -78,13 +79,12 @@ export function readinessCard(r) {
 }
 export function render() {
   const d = S.data;
-  $('#main').innerHTML = `<p class="small"><span class="crumb" id="back">All modules</span> › ${esc(d.module)}</p>
-    <div class="card"><h2 style="margin:0">${esc(d.module)} ${d.meta.title ? `<span class="muted" style="font-weight:400;font-size:15px">${esc(d.meta.title)}</span>` : ''}</h2>${pipeline(d.stages)}${nextBox(d.next, d.job && d.job.title)}</div>
+  setCrumbs([['Modules', home], [d.module, () => { S.tab = 'sources'; openModule(d.module, true); }], [TABS.find(([t]) => t === S.tab)[1]]]);
+  $('#main').innerHTML = `<div class="card"><h2 style="margin:0">${esc(d.module)} ${d.meta.title ? `<span class="muted" style="font-weight:400;font-size:15px">${esc(d.meta.title)}</span>` : ''}</h2>${pipeline(d.stages)}${nextBox(d.next, d.job && d.job.title)}</div>
     ${jobCard(d.job)}
     ${readinessCard(d.readiness)}
     <div class="tabs">${TABS.map(([t, l]) => `<button data-tab="${t}" class="${S.tab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="tab"></div>`;
-  $('#back').onclick = () => confirmLeave(home);
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => confirmLeave(() => { S.tab = b.dataset.tab; S.dirty = {}; render(); setHash(false); }));
   ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals, activity: renderActivity })[S.tab]();
   updateSavebar(); bindStop(); watchJob();
