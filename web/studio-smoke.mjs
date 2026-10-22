@@ -16,7 +16,7 @@ await page.addInitScript(() => { try { localStorage.setItem('th-name', 'Sara (QA
 const errors = [];
 page.on('pageerror', e => errors.push(e.message));
 const shot = async name => page.screenshot({ path: `${out}/${name}.png`, fullPage: false });
-const check = async (text, fn) => { try { await fn(); console.log('  ok    ' + text); } catch (e) { errors.push(`${text}: ${e.message.split('\n')[0]}`); console.log('  WRONG ' + text); } };
+const check = async (text, fn) => { try { await fn(); console.log('  ok    ' + text); } catch (e) { errors.push(`${text}: ${e.message.split('\n')[0]}`); console.log('  WRONG ' + text); await shot(`wrong-${errors.length}`).catch(() => {}); } };
 
 await page.goto(url);
 await check('home shows the module with its stages', async () => { await page.getByText('Design · waiting for you').waitFor(); });
@@ -29,10 +29,19 @@ await shot('2-analysis');
 await page.getByRole('tab', { name: /^Requirements/ }).click();
 await check('the Requirements sub-tab lists the requirements', async () => { await page.locator('td.id [data-req]').first().waitFor(); });
 await page.getByRole('tab', { name: /^Design/ }).click();
-await check('Design tab lists the cases', async () => { await page.getByText('requirements covered').waitFor(); await page.locator('select[data-rev]').first().waitFor(); });
+await check('Design tab lists the cases', async () => { await page.getByText('requirements covered').waitFor(); await page.locator('[data-rev]').first().waitFor(); });
+await check('Change on a case asks what to change; Discard drops it, Accept and Save keep the review', async () => {
+  const id = await page.locator('table.cases tbody tr').filter({ has: page.locator('[data-rev]') }).filter({ hasNot: page.locator('[aria-pressed="true"]') })
+    .first().locator('[data-rev]').first().getAttribute('data-rev');
+  const pick = v => page.locator(`[data-rev="${id}"][data-v="${v}"]`);
+  await pick('Change').click(); await page.locator(`[data-com="${id}"]`).fill('Also check the message in Arabic');
+  await page.getByText('1 unsaved review').waitFor(); await shot('3a-design-review');
+  await page.getByRole('button', { name: 'Discard' }).click(); await pick('Accepted').click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click(); await page.getByText(/Saved/).first().waitFor();
+  if (await pick('Accepted').getAttribute('aria-pressed') !== 'true') throw new Error(`${id} is not shown as accepted after saving`); });
 await page.locator('[data-open]').first().click();
 await shot('3-design-cases');
-await page.getByRole('button', { name: 'Coverage' }).click();
+await page.getByRole('tab', { name: /^Coverage/ }).click();
 await check('Coverage shows every requirement', async () => { await page.getByRole('columnheader', { name: 'Boundary' }).waitFor(); });
 await shot('4-design-coverage');
 await page.getByRole('tab', { name: 'Approvals' }).click();
