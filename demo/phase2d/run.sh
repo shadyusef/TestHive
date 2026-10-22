@@ -8,7 +8,9 @@
 set -e
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"
 W=$(mktemp -d); cd "$SRC"  # copy the tool only: no project files, no requirements, no work
-tar --exclude=.git --exclude=./runs/R-* --exclude=./runs/agents --exclude='./demo/*/output' --exclude=./analysis --exclude=./test-cases --exclude=./reviews --exclude=./requirements --exclude=./workflow/state.json --exclude=./workflow/APPROVALS.md --exclude=./.testhive-ready --exclude=./PROJECT_BRIEF.md --exclude=./CONTEXT.md --exclude=./.env --exclude=./.mask-terms --exclude=./.mask-allow --exclude=./.mask-map.json -cf - . | (cd "$W" && tar -xf -); cd "$W"
+tar --exclude=.git --exclude=./runs/R-* --exclude=./runs/agents --exclude='./demo/*/output' --exclude=./analysis --exclude=./test-cases --exclude=./reviews --exclude=./requirements --exclude=./workflow/state.json --exclude=./workflow/APPROVALS.md --exclude=./.testhive-ready -cf - . | (cd "$W" && tar -xf -); cd "$W"
+# the project's own files, removed by full path (macOS tar would also drop templates/PROJECT_BRIEF.md with --exclude=./PROJECT_BRIEF.md)
+for f in PROJECT_BRIEF.md CONTEXT.md .env .mask-terms .mask-allow .mask-map.json; do rm -f "$W/$f"; done
 . scripts/_py.sh
 bash scripts/init-project.sh "Nakhla Rewards" >/dev/null; cp demo/phase2/CONTEXT.md CONTEXT.md
 bash scripts/stage.sh init SIGNUP >/dev/null
