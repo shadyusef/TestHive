@@ -234,6 +234,9 @@ hook() { printf '{"tool_input":{"file_path":"%s"}}' "$2" | CLAUDE_PROJECT_DIR="$
 [ "$(hook check_edit "$HW/bad.sh")$(hook check_edit "$HW/bad.py")$(hook check_edit "$HW/cr.py")$(hook check_edit "$HW/good.sh")" = "2220" ] || { echo "the edit-check hook missed a broken file or refused a good one"; exit 1; }
 [ "$(hook guard_records "$P/workflow/APPROVALS.md")$(hook guard_records "$P/test-cases/baseline/X/v1/TestCases.csv")$(hook guard_records "$P/analysis/gaps.csv")" = "220" ] || { echo "the approval-records guard is wrong"; exit 1; }
 bash scripts/check-private.sh >/dev/null || { bash scripts/check-private.sh; exit 1; }
+PR=$(mktemp -d); mkdir -p "$PR/scripts"; cp scripts/check-private.sh scripts/_py.sh "$PR/scripts/"   # a planted name must fail
+(cd "$PR" && git init -q && printf 'Acme-Secret\n' > .private-names && printf 'see acme-secret here\n' > notes.txt && printf '.private-names\n' > .gitignore)
+bash "$PR/scripts/check-private.sh" >/dev/null 2>&1 && { echo "check-private missed a planted private name"; exit 1; }
 # phase 2d: Run buttons with the recorded agents (jobs, progress, Stop, lock, every step to an approved design)
 D_OUT=$(bash demo/phase2d/run.sh --check 2>&1); echo "$D_OUT" | grep -q "STUDIO RUN CHECK PASS" || { echo "$D_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio run check failed"; exit 1; }
 C_OUT=$(bash demo/phase2c/run.sh --check 2>&1); echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio intake check failed"; exit 1; }
