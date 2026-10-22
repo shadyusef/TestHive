@@ -1,7 +1,7 @@
 """TestHive Studio lite: a local web page over the project files, for people who do not use a terminal.
 Started by scripts/studio.sh. Serves studio/index.html and a small JSON API on 127.0.0.1 only.
 Every write goes through the same code as the Excel imports (analysis.apply_answers, design.apply_review) or through
-scripts/stage.sh, so the rules are identical. Every API call needs the random token printed at start.
+scripts/lib/stage.py (what scripts/stage.sh runs), so the rules are identical. Every API call needs the random token printed at start.
 A save is refused (409) when the files changed since the page read them (an agent or Excel wrote in between)."""
 import sys, os, re, glob, json, time, hashlib, secrets, subprocess, tempfile, threading, webbrowser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
@@ -263,9 +263,7 @@ def approvals(module):
 
 
 def run_stage(args):
-    bash = os.environ.get("TH_BASH") or "bash"
-    r = subprocess.run([bash, os.path.join("scripts", "stage.sh")] + args, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return r.returncode, (r.stdout + r.stderr).strip()
+    return intake.run_py("stage.py", args)  # the same rules as scripts/stage.sh, with no bash needed
 
 
 # ---------- API ----------

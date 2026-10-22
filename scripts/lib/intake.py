@@ -27,6 +27,30 @@ def run(args):
     return r.returncode, (r.stdout + r.stderr).strip()
 
 
+def run_py(lib, args):
+    """Runs scripts/lib/<lib> with this Python (no bash needed)."""
+    r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), lib)] + args,
+                       capture_output=True, text=True, encoding="utf-8", errors="replace")
+    return r.returncode, (r.stdout + r.stderr).strip()
+
+
+def init_project(name):
+    """Creates the project files (brief, CONTEXT, board, case sheet, registers, .env) from templates; keeps the ones that exist.
+    Used by scripts/init-project.sh and by Studio's first opening."""
+    for d in ("workflow/intake", "test-cases", "reports", "reviews", "mobile/data", "requirements/sources", "analysis", "runs"):
+        os.makedirs(d, exist_ok=True)
+    first_line = lambda p: read(p).split("\n", 1)[0] + "\n"  # a register's header only: the template's example row stays in templates/
+    files = {"PROJECT_BRIEF.md": lambda: read("templates/PROJECT_BRIEF.md").replace("<PROJECT_NAME>", name),
+             "workflow/BOARD.md": lambda: read("templates/BOARD.md"), "test-cases/TestCases.csv": lambda: first_line("templates/TestCases.csv"),
+             "test-cases/requests.csv": lambda: read("templates/requests.csv"), ".env": lambda: read("templates/env.example"),
+             "CONTEXT.md": lambda: read("templates/CONTEXT.md"), "analysis/requirements.csv": lambda: first_line("templates/requirements.csv"),
+             "analysis/gaps.csv": lambda: first_line("templates/gaps.csv")}
+    for path, text in files.items():
+        if not os.path.exists(path): write(path, text())
+    h = os.environ.get("TH_CMD", "bash scripts/hive.sh")
+    return f"Project '{name}' initialised. Next: fill in CONTEXT.md and .env, then run: {h} setup --check   and   {h} check-devices"
+
+
 def read(path):
     with open(path, encoding="utf-8") as f: return f.read()
 
@@ -78,8 +102,7 @@ def save_project(f):
     if app_id and not re.fullmatch(r"[A-Za-z][\w]*(\.[A-Za-z][\w]*)+", app_id): return False, "Android package looks like com.company.app"
     if re.search(r"[\r\n|<>]", name + app): return False, "Names cannot contain line breaks or the characters | < >"
     if not os.path.exists("PROJECT_BRIEF.md"):
-        code, out = run(["scripts/init-project.sh", name])
-        if code: return False, out
+        init_project(name)
     brief = read("PROJECT_BRIEF.md")
     brief = re.sub(r"^# Project brief:.*$", lambda m: f"# Project brief: {name}", brief, count=1, flags=re.M)  # lambda: user text is never a pattern
     for label, value in (("Name", app), ("Platforms", " / ".join(plats)), ("Android package", app_id or "-"),
@@ -333,7 +356,7 @@ def sources(module, approved_at=""):
 
 
 def ingest(module, mask):
-    return run(["scripts/ingest.sh", module] + (["--mask"] if mask else []))
+    return run_py("ingest.py", [module] + (["--mask"] if mask else []))
 
 
 # ---------- masking (the human's own browser on this PC; agents cannot use Studio) ----------
@@ -357,3 +380,9 @@ def mask_preview(module):
 def save_mask_lists(terms, allow):
     import mask as masker
     return masker.add_lines(masker.TERMS, [str(t) for t in terms]), masker.add_lines(masker.ALLOW, [str(a) for a in allow])
+
+
+if __name__ == "__main__":  # python scripts/lib/intake.py init "<PROJECT_NAME>"   (what scripts/init-project.sh runs)
+    if len(sys.argv) != 3 or sys.argv[1] != "init": sys.exit('Usage: init-project.sh "<PROJECT_NAME>"')
+    sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    print(init_project(sys.argv[2]))

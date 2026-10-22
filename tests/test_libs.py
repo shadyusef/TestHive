@@ -184,7 +184,8 @@ class StudioApi(Project):
                                      headers={**({"X-TestHive-Token": studio.TOKEN} if token else {}), **({"Content-Type": ctype} if data is not None else {})})
         try:
             with urllib.request.urlopen(req) as r: return r.status, r.read(), r.headers
-        except urllib.error.HTTPError as e: return e.code, e.read(), e.headers
+        except urllib.error.HTTPError as e:
+            with e: return e.code, e.read(), e.headers
 
     def js(self, *a, **k):
         code, data, _ = self.call(*a, **k); return code, json.loads(data or b"{}")
@@ -225,6 +226,27 @@ class StudioApi(Project):
         self.assertEqual(self.js("/api/module-restore", {"archive": "../../x", "by": "Sara"})[0], 400)
         self.assertEqual(self.js("/api/module-restore", {"archive": a["name"], "by": "Sara"})[0], 200)
         self.assertEqual([m["module"] for m in self.js("/api/overview")[1]["modules"]], ["SIGNUP"])
+
+
+class StudioWithoutBash(StudioApi):
+    """Review mode on a PC with Python only: project setup, a module, documents, reading them and the stage rules need no bash."""
+
+    def setUp(self):
+        super().setUp()
+        shutil.copytree(os.path.join(ROOT, "templates"), "templates")
+        os.environ["TH_BASH"] = os.path.join(self.dir, "no-bash-here")
+
+    def tearDown(self):
+        os.environ["TH_BASH"] = BASH; super().tearDown()
+
+    def test_setup_to_stage_rules(self):
+        code, r = self.js("/api/project", {"project": "Demo", "app": "Demo", "platforms": ["Web"]})
+        self.assertEqual(code, 200, r); self.assertTrue(os.path.exists("PROJECT_BRIEF.md"))
+        self.assertEqual(self.js("/api/module-new", {"module": "LOGIN", "title": "Log in"})[0], 200)
+        self.assertEqual(self.js("/api/source?m=LOGIN&name=prd.txt&by=Sara", raw=b"Rule: 8 characters.", ctype="application/octet-stream")[0], 200)
+        code, r = self.js("/api/ingest", {"module": "LOGIN", "mask": False}); self.assertEqual(code, 200, r)
+        code, r = self.js("/api/stage", {"module": "LOGIN", "stage": "analysis", "action": "approve", "by": "Sara", "comment": ""})
+        self.assertEqual(code, 400); self.assertIn("not waiting for approval", r.get("message", "") + r.get("error", ""))
 
 
 if __name__ == "__main__":
