@@ -19,7 +19,7 @@ const shot = async name => page.screenshot({ path: `${out}/${name}.png`, fullPag
 const check = async (text, fn) => { try { await fn(); console.log('  ok    ' + text); } catch (e) { errors.push(`${text}: ${e.message.split('\n')[0]}`); console.log('  WRONG ' + text); await shot(`wrong-${errors.length}`).catch(() => {}); } };
 
 await page.goto(url);
-await check('home shows the module with its stages', async () => { await page.getByText('Design · waiting for you').waitFor(); });
+await check('home shows the module with its stages', async () => { await page.locator('.module-card').getByText('Design waits for your approval').waitFor(); });
 await shot('1-home');
 await page.locator('.module-card').first().click();
 await check('Analysis tab lists the questions, read-only because the analysis is approved', async () => {

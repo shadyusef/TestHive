@@ -60,16 +60,16 @@ export function bindStop() {
 export function renderActivity() {
   const js = S.data.jobs;
   $('#tab').innerHTML = `<p class="small muted">Every agent run and exploration started from Studio, newest first. Runs started in Claude Code directly are not listed.</p>
-    <div class="table-wrap"><table><thead><tr><th>Started (UTC)</th><th>What</th><th>Status</th><th>Took</th><th style="min-width:320px">Result</th><th></th></tr></thead><tbody>
+    <div class="table-wrap"><table class="list"><thead><tr><th>Started (UTC)</th><th>What</th><th>Status</th><th>Took</th><th class="wide">Result</th><th><span class="sr">Log</span></th></tr></thead><tbody>
     ${js.map(j => { const took = j.ended ? Math.round((Date.parse(j.ended) - Date.parse(j.started)) / 60000) : null;
       return `<tr><td class="small">${esc(j.started.replace('T', ' ').slice(0, 16))}</td><td>${esc(j.title)}</td>
-        <td><span class="chip ${j.status === 'done' ? 's-approved' : j.status === 'running' ? 's-in_progress' : 'sev-High'}">${esc(j.status)}</span></td>
+        <td><span class="pill ${j.status === 'done' ? 'ok' : j.status === 'running' ? 'Medium' : 'High'}">${esc(j.status)}</span></td>
         <td class="small">${took === null ? '' : took + ' min'}${j.cost_usd ? ` · $${esc(j.cost_usd)}` : ''}</td><td class="small" dir="auto">${esc(j.summary)}</td>
-        <td><button class="small" data-log="${esc(j.id)}">Log</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="muted">Nothing run from Studio yet.</td></tr>'}
-    </tbody></table></div><pre id="logview" class="small" style="white-space:pre-wrap;display:none;background:var(--raised);padding:8px;border-radius:6px;margin-top:10px"></pre>`;
+        <td class="rowacts"><button class="small" data-log="${esc(j.id)}">Log</button></td></tr>`; }).join('') || '<tr><td colspan="6" class="muted">Nothing run from Studio yet.</td></tr>'}
+    </tbody></table></div><pre id="logview" class="log" hidden></pre>`;
   document.querySelectorAll('[data-log]').forEach(b => b.onclick = async () => {
     const r = await api('/api/job?id=' + encodeURIComponent(b.dataset.log));
-    const v = $('#logview'); v.style.display = 'block'; v.textContent = `${r.title} (${r.status})\nTask: ${r.task}\n\n${(r.lines || []).join('\n')}`;
+    const v = $('#logview'); v.hidden = false; v.textContent = `${r.title} (${r.status})\nTask: ${r.task}\n\n${(r.lines || []).join('\n')}`;
   });
 }
 /* ---------- The module header: title, what to do next with its one action, and the stage track ---------- */

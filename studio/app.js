@@ -15,7 +15,7 @@ document.addEventListener('click', e => {
   const r = a.requirements.find(x => x.ID === id) || (d.requirements || []).find(x => x.ID === id);
   if (!r) return toast(`${id} is not in the requirements of ${S.module}.`, 'warn');
   const qs = a.gaps.filter(g => refs(g.Requirement).includes(id)), cs = d.cases.filter(c => refs(c.Requirements).includes(id) && c.Status !== 'Removed');
-  panel(`${id} · ${r.Priority} · ${r.Type}`, `<p dir="auto" style="font-size:15px">${esc(r.Text)}</p>
+  panel(`${id} · ${r.Priority} · ${r.Type}`, `<p dir="auto" class="lead">${esc(r.Text)}</p>
     <p class="small muted">Status ${esc(r.Status)} · from ${esc(r.Source)}${r.Section ? ', ' + esc(r.Section) : ''}${r.Notes ? ' · ' + esc(r.Notes) : ''}</p>
     <h4>Questions (${qs.length})</h4>${qs.length ? `<ul class="plain">${qs.map(g => `<li dir="auto"><b>${esc(g.ID)}</b> ${esc(g.Status)}: ${esc(g.Question)}${g.Answer ? ` <span class="muted">→ ${esc(g.Answer)}</span>` : ''}</li>`).join('')}</ul>` : '<p class="muted">None.</p>'}
     <h4>Test cases (${cs.length})</h4>${cs.length ? `<ul class="plain">${cs.map(c => `<li dir="auto"><b>${esc(c.ID)}</b> ${esc(c.Priority)} ${esc(c.Title)}</li>`).join('')}</ul>` : '<p class="muted">None yet.</p>'}`);

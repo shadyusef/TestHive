@@ -25,10 +25,10 @@ export function me() { return store.get('th-name') || ''; }
 export function showMe() { const n = me(); $('#whoname').textContent = n || 'Set your name'; $('#avatar').textContent = (n.trim()[0] || '?').toUpperCase(); }
 export function askName(then) {
   const m = document.createElement('div'); m.className = 'modal';
-  m.innerHTML = `<div class="card"><h3 style="margin-top:0">Who are you?</h3>
+  m.innerHTML = `<div class="dialog"><h2>Who are you?</h2>
     <p class="muted small">Your name signs your answers, reviews and approvals (as in the approvals log). It stays in this browser.</p>
-    <input id="nm" style="width:100%" placeholder="e.g. Sara (QA lead)" value="${esc(me())}">
-    <p style="text-align:end;margin-bottom:0"><button class="primary" id="nmok">Continue</button></p></div>`;
+    <input id="nm" class="full" placeholder="e.g. Sara (QA lead)" aria-label="Your name" value="${esc(me())}">
+    <p class="buttons"><button class="primary" id="nmok">Continue</button></p></div>`;
   document.body.appendChild(m); const inp = m.querySelector('#nm'); inp.focus();
   const done = () => { const v = inp.value.trim(); if (!v) return inp.focus(); store.set('th-name', v); m.remove(); showMe(); then && then(); };
   m.querySelector('#nmok').onclick = done; inp.onkeydown = e => { if (e.key === 'Enter') done(); };
@@ -38,9 +38,9 @@ export function askName(then) {
 export function ask(text, opts = {}) {
   return new Promise(resolve => {
     const m = document.createElement('div'); m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
-    m.innerHTML = `<div class="card"><p style="margin-top:0;white-space:pre-wrap" dir="auto">${esc(text)}</p>
-      ${opts.input ? `<input id="ask-in" style="width:100%" placeholder="${esc(opts.input)}" aria-label="${esc(opts.input)}">` : ''}
-      <p style="text-align:end;margin-bottom:0"><button id="ask-no">Cancel</button> <button id="ask-ok" class="${opts.danger ? 'danger' : 'primary'}">${esc(opts.ok || 'OK')}</button></p></div>`;
+    m.innerHTML = `<div class="dialog"><p class="text" dir="auto">${esc(text)}</p>
+      ${opts.input ? `<input id="ask-in" class="full" placeholder="${esc(opts.input)}" aria-label="${esc(opts.input)}">` : ''}
+      <p class="buttons"><button id="ask-no">Cancel</button><button id="ask-ok" class="${opts.danger ? 'danger' : 'primary'}">${esc(opts.ok || 'OK')}</button></p></div>`;
     document.body.appendChild(m);
     const inp = m.querySelector('#ask-in'), ok = m.querySelector('#ask-ok');
     const close = v => { m.remove(); document.removeEventListener('keydown', key); resolve(v); };
@@ -54,7 +54,7 @@ export function ask(text, opts = {}) {
 }
 export function panel(title, html) {  // a wide read-only window: document text, requirement details
   const m = document.createElement('div'); m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
-  m.innerHTML = `<div class="card wide"><div class="bar"><h3 style="margin:0;flex:1" dir="auto">${esc(title)}</h3><button id="pn-x">Close</button></div>${html}</div>`;
+  m.innerHTML = `<div class="dialog wide"><div class="dialoghead"><h2 class="grow" dir="auto">${esc(title)}</h2><button id="pn-x">Close</button></div>${html}</div>`;
   document.body.appendChild(m);
   const close = () => { m.remove(); document.removeEventListener('keydown', key); };
   const key = e => { if (e.key === 'Escape') close(); };
@@ -65,11 +65,6 @@ export function panel(title, html) {  // a wide read-only window: document text,
 export const reqLinks = text => esc(text).replace(/REQ-[A-Z0-9]+-\d+/g, id => `<button class="req" data-req="${id}">${id}</button>`);
 export const refs = cell => String(cell || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);
 export function setTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
-export const chip = (st, status) => `<span class="chip s-${status}" title="${esc(STAGE_LABEL[st])}: ${esc(STATUS_LABEL[status])}">${esc(STAGE_LABEL[st])} · ${esc(STATUS_LABEL[status])}</span>`;
-export const pipeline = stages => `<div class="pipeline">${stages.map(s => chip(s.stage, s.status)).join('')}</div>`;
-export const nextBox = (n, job) => `<div class="next"><b>Next:</b> ${esc(n.text)}
-  ${job ? `<span class="chip s-in_progress">${esc(job)} is working…</span>` : n.run ? `<button class="primary" data-run="${esc(n.run)}" data-title="${esc(n.title)}" data-min="${esc(n.minutes)}">Run: ${esc(n.title)}</button>` : ''}
-  ${n.command && !job ? `<span class="small muted">${n.run ? 'or in Claude Code:' : ''}</span> <code>${esc(n.command)}</code> <button class="small" data-copy="${esc(n.command)}">Copy</button>` : ''}</div>`;
 export async function confirmLeave(go) {
   if (Object.keys(S.dirty).length && !await ask('You have unsaved changes. Leave without saving?', { ok: 'Leave', danger: true })) return false;
   S.dirty = {}; go(); return true;
