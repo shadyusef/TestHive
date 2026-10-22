@@ -17,3 +17,6 @@
 *.xml text eol=lf
 VERSION text eol=lf
 *.ps1 text eol=crlf
+*.html text eol=lf
+*.mjs text eol=lf
+*.js text eol=lf

@@ -1,0 +1,24 @@
+"""Claude Code hook (PreToolUse on Edit|Write|MultiEdit|NotebookEdit): blocks direct edits of the approval records.
+Only scripts/stage.sh writes them, so a decision always has a named human, a log line and a frozen baseline.
+Registered in .claude/settings.json; tested by scripts/selftest.sh. Exit 2 = the edit is refused and Claude reads why."""
+import sys, os, json
+
+PROTECTED = {"workflow/APPROVALS.md": "the approvals log is append-only and written by stage.sh",
+             "workflow/state.json": "stage status changes only through stage.sh (start, submit; approve and reject by a named human)"}
+PROTECTED_DIRS = {"analysis/baseline/": "an approved analysis baseline is frozen",
+                  "test-cases/baseline/": "an approved design baseline is frozen"}
+
+try: data = json.load(sys.stdin)
+except ValueError: sys.exit(0)
+inp = data.get("tool_input") or {}
+path = inp.get("file_path") or inp.get("notebook_path") or ""
+if not path: sys.exit(0)
+root = os.environ.get("CLAUDE_PROJECT_DIR") or data.get("cwd") or os.getcwd()
+rel = os.path.relpath(os.path.abspath(path), os.path.abspath(root)).replace(os.sep, "/")
+fold = (lambda x: x.lower()) if os.name == "nt" else (lambda x: x)  # Windows paths ignore case
+why = next((w for f, w in PROTECTED.items() if fold(rel) == fold(f)), None) or \
+      next((w for d, w in PROTECTED_DIRS.items() if fold(rel).startswith(fold(d))), None)
+if why:
+    print(f"Refused: {rel} is not edited directly ({why}). Use bash scripts/stage.sh (status, start, submit, reopen); "
+          "approvals and rejections are made by a named human.", file=sys.stderr)
+    sys.exit(2)

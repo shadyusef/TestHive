@@ -16,7 +16,10 @@ You do not need the original author or any chat history; everything is in this r
 |---|---|---|
 | `.claude/agents/*.md` | Agent definitions: frontmatter (`name` = file name, `model`, `tools`) and rules | An agent's role or rules change |
 | `.claude/commands/th-*.md` | `/th-*` slash commands, one per agent | An agent is added or renamed |
-| `.claude/settings.json` | Commands agents may run (`allow`) and must never run (`deny`) | A new script or tool is needed by agents |
+| `.claude/settings.json` | Commands agents may run (`allow`) and must never run (`deny`); two hooks (`scripts/hooks/`): `check_edit` after every edit (syntax, line endings), `guard_records` before every edit (approval records and baselines are written only by `stage.sh`) | A new script or tool is needed by agents; a new file that only a script may write |
+| `.claude/skills/release-phase`, `.claude/skills/rerecord-demo` | Maintainer skills, started by you (`/release-phase 0.8.0 phase3-tools "..."`, `/rerecord-demo phase2`): every release step and check in order; the demo re-recording procedure below | The release or recording steps change |
+| `.claude/agents/studio-security-reviewer.md`, `docs-consistency-reviewer.md` | Maintainer reviewers (read-only): Studio's security checklist; documentation against the code | Studio's attack surface or the docs set changes |
+| `scripts/check-private.sh`, `.private-names` | Fails if a private name (one per line in the git-ignored `.private-names`) appears in any file git would publish | Never commit `.private-names` |
 | `CLAUDE.md` | Rules for every Claude session opened in the folder | Project-wide rules change |
 | `hive.cmd`, `scripts/hive.sh` | Launcher: `.\hive <name>` runs `scripts/<name>.sh` | Rarely |
 | `scripts/*.sh` | One script per job. Line 2 is its one-line description (shown by `.\hive`); then `# Usage:` lines | Behaviour changes |
@@ -103,7 +106,9 @@ You do not need the original author or any chat history; everything is in this r
 - Not covered by automated tests: real installs (`setup --install`), real Maestro/Newman/Playwright runs against an app, the agents' own work. Check those by hand when they change.
 
 ## Releasing
-1. All tests pass locally; the demo runs.
+Use `/release-phase <version> <branch> "<summary>"`: it runs the steps below in order and stops at the first failure.
+
+1. All tests pass locally; the demos run; `bash scripts/check-private.sh` passes.
 2. Update `VERSION` and add a `CHANGELOG.md` entry.
 3. Commit, push, and check the Actions tab is green on all three systems.
 4. Tag: `git tag v<version> && git push --tags`.

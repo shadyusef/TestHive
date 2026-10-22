@@ -19,7 +19,34 @@
       "Read(./.mask-map.json)",
       "Read(./.mask-terms)",
       "Bash(bash scripts/studio.sh*)",
-      "Bash(bash scripts/hive.sh studio*)"
+      "Bash(bash scripts/hive.sh studio*)",
+      "Read(./.private-names)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/run.sh\" guard_records",
+            "timeout": 15
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/scripts/hooks/run.sh\" check_edit",
+            "timeout": 60
+          }
+        ]
+      }
     ]
   }
 }

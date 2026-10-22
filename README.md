@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.7.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.7.1).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -65,6 +65,8 @@ Each module goes through six stages. A stage cannot start until a named person a
 
 Call one agent directly inside Claude Code with `/th-lead`, `/th-analyst`, `/th-manual`, `/th-mobile`, `/th-api`, `/th-web`, `/th-data`, `/th-triage`, `/th-review` followed by the task, or from a terminal with `.\hive th mobile "automate TC-SIGNUP-001"`. `/th-lead` makes the current session act as the Lead (a subagent cannot start other agents); for a full module `claude --agent testhive-lead` is the better start.
 
+Maintainer tools (not part of the QA team): the `studio-security-reviewer` and `docs-consistency-reviewer` agents, and the `/release-phase` and `/rerecord-demo` skills. See [docs/MAINTAINING.md](docs/MAINTAINING.md).
+
 ## Analyse a module (stage 1)
 1. Put the module's documents in `requirements/sources/<MODULE>/` (PDF, Word, Excel, text, OpenAPI/Swagger, design images). No documents? Give the analyst a URL or an APK instead: it explores the built product and drafts the requirements as **observed** behaviour for you to confirm.
 2. In Claude Code: `/th-analyst SIGNUP` (add e.g. `url=https://staging.example.com, test environment`), or ask the Lead.
@@ -117,6 +119,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `design-impact` | Lists (and with `--apply` flags) the cases affected when approved requirements change |
 | `score-design` | Benchmark: how many expert test conditions the cases cover |
 | `studio` | Opens TestHive Studio in the browser (local only) |
+| `check-private` | Fails if a private name from your git-ignored `.private-names` list is in a file that would be published |
 | `run-mobile` / `run-api` / `run-web` | Run a module's tests; each run is stored in `runs/` |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |
 | `gate` | Definition-of-done check on the case sheet |
@@ -126,6 +129,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 ## Privacy and safety
 - `.env` holds your app ids and URLs; it is git-ignored and the agents are blocked from reading it (`.claude/settings.json`).
 - Agents cannot `git push`; you publish.
+- Two Claude Code hooks (`.claude/settings.json`): every file Claude edits is checked at once (shell, Python, JSON, JavaScript, PowerShell syntax; no Windows line endings where they break things), and Claude cannot edit the approval records (`workflow/APPROVALS.md`, `workflow/state.json`, the baselines): only `stage` writes them.
 - Before sending business documents to Claude, mask them: `.\hive mask suggest <file>` (find names), `.\hive mask review <file>` (check every match), `.\hive mask mask <file> <out>`. The token map stays on your PC (`.mask-map.json`, git-ignored). `suggest` and `review` show real data, so only you run them.
 - Use made-up test data in test environments, so screenshots never show real people.
 

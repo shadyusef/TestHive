@@ -226,6 +226,14 @@ PY
 grep -q "^GAP-DEMO-001,DEMO,REQ-DEMO-002,Missing,Medium,Which help page does the link open?,The /help page,tester,Answered" "$TH_ANALYSIS/gaps.csv" || { echo "studio did not write the answer"; exit 1; }
 unset TH_ANALYSIS TH_STATE TH_CASES
 # phase 2c: Studio from an empty project (setup, module, uploads and refusals, masking preview, read, readiness), in a temporary copy
+# Claude Code hooks: the edit check catches broken files, the guard refuses direct edits of the approval records
+H=$(mktemp -d); HW=$(cygpath -m "$H" 2>/dev/null || echo "$H")
+printf 'echo "unclosed\n' > "$H/bad.sh"; printf 'x = (\n' > "$H/bad.py"; printf 'echo ok\n' > "$H/good.sh"; printf 'x = 1%b\n' '\r' > "$H/cr.py"
+P=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")   # Claude Code passes native paths; so does this test
+hook() { printf '{"tool_input":{"file_path":"%s"}}' "$2" | CLAUDE_PROJECT_DIR="$P" bash scripts/hooks/run.sh "$1" 2>/dev/null; echo $?; }
+[ "$(hook check_edit "$HW/bad.sh")$(hook check_edit "$HW/bad.py")$(hook check_edit "$HW/cr.py")$(hook check_edit "$HW/good.sh")" = "2220" ] || { echo "the edit-check hook missed a broken file or refused a good one"; exit 1; }
+[ "$(hook guard_records "$P/workflow/APPROVALS.md")$(hook guard_records "$P/test-cases/baseline/X/v1/TestCases.csv")$(hook guard_records "$P/analysis/gaps.csv")" = "220" ] || { echo "the approval-records guard is wrong"; exit 1; }
+bash scripts/check-private.sh >/dev/null || { bash scripts/check-private.sh; exit 1; }
 # phase 2d: Run buttons with the recorded agents (jobs, progress, Stop, lock, every step to an approved design)
 D_OUT=$(bash demo/phase2d/run.sh --check 2>&1); echo "$D_OUT" | grep -q "STUDIO RUN CHECK PASS" || { echo "$D_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio run check failed"; exit 1; }
 C_OUT=$(bash demo/phase2c/run.sh --check 2>&1); echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | grep -E "WRONG|Traceback|Error" | head; echo "studio intake check failed"; exit 1; }

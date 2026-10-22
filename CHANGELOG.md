@@ -2,6 +2,11 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.7.1 (2026-10-22)
+- Claude Code hooks in `.claude/settings.json` (`scripts/hooks/`): `check_edit` checks every file Claude edits (bash, Python, JSON, JavaScript, PowerShell syntax; no carriage returns where LF is required); `guard_records` refuses direct edits of `workflow/APPROVALS.md`, `workflow/state.json` and the baselines (also with other capitals or `..` on Windows).
+- Maintainer tools: skills `/release-phase` and `/rerecord-demo`; agents `studio-security-reviewer` and `docs-consistency-reviewer` (read-only); `check-private` with a git-ignored `.private-names` list.
+- `.gitattributes` keeps `.html`, `.mjs`, `.js` on LF; selftest covers the hooks and the private-name check.
+
 ## 0.7.0 (2026-10-22)
 - Phase 2d, run the agents from Studio: every step that needs an agent has a Run button under Next (analyst first pass and re-check, manual-tester design, QA pre-review, fixing the findings, re-check of the human review, update after a requirement change), with a confirmation (time, plan usage). A live job panel shows the agent's steps; Stop ends it (the whole process tree); saving on the module pauses while it works; one job per module. Activity tab: every run with status, time, cost and log, saved in `runs/agents/` (git-ignored). Run exploration button for the web address.
 - `scripts/lib/jobs.py` (background jobs, Claude Code stream-json); Studio stops running agents when it closes. Agents started from Studio can run only `bash scripts/*` and edit files.
