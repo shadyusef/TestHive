@@ -30,7 +30,7 @@ if (process.argv.includes('--welcome')) {  // before setup: the first-opening sc
 await check('home lists the module and the New module button', async () => { await page.getByRole('button', { name: 'New module', exact: true }).waitFor(); await page.locator('.module-card').first().waitFor(); await page.locator('#mods [data-side]').first().waitFor(); });
 await shot('1-home');
 await page.locator('.module-card').first().click();
-await check('the module opens on its readiness card and Sources tab', async () => { await page.getByText('Ready for automation:').waitFor(); await page.getByText('Requirement documents').waitFor(); });
+await check('the module opens on its readiness card and Sources tab', async () => { await page.getByRole('button', { name: /^Ready for automation/ }).waitFor(); await page.getByText('Requirement documents').waitFor(); });
 await page.locator('#files').setInputFiles(file);
 await check('a file chosen in the file picker is uploaded and shown as not read yet', async () => { await page.getByText('not read yet').first().waitFor(); });
 await shot('2-sources-uploaded');
@@ -48,7 +48,7 @@ await check('Remove asks in the page and takes the document out of the list', as
 await check('Earlier versions shows it as removed, and Restore brings it back', async () => {
   await page.getByText('Earlier versions and removed documents').click(); await page.getByText('removed', { exact: true }).first().waitFor();
   await shot('3b-versions'); await page.locator('[data-restore]').first().click(); await dlg.getByRole('button', { name: 'Restore' }).click(); await row().waitFor(); });
-const mod = (await page.locator('h2').first().textContent()).trim().split(/\s/)[0];
+const mod = (await page.locator('#main h1').first().textContent()).trim().split(/\s/)[0];
 await check('Archive needs the module code typed, then moves the module to Archived modules', async () => {
   await page.getByText('Archive this module').click(); await page.getByRole('button', { name: /^Archive / }).click();
   if (!(await dlg.getByRole('button', { name: 'Continue' }).isDisabled())) throw new Error('Continue enabled before the code is typed');

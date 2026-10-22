@@ -29,17 +29,17 @@ await check('typing an answer shows the save bar', async () => { await page.getB
 await shot('2-analysis-answer');
 await page.getByRole('button', { name: 'Save', exact: true }).click();
 await check('the answer is saved', async () => { await page.getByText(/Saved: 1 answer/).waitFor(); });
-await page.getByRole('button', { name: 'Design (test cases)' }).click();
+await page.getByRole('tab', { name: /^Design/ }).click();
 await check('Design tab lists the cases', async () => { await page.getByText('requirements covered').waitFor(); await page.locator('select[data-rev]').first().waitFor(); });
 await page.locator('[data-open]').first().click();
 await shot('3-design-cases');
 await page.getByRole('button', { name: 'Coverage' }).click();
 await check('Coverage shows every requirement', async () => { await page.getByRole('columnheader', { name: 'Boundary' }).waitFor(); });
 await shot('4-design-coverage');
-await page.getByRole('button', { name: 'Approvals' }).click();
+await page.getByRole('tab', { name: 'Approvals' }).click();
 await check('Approvals shows the design ready with Approve enabled', async () => {
   await page.getByText('Ready for approval: every rule passes.').waitFor();
-  if (await page.getByRole('button', { name: 'Approve' }).isDisabled()) throw new Error('Approve is disabled');
+  if (await page.getByRole('button', { name: 'Approve', exact: true }).isDisabled()) throw new Error('Approve is disabled');
 });
 await shot('5-approvals');
 await browser.close();
