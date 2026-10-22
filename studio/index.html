@@ -86,7 +86,7 @@ ul.plain { margin: 4px 0; padding-inline-start: 18px; }
 <header>
   <h1>TestHive Studio</h1><span class="project" id="project"></span>
   <span class="spacer"></span>
-  <span class="small muted">You are</span> <button id="who" title="Change your name"></button>
+  <button id="projbtn" title="Project details">Project</button> <span class="small muted">You are</span> <button id="who" title="Change your name"></button>
   <button id="theme" title="Light or dark">◐</button>
 </header>
 <main id="main"><p class="muted">Loading…</p></main>
@@ -98,7 +98,7 @@ const TOKEN = new URLSearchParams(location.search).get('t') || '';
 const store = { get(k) { try { return localStorage.getItem(k); } catch { return null; } }, set(k, v) { try { localStorage.setItem(k, v); } catch {} } };
 const STAGE_LABEL = { analysis: 'Analysis', design: 'Design', tools: 'Tools', automation: 'Automation', execution: 'Execution', reporting: 'Reporting' };
 const STATUS_LABEL = { approved: 'approved', awaiting_approval: 'waiting for you', in_progress: 'in progress', pending: 'not started' };
-const S = { view: 'home', module: null, tab: 'analysis', dtab: 'cases', data: null, dirty: {}, open: new Set(), filters: {} };
+const S = { view: 'home', module: null, tab: 'sources', dtab: 'cases', data: null, dirty: {}, open: new Set(), filters: {} };
 const $ = s => document.querySelector(s);
 const esc = v => String(v ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
@@ -137,30 +137,176 @@ async function home() {
   S.view = 'home'; S.module = null; S.dirty = {}; updateSavebar();
   const d = await api('/api/overview');
   if (d.status !== 200) return $('#main').innerHTML = `<div class="msg bad">${esc(d.error || 'Studio could not load. Open the address printed in the Studio window.')}</div>`;
-  $('#project').textContent = d.project;
-  if (!d.modules.length) return $('#main').innerHTML = `<div class="card"><h2>No modules yet</h2><p>Add one in a terminal: <code>${esc(d.command)} stage init SIGNUP</code>, or ask the TestHive Lead in Claude Code. Then reload this page.</p></div>`;
-  $('#main').innerHTML = `<div class="cards">${d.modules.map(m => `<div class="card module-card" data-mod="${esc(m.module)}">
-    <h2>${esc(m.module)}</h2>${pipeline(m.stages)}
-    <p class="small muted">${m.open_gaps} open questions · ${m.cases} active test cases</p>${nextBox(m.next)}</div>`).join('')}</div>`;
+  $('#project').textContent = d.setup.setup_needed ? '' : d.project;
+  if (d.setup.setup_needed) return renderSetup(d.setup, true);
+  $('#main').innerHTML = `${d.setup.incomplete ? `<div class="msg warn">Some project details are missing (app name, platforms). <span class="crumb" id="fix">Complete them</span></div>` : ''}
+    <div class="bar"><h2 style="margin:0;flex:1">Modules</h2><button class="primary" id="newmod">New module</button></div>
+    ${d.modules.length ? `<div class="cards">${d.modules.map(m => `<div class="card module-card" data-mod="${esc(m.module)}">
+      <h2>${esc(m.module)}</h2>${pipeline(m.stages)}
+      <p class="small muted">${m.open_gaps} open questions · ${m.cases} active test cases</p>${nextBox(m.next)}</div>`).join('')}</div>`
+    : `<div class="card"><h2 style="margin-top:0">Start with your first module</h2><p>A module is one part of the product, tested on its own: sign-up, login, checkout… Add it, then give TestHive its requirement documents or the address of the built product.</p></div>`}`;
+  $('#newmod').onclick = renderNewModule;
+  if (!me() && !document.querySelector('.modal')) askName();  // first opening asks the name in the setup form instead
+  if ($('#fix')) $('#fix').onclick = () => renderSetup(d.setup, false);
   document.querySelectorAll('[data-mod]').forEach(el => el.onclick = e => { if (!e.target.closest('[data-copy]')) openModule(el.dataset.mod); });
+}
+
+/* ---------- Project setup (first opening) ---------- */
+function renderSetup(p, first) {
+  S.view = 'setup'; updateSavebar();
+  const plat = ['Web', 'API', 'Android', 'iOS'];
+  $('#main').innerHTML = `<div class="card" style="max-width:760px">
+    <h2 style="margin-top:0">${first ? 'Welcome to TestHive' : 'Project details'}</h2>
+    <p class="muted">${first ? 'Tell TestHive about the product you are testing. You can change this later (Project, top right).' : 'These facts are shared with the agents (CONTEXT.md).'}</p>
+    <div class="form">
+      <label>Project name</label><input id="p-project" dir="auto" value="${esc(p.project)}" placeholder="Nakhla Rewards">
+      <label>App name</label><input id="p-app" dir="auto" value="${esc(p.app)}" placeholder="Nakhla">
+      <label>Platforms</label><span>${plat.map(x => `<label style="margin-inline-end:14px"><input type="checkbox" class="p-plat" value="${x}" ${p.platforms.includes(x) ? 'checked' : ''}> ${x}</label>`).join('')}</span>
+      <label>Environment name</label><input id="p-env" value="${esc(p.test_env)}" placeholder="staging">
+      <label>Web address</label><input id="p-web" value="${esc(p.base_url)}" placeholder="https://staging.example.com">
+      <label>API address</label><input id="p-api" value="${esc(p.api_url)}" placeholder="https://api.staging.example.com">
+      <label>Android package</label><input id="p-appid" value="${esc(p.app_id)}" placeholder="com.company.app (optional)">
+      <label>Your name</label><input id="p-me" value="${esc(me())}" placeholder="Sara (QA lead)">
+      <span></span><span class="small muted">Passwords and tokens are never typed here: add them to the .env file yourself when a test needs them.</span>
+      <span></span><span><button class="primary" id="p-save">${first ? 'Create project' : 'Save'}</button> ${first ? '' : '<button id="p-cancel">Cancel</button>'}</span>
+    </div></div>`;
+  if ($('#p-cancel')) $('#p-cancel').onclick = home;
+  $('#p-save').onclick = async () => {
+    const name = $('#p-me').value.trim(); if (!name) return toast('Enter your name: it signs your decisions.', 'warn');
+    store.set('th-name', name); $('#who').textContent = name;
+    const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ project: $('#p-project').value, app: $('#p-app').value,
+      platforms: [...document.querySelectorAll('.p-plat:checked')].map(x => x.value), test_env: $('#p-env').value.trim(), base_url: $('#p-web').value.trim(),
+      api_url: $('#p-api').value.trim(), app_id: $('#p-appid').value.trim() }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) home();
+  };
+}
+$('#projbtn').onclick = async () => confirmLeave(async () => { const p = await api('/api/project'); if (p.status === 200) renderSetup(p, p.setup_needed); });
+
+/* ---------- New module ---------- */
+function renderNewModule() {
+  S.view = 'newmodule'; updateSavebar();
+  $('#main').innerHTML = `<p class="small"><span class="crumb" id="back">All modules</span> › New module</p><div class="card" style="max-width:760px">
+    <h2 style="margin-top:0">New module</h2><div class="form">
+      <label>Module code</label><input id="m-code" placeholder="SIGNUP" style="text-transform:uppercase">
+      <label>Title</label><input id="m-title" dir="auto" placeholder="Sign-up and mobile verification">
+      <label>Built product (optional)</label><input id="m-url" placeholder="https://staging.example.com/signup">
+      <span></span><label><input type="checkbox" id="m-test"> This address is a test environment (the analyst may submit forms with test data)</label>
+      <span></span><label><input type="checkbox" id="m-mask"> The documents contain personal data: mask it before the AI reads them</label>
+      <span></span><span><button class="primary" id="m-save">Add module</button> <span class="small muted">Next: add the documents (and an APK if you have one).</span></span>
+    </div></div>`;
+  $('#back').onclick = home;
+  $('#m-save').onclick = async () => {
+    const r = await api('/api/module-new', { method: 'POST', body: JSON.stringify({ module: $('#m-code').value.trim().toUpperCase(), title: $('#m-title').value,
+      url: $('#m-url').value.trim(), test_env: $('#m-test').checked, mask: $('#m-mask').checked }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) { S.tab = 'sources'; openModule(r.module, true); }
+  };
 }
 
 async function openModule(mod, keepTab) {
   const d = await api('/api/module?m=' + encodeURIComponent(mod));
   if (d.status !== 200) return toast(d.error || 'Could not load the module', 'bad');
-  S.view = 'module'; S.module = mod; S.data = d; S.dirty = {}; if (!keepTab) { S.tab = 'analysis'; S.open.clear(); }
+  S.view = 'module'; S.module = mod; S.data = d; S.dirty = {};
+  if (!keepTab) { S.tab = d.stages[0].status === 'pending' ? 'sources' : 'analysis'; S.open.clear(); }
   render();
+}
+const TABS = [['sources', 'Sources'], ['analysis', 'Analysis (questions)'], ['design', 'Design (test cases)'], ['approvals', 'Approvals']];
+function readinessCard(r) {
+  return `<details class="card" ${r.ready ? 'open' : ''}><summary><b>Ready for automation:</b> ${r.ready ? '<span class="chip s-approved">yes</span>' : `<span class="chip s-pending">not yet</span> <span class="small muted">${r.items.filter(i => i.ok).length} of ${r.items.length} approvals</span>`}</summary>
+    <ul class="plain" style="margin-top:8px">${r.items.map(i => `<li>${i.ok ? '✓' : '○'} <b>${esc(i.label)}</b> <span class="muted small">${esc(i.detail)}</span></li>`).join('')}</ul>
+    ${r.notes.length ? `<p class="small muted" style="margin-bottom:0">${r.notes.map(esc).join(' · ')}</p>` : ''}</details>`;
 }
 function render() {
   const d = S.data;
   $('#main').innerHTML = `<p class="small"><span class="crumb" id="back">All modules</span> › ${esc(d.module)}</p>
-    <div class="card"><h2 style="margin:0">${esc(d.module)}</h2>${pipeline(d.stages)}${nextBox(d.next)}</div>
-    <div class="tabs">${['analysis', 'design', 'approvals'].map(t => `<button data-tab="${t}" class="${S.tab === t ? 'on' : ''}">${t === 'analysis' ? 'Analysis (questions)' : t === 'design' ? 'Design (test cases)' : 'Approvals'}</button>`).join('')}</div>
+    <div class="card"><h2 style="margin:0">${esc(d.module)} ${d.meta.title ? `<span class="muted" style="font-weight:400;font-size:15px">${esc(d.meta.title)}</span>` : ''}</h2>${pipeline(d.stages)}${nextBox(d.next)}</div>
+    ${readinessCard(d.readiness)}
+    <div class="tabs">${TABS.map(([t, l]) => `<button data-tab="${t}" class="${S.tab === t ? 'on' : ''}">${l}</button>`).join('')}</div>
     <div id="tab"></div>`;
   $('#back').onclick = () => confirmLeave(home);
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => confirmLeave(() => { S.tab = b.dataset.tab; S.dirty = {}; render(); }));
-  ({ analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals })[S.tab]();
+  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals })[S.tab]();
   updateSavebar();
+}
+
+/* ---------- Sources ---------- */
+function renderSources() {
+  const d = S.data, src = d.sources, mt = d.meta, analysisDone = d.stages[0].status === 'approved';
+  const late = src.files.filter(f => f.after_approval);
+  const unread = src.files.filter(f => !f.read).length;
+  $('#tab').innerHTML = `${late.length && analysisDone ? `<div class="msg warn"><b>${late.length} document(s) changed after the analysis was approved.</b> Reopen the analysis so the analyst reads them; after the new approval TestHive shows which test cases are affected.
+      <div class="bar" style="margin-top:8px;margin-bottom:0"><input class="grow" id="ro-c" placeholder="What changed (required)"><button id="ro">Reopen analysis</button></div></div>` : ''}
+    <div class="card"><h3 style="margin-top:0">Requirement documents</h3>
+      <div id="drop" style="border:1px dashed var(--line);border-radius:8px;padding:18px;text-align:center" class="muted">
+        Drop files here, or <label class="crumb">choose files<input type="file" id="files" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.bmp,.webp"></label>
+        <div class="small">PDF, Word (.docx), Excel, CSV, text, OpenAPI / Swagger (.json, .yaml), design images · up to 25 MB each · a file with the same name replaces the old one, which is kept</div></div>
+      <div class="table-wrap" style="margin-top:10px"><table><thead><tr><th>Document</th><th>Type</th><th>Changed</th><th>Read by TestHive</th></tr></thead><tbody>
+      ${src.files.map(f => `<tr><td dir="auto">${esc(f.name)}</td><td>${esc(f.type)}</td><td class="small">${esc(f.modified)}</td>
+        <td class="small">${f.read ? `✓ ${f.type === 'image' ? 'image (read directly)' : esc(f.words) + ' words'}${f.masked === 'yes' ? ' · masked' : ''}` : '<span class="chip s-in_progress">not read yet</span>'}</td></tr>`).join('') || '<tr><td colspan="4" class="muted">No documents yet.</td></tr>'}
+      </tbody></table></div>
+      ${src.old_versions ? `<p class="small muted">${src.old_versions} earlier upload(s) kept in requirements/sources/${esc(d.module)}/_old/.</p>` : ''}
+      <div class="bar" style="margin-top:10px"><label><input type="checkbox" id="rd-mask" ${mt.mask ? 'checked' : ''}> Mask personal data</label>
+        <button class="primary" id="read" ${src.files.length ? '' : 'disabled'}>Read the documents${unread ? ` (${unread} new)` : ''}</button>
+        <span class="small muted">${src.read_at ? 'Last read ' + esc(src.read_at) : 'Turns every document into text the analyst can read (free, no AI).'}</span></div>
+      <pre id="readout" class="small" style="white-space:pre-wrap;display:none;background:var(--soft);padding:8px;border-radius:6px"></pre></div>
+    <div class="card"><h3 style="margin-top:0">Built product (optional)</h3><div class="form">
+      <label>Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://staging.example.com/signup">
+      <span></span><label><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
+      <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="crumb">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
+      <label>Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
+      <span></span><span><button id="u-save">Save</button> <span class="small muted">The analyst explores it when you run its command (see Next).</span></span></div></div>
+    <details class="card" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody" style="margin-top:10px"><button id="mprev">Check the documents</button></div></details>`;
+  const upload = async (files, kind) => {
+    for (const f of files) {
+      const r = await api(`/api/source?m=${encodeURIComponent(d.module)}&kind=${kind}&name=${encodeURIComponent(f.name)}`, { method: 'POST', body: f, headers: { 'Content-Type': 'application/octet-stream' } });
+      toast(r.message || r.error, r.ok ? 'ok' : 'bad');
+    }
+    openModule(d.module, true);
+  };
+  $('#files').onchange = e => upload([...e.target.files], 'source');
+  $('#apk').onchange = e => upload([...e.target.files], 'apk');
+  const drop = $('#drop');
+  drop.ondragover = e => { e.preventDefault(); drop.style.borderColor = 'var(--accent)'; };
+  drop.ondragleave = () => drop.style.borderColor = '';
+  drop.ondrop = e => { e.preventDefault(); drop.style.borderColor = ''; upload([...e.dataTransfer.files], 'source'); };
+  $('#read').onclick = async () => {
+    $('#read').disabled = true; $('#read').textContent = 'Reading…';
+    const r = await api('/api/ingest', { method: 'POST', body: JSON.stringify({ module: d.module, mask: $('#rd-mask').checked }) });
+    toast(r.ok ? 'Documents read.' : 'Some documents could not be read.', r.ok ? 'ok' : 'bad');
+    await openModule(d.module, true); const o = $('#readout'); o.textContent = r.message || r.error; o.style.display = 'block';
+  };
+  $('#u-save').onclick = async () => {
+    const r = await api('/api/module-meta', { method: 'POST', body: JSON.stringify({ module: d.module, url: $('#u-url').value.trim(), test_env: $('#u-test').checked,
+      title: $('#u-title').value, mask: $('#rd-mask').checked }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(d.module, true);
+  };
+  if ($('#ro')) $('#ro').onclick = async () => {
+    if (!me()) return askName(); const c = $('#ro-c').value.trim(); if (!c) return toast('Say what changed.', 'warn');
+    if (!confirm('Reopen the analysis? Later stages go back to in progress and need a new approval.')) return;
+    const r = await api('/api/stage', { method: 'POST', body: JSON.stringify({ module: d.module, stage: 'analysis', action: 'reopen', by: me(), comment: c }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); openModule(d.module, true);
+  };
+  $('#mprev').onclick = renderMask;
+}
+async function renderMask() {
+  $('#maskbody').innerHTML = '<p class="muted">Checking…</p>';
+  const m = await api('/api/mask-preview?m=' + encodeURIComponent(S.module));
+  if (m.status !== 200) return $('#maskbody').innerHTML = `<div class="msg bad">${esc(m.error)}</div>`;
+  const counts = Object.entries(m.counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(', ') || 'nothing';
+  $('#maskbody').innerHTML = `<p class="small muted">This stays on your PC: the agents cannot open Studio. Ticked names are added to the names to hide (.mask-terms); unticked values are left as they are (.mask-allow). Then read the documents again with "Mask personal data" on.</p>
+    <h4>Names TestHive is not sure about (${m.names.length})</h4>
+    ${m.names.length ? `<div class="table-wrap"><table><thead><tr><th>Hide</th><th>Name</th><th>Why</th><th>In</th></tr></thead><tbody>${m.names.map((n, i) =>
+      `<tr><td><input type="checkbox" class="mk-name" data-i="${i}"></td><td dir="auto">${esc(n.name)}</td><td class="small muted">${esc(n.why)}</td><td class="small">${esc(n.file)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None.</p>'}
+    <h4>Values masking would hide (${counts})</h4>
+    ${m.values.length ? `<div class="table-wrap"><table><thead><tr><th>Hide</th><th>Kind</th><th style="min-width:340px">In context</th><th>In</th></tr></thead><tbody>${m.values.map((v, i) =>
+      `<tr><td><input type="checkbox" class="mk-val" data-i="${i}" checked></td><td>${esc(v.kind)}</td><td dir="auto" class="small">${esc(v.context)}</td><td class="small">${esc(v.file)}</td></tr>`).join('')}</tbody></table></div>` : '<p class="muted">None.</p>'}
+    ${m.skipped.length ? `<div class="msg warn small">${m.skipped.map(esc).join('<br>')}</div>` : ''}
+    <p><button class="primary" id="mk-save">Save choices</button></p>`;
+  $('#mk-save').onclick = async () => {
+    const terms = [...document.querySelectorAll('.mk-name:checked')].map(x => m.names[x.dataset.i].name);
+    const allow = [...new Set([...document.querySelectorAll('.mk-val:not(:checked)')].map(x => m.values[x.dataset.i].value))];
+    const r = await api('/api/mask-lists', { method: 'POST', body: JSON.stringify({ module: S.module, terms, allow }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad');
+  };
 }
 function confirmLeave(go) { if (Object.keys(S.dirty).length && !confirm('You have unsaved changes. Leave without saving?')) return; S.dirty = {}; go(); }
 window.addEventListener('beforeunload', e => { if (Object.keys(S.dirty).length) { e.preventDefault(); e.returnValue = ''; } });
@@ -383,7 +529,7 @@ $('#discard').onclick = () => { S.dirty = {}; render(); };
 
 $('#who').textContent = me() || 'set your name';
 if (!TOKEN) $('#main').innerHTML = '<div class="msg bad">Open Studio with the address printed in its window (it contains an access key).</div>';
-else { home(); if (!me()) askName(); }
+else home();
 </script>
 </body>
 </html>

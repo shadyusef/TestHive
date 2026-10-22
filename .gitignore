@@ -22,3 +22,4 @@ runs/*/evidence/
 workflow/state.json.tmp
 demo/*/output/
 __pycache__/
+requirements/apps/

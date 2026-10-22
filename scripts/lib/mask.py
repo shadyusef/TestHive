@@ -128,8 +128,9 @@ def review(src):
     print(f"--- {len(spans)} values would be masked ({summary(spans)}). Wrong ones: add them to {ALLOW}.")
 
 
-def suggest(src):
-    text, known = read(src), {t.lower() for t in read_lines(TERMS)}
+def suggest_names(text):
+    """Possible people's names not yet in the terms file: {name: why}. Used by suggest and by TestHive Studio."""
+    known = {t.lower() for t in read_lines(TERMS)}
     found = {}
     for m in re.finditer(rf"\b{TITLES_EN}\s+((?:[A-Z][\w'-]+\s?){{1,3}})", text):
         found.setdefault(m.group(1).strip(), "after a title")
@@ -137,7 +138,20 @@ def suggest(src):
         found.setdefault(m.group(1).strip(), "after a title")
     for m in re.finditer(r"\b[A-Z][a-z]+(?:[ -](?:Al-|al-)?[A-Z][a-z]+)+\b", text):
         if m.group(0).split()[0] not in STOP: found.setdefault(m.group(0), "capitalised name")
-    new = {k: v for k, v in found.items() if k.lower() not in known}
+    return {k: v for k, v in found.items() if k.lower() not in known}
+
+
+def add_lines(path, values):
+    """Appends values to a terms or allow file, skipping ones already there. Returns how many were added."""
+    have = {v.lower() for v in read_lines(path)}
+    new = [v.strip() for v in values if v.strip() and v.strip().lower() not in have]
+    if new:
+        with open(path, "a", encoding="utf-8", newline="\n") as f: f.write("".join(v + "\n" for v in new))
+    return len(new)
+
+
+def suggest(src):
+    new = suggest_names(read(src))
     for k, why in sorted(new.items()): print(f"  {k}    ({why})")
     print(f"--- {len(new)} possible names. Put the real ones in {TERMS}, one per line, then run mask again.")
 

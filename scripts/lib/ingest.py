@@ -138,7 +138,8 @@ def main():
     module = a[0].upper()
     src_dir = next((d for d in (f"requirements/sources/{a[0]}", f"requirements/sources/{module}", f"requirements/sources/{a[0].lower()}") if os.path.isdir(d)), "requirements/sources")
     files = sorted(p for p in glob.glob(os.path.join(src_dir, "**", "*"), recursive=True)
-                   if os.path.isfile(p) and not os.path.basename(p).startswith(".") and ".masked." not in p)
+                   if os.path.isfile(p) and not os.path.basename(p).startswith(".") and ".masked." not in p
+                   and "_old" not in p.replace(os.sep, "/").split("/"))  # _old/: earlier versions kept by Studio
     if not files: die(f"No source files in {src_dir}/. Put the module's documents there first.")
     out_dir = os.path.join(OUT, "sources-text", module); os.makedirs(out_dir, exist_ok=True)
     if mask: import mask as masker
@@ -169,4 +170,5 @@ def main():
     sys.exit(1 if skipped and not rows else 0)
 
 
-main()
+if __name__ == "__main__":
+    main()

@@ -26,6 +26,8 @@ First run these two; most problems show up in them:
 | Studio opens on another port than 8765, or the page says the access key is missing | 8765 was in use, or the page was opened without the address Studio printed | Use the full address printed in the Studio window (it contains `?t=...`); restart `.\hive studio` for a new one |
 | Studio: "the questions/cases changed since you opened the page" | An agent, Excel or another tab saved the same file | Nothing was lost: the page reloads; make your change again |
 | Studio: approve or reopen does nothing / an error mentions bash | Studio runs `scripts/stage.sh` with Git Bash | Start Studio with `.\hive studio` (not by running the Python file directly) |
+| Studio refuses an upload ("file type cannot be read", "old Word format", "larger than 25 MB", "file name not allowed") | Only documents TestHive can read are accepted, up to 25 MB (APK 300 MB) | Save .doc as .docx, split very large files, rename files with unusual characters |
+| A document shows "not read yet" in Studio | It was added or replaced after the last read | Click **Read the documents** |
 | `no approved analysis baseline` | Design needs the approved requirements | Approve the analysis stage first (`.\hive stage status <MODULE>`) |
 | `No results file: reports/...xml` | The test run did not produce results (tool crashed, wrong module name) | Run `.\hive run-mobile <module>` and read its output; module name = folder under `mobile/flows/`. |
 | `GATE FAIL` | The case sheet breaks a definition-of-done rule | Each line says which case and why. Fix the sheet or finish the work (e.g. run `stable` for "Done" cases). |

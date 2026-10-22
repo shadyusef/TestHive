@@ -15,6 +15,12 @@ and the design baseline. A stage can be submitted only while the stage before it
 `reopen` (needs `--by` and `--comment`) sends an approved stage back to in progress, for example when requirements change;
 later stages that were submitted or approved go back to in progress too and need a new approval.
 
+## Modules and uploads (written by TestHive Studio)
+`requirements/modules/<MODULE>.json`: `title`, `url` (built product to explore), `test_env` (true: the analyst may submit forms),
+`apk` (path of an uploaded APK), `mask` (mask personal data when reading). Documents go to `requirements/sources/<MODULE>/`;
+uploading a file with the same name moves the earlier one to `requirements/sources/<MODULE>/_old/<yyyymmdd-hhmmss>/`
+(`ingest` skips `_old`). APKs go to `requirements/apps/<MODULE>/` (git-ignored).
+
 ## Ingested sources: `analysis/sources-text/<MODULE>/` (written by `scripts/ingest.sh`)
 One `<file>.md` per source document; line 1 is `<!-- source: <path> | type: <kind> | ingested: <date> -->`.
 PDF pages are marked `<!-- page N -->`; Word headings become `#` lines and tables become Markdown tables;

@@ -24,6 +24,9 @@ jobs:
       - name: Phase 2b demo (Studio, driven through its API)
         run: bash demo/phase2b/run.sh --check
         shell: bash
+      - name: Phase 2c demo (Studio from an empty project)
+        run: bash demo/phase2c/run.sh --check
+        shell: bash
       - name: Windows launcher
         if: runner.os == 'Windows'
         shell: pwsh

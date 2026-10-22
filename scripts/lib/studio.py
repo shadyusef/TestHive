@@ -7,7 +7,7 @@ import sys, os, re, json, time, hashlib, secrets, subprocess, tempfile, threadin
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design
+import analysis, design, intake
 from analysis import read_csv, refs
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -77,8 +77,15 @@ def next_step(module, m, info):
             return {"text": f"The {st} is ready: check it and approve or reject it in the Approvals tab.", "command": ""}
         if st == "analysis":
             if status == "pending":
-                return {"text": f"Put the module's documents in requirements/sources/{module}/ (or have a URL or APK), then in Claude Code ask the analyst:",
-                        "command": f"/th-analyst {module}"}
+                src, mt = info["sources"], info["meta"]
+                if not src["files"] and not mt.get("url") and not mt.get("apk"):
+                    return {"text": "Add the module's requirement documents in the Sources tab, or give the address (URL) or APK of the built product.", "command": ""}
+                if src["files"] and not all(f["read"] for f in src["files"]):
+                    return {"text": "Read the documents in the Sources tab (button 'Read the documents'), so the analyst can use them.", "command": ""}
+                extra = ""
+                if mt.get("url"): extra += f" url={mt['url']}" + (", test environment" if mt.get("test_env") else ", not a test environment: do not submit forms")
+                if mt.get("apk"): extra += f" apk={mt['apk']}"
+                return {"text": "Everything is ready for the analyst. In Claude Code:", "command": f"/th-analyst {module}{extra}"}
             mine = [g for g in info["analysis"]["gaps"] if g["Status"] == "Answered"]
             open_q = [g for g in info["analysis"]["gaps"] if g["Status"] == "Open"]
             if mine: return {"text": f"You answered {len(mine)} questions. In Claude Code ask the analyst to re-check them:", "command": f"/th-analyst re-check {module}"}
@@ -125,8 +132,42 @@ def module_info(module):
                              "Cases": [c["ID"] for c in act if g["ID"] in refs(c["Assumption"])]} for g in allg if g["Status"] == "Open"],
             "check": check("design", module)})
     info["approvals"] = approvals(module)
+    a_hist = [h for h in m["stages"]["analysis"]["history"] if h["status"] == "approved"]
+    info["meta"] = intake.meta(module)
+    info["sources"] = intake.sources(module, a_hist[-1]["at"] if a_hist and m["stages"]["analysis"]["status"] == "approved" else "")
+    info["readiness"] = readiness(module, m, info)
     info["next"] = next_step(module, m, info)
     return info
+
+
+def latest_meta(folder):
+    """meta.json of the newest baseline in folder (analysis/baseline/<M> or test-cases/baseline/<M>), or None."""
+    vs = sorted(int(d[1:]) for d in os.listdir(folder) if re.fullmatch(r"v\d+", d)) if os.path.isdir(folder) else []
+    if not vs: return None
+    p = os.path.join(folder, f"v{vs[-1]}", "meta.json")
+    if not os.path.exists(p): return {"version": f"v{vs[-1]}"}
+    with open(p, encoding="utf-8") as f: return json.load(f)
+
+
+def readiness(module, m, info):
+    """Is the module ready for automation: the three approvals, and what is still assumed."""
+    st = {s: m["stages"][s]["status"] for s in STAGES}
+    ab, db = latest_meta(os.path.join(analysis.DIR, "baseline", module)), latest_meta(os.path.join(design.TC_DIR, "baseline", module))
+    act = [c for c in info["design"]["cases"] if design.active(c)]
+    items = [
+        {"label": "Requirements approved", "ok": st["analysis"] == "approved",
+         "detail": f"baseline {ab['version']}, approved by {ab.get('approved_by', '?')}" if ab and st["analysis"] == "approved" else "analysis " + st["analysis"].replace("_", " ")},
+        {"label": "Test cases approved", "ok": st["design"] == "approved",
+         "detail": f"design baseline {db['version']}, {db.get('active', len(act))} cases" if db and st["design"] == "approved" else "design " + st["design"].replace("_", " ")},
+        {"label": "Tools chosen", "ok": st["tools"] == "approved",
+         "detail": "tool advice comes in phase 3" if st["tools"] == "pending" else "tools " + st["tools"].replace("_", " ")}]
+    notes = []
+    if act:
+        notes.append(f"{sum(1 for c in act if 'smoke' in refs(c['Tags']))} smoke cases to automate first")
+        nu = sum(1 for c in act if c["Status"] == "Needs update")
+        if nu: notes.append(f"{nu} cases need an update after a requirement change")
+    if info["design"]["assumptions"]: notes.append(f"{len(info['design']['assumptions'])} open questions the cases still rely on")
+    return {"ready": all(i["ok"] for i in items), "items": items, "notes": notes}
 
 
 def approvals(module):
@@ -179,7 +220,13 @@ class Handler(BaseHTTPRequestHandler):
                 mods.append({"module": name, "stages": info["stages"], "next": info["next"],
                              "open_gaps": sum(1 for g in info["analysis"]["gaps"] if g["Status"] == "Open"),
                              "cases": sum(1 for c in info["design"]["cases"] if design.active(c))})
-            return self.send(200, {"project": project_name(), "modules": mods, "command": RUN})
+            return self.send(200, {"project": project_name(), "setup": intake.project(), "modules": mods, "command": RUN})
+        if u.path == "/api/project":
+            return self.send(200, intake.project())
+        if u.path == "/api/mask-preview":
+            module = q.get("m", [""])[0].upper()
+            if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
+            return self.send(200, intake.mask_preview(module))
         if u.path == "/api/module":
             info = module_info((q.get("m", [""])[0]).upper())
             return self.send(200, info) if info else self.send(404, {"error": "unknown module"})
@@ -198,7 +245,10 @@ class Handler(BaseHTTPRequestHandler):
         u = urlparse(self.path); q = parse_qs(u.query)
         if not self.allowed(q): return self.send(403, {"error": "missing or wrong token"})
         n = int(self.headers.get("Content-Length") or 0)
-        if n > 20_000_000: return self.send(413, {"error": "too large"})
+        limit = intake.MAX_APK if u.path == "/api/source" and q.get("kind", [""])[0] == "apk" else intake.MAX_DOC
+        if n > limit:  # read and drop the body first, so the browser receives the message instead of a broken connection
+            while n > 0: n -= len(self.rfile.read(min(n, 1 << 20)) or b"x" * n)
+            return self.send(413, {"ok": False, "message": f"The file is larger than {limit // 1_000_000} MB."})
         raw = self.rfile.read(n)
         if u.path == "/api/shutdown":
             self.send(200, {"ok": True}); threading.Thread(target=self.server.shutdown, daemon=True).start(); return
@@ -211,9 +261,29 @@ class Handler(BaseHTTPRequestHandler):
                 lib = os.path.join(HERE, "analysis.py" if kind == "analysis" else "design.py")
                 r = subprocess.run([sys.executable, lib, "import", module, path], capture_output=True, text=True, encoding="utf-8", errors="replace")
             return self.send(200 if r.returncode == 0 else 400, {"ok": r.returncode == 0, "message": (r.stdout + r.stderr).strip()})
+        if u.path == "/api/source":  # one uploaded document or APK as raw bytes; its name comes in the address
+            module = q.get("m", [""])[0].upper()
+            if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
+            with WRITE: ok, msg = intake.save_upload(module, q.get("name", [""])[0], raw, q.get("kind", ["source"])[0])
+            return self.send(200 if ok else 400, {"ok": ok, "message": msg})
         if (self.headers.get("Content-Type") or "").split(";")[0] != "application/json": return self.send(415, {"error": "JSON only"})
         try: body = json.loads(raw or b"{}")
         except ValueError: return self.send(400, {"error": "bad JSON"})
+        if u.path == "/api/project":
+            with WRITE: ok, msg = intake.save_project(body)
+            return self.send(200 if ok else 400, {"ok": ok, "message": msg})
+        if u.path == "/api/module-new":
+            code = str(body.get("module", "")).strip().upper()
+            if not re.fullmatch(r"[A-Z][A-Z0-9]{1,19}", code):
+                return self.send(400, {"ok": False, "message": "Module code: 2 to 20 letters and digits, starting with a letter (for example SIGNUP)."})
+            if code in load_state()["modules"]: return self.send(400, {"ok": False, "message": f"{code} already exists."})
+            m, err = intake.clean_meta(code, body)
+            if err: return self.send(400, {"ok": False, "message": err})
+            with WRITE:
+                rc, out = run_stage(["init", code])
+                if rc: return self.send(400, {"ok": False, "message": out})
+                intake.save_meta(code, m); os.makedirs(os.path.join(intake.SOURCES, code), exist_ok=True)
+            return self.send(200, {"ok": True, "module": code, "message": f"Module {code} added. Now add its documents, or the URL or APK to explore."})
         module = str(body.get("module", "")).upper()
         if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
         with WRITE:
@@ -231,6 +301,16 @@ class Handler(BaseHTTPRequestHandler):
                 if errors: return self.send(400, {"ok": False, "errors": errors})
                 return self.send(200, {"ok": True, "version": version("design"), "message":
                                        f"Saved: {decided['Accepted']} accepted, {decided['Change']} to change, {decided['Remove']} to remove, {new_cases} new cases, {new_asks} new requests."})
+            if u.path == "/api/module-meta":
+                m, err = intake.clean_meta(module, body)
+                if err: return self.send(400, {"ok": False, "message": err})
+                intake.save_meta(module, m); return self.send(200, {"ok": True, "message": "Saved."})
+            if u.path == "/api/ingest":
+                code, out = intake.ingest(module, bool(body.get("mask")))
+                return self.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
+            if u.path == "/api/mask-lists":
+                t, a = intake.save_mask_lists(body.get("terms") or [], body.get("allow") or [])
+                return self.send(200, {"ok": True, "message": f"Saved: {t} names to hide, {a} values to leave as they are. Read the documents again to apply."})
             if u.path == "/api/stage":
                 action, st, by, comment = body.get("action"), body.get("stage"), str(body.get("by", "")).strip(), str(body.get("comment", "")).strip()
                 if action not in ("approve", "reject", "reopen") or st not in STAGES: return self.send(400, {"error": "bad request"})

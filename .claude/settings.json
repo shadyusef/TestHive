@@ -17,7 +17,9 @@
       "Bash(bash scripts/hive.sh mask suggest *)",
       "Bash(bash scripts/hive.sh mask review *)",
       "Read(./.mask-map.json)",
-      "Read(./.mask-terms)"
+      "Read(./.mask-terms)",
+      "Bash(bash scripts/studio.sh*)",
+      "Bash(bash scripts/hive.sh studio*)"
     ]
   }
 }

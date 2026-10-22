@@ -57,7 +57,7 @@ Put the module's documents in `requirements/sources/<MODULE>/`, or have a URL / 
 After you approve the analysis, follow **Design the tests** in the README: the manual-tester writes cases linked to the approved requirements, the reviewer checks them, you review them in `test-cases/<MODULE>-design.xlsx` (accept, change, remove, add your own, request more), it re-checks, and you approve. To see it first: `.\hive demo/phase2/run.sh`.
 
 ## 8c. Prefer a browser to a terminal?
-`.\hive studio` opens TestHive Studio: answer questions, review cases and approve stages on a web page (local to your PC). Agents still run in Claude Code; Studio shows the command to copy. See it first with `.\hive demo/phase2b/run.sh`.
+After steps 1 to 3, `.\hive studio` opens TestHive Studio instead of steps 5 to 8: the first page asks for the project details, then **New module**, drop the documents in **Sources**, **Read the documents**, and copy the analyst command shown under **Next** into Claude Code. Answer the questions, review the cases and approve the stages in Studio too. See it first with `.\hive demo/phase2c/run.sh` (an empty project).
 
 ## 9. Mask personal data (when documents contain it)
 ```

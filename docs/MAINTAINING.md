@@ -24,6 +24,8 @@ You do not need the original author or any chat history; everything is in this r
 | `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline) | Behaviour changes |
 | `web/explore.mjs` | Web exploration with Playwright (Edge on Windows) | Exploration behaviour changes |
 | `scripts/lib/studio.py`, `studio/index.html` | TestHive Studio lite: a local server (Python standard library, 127.0.0.1 only, token per start) and one page with no libraries or build step. Writes only through `analysis.apply_answers`, `design.apply_review` and `stage.sh` | A screen or an action changes; keep every rule in the shared functions, never in the page |
+| `scripts/lib/intake.py` | Studio's project setup, modules, uploads, sources list and masking preview (uses `ingest.convert`, `mask.find`, `mask.suggest_names`) | Intake behaviour changes |
+| `web/studio-intake-smoke.mjs`, `demo/phase2c/` | Studio from an empty project: `run.sh --check` drives setup, module, uploads (and refusals), masking preview, reading, readiness; with web tools also the screens | When intake changes |
 | `web/studio-smoke.mjs`, `demo/phase2b/` | Studio click-through (Playwright) and the Studio demo; `run.sh --check` drives the API (`walkthrough.py`) and, with web tools, the screens | When Studio changes |
 | `.claude/agents/business-analyst.md` | The analyst's procedure and checklist; the quality of the gaps depends on it | After a benchmark shows misses; re-run `demo/phase1/run.sh --live` and `score-analysis` |
 | `.claude/agents/manual-tester.md` | The designer's procedure (techniques, risk, tags, review loop); the coverage of the cases depends on it | After a design benchmark shows misses; re-run `demo/phase2/run.sh --live` and `score-design` |
@@ -90,7 +92,7 @@ You do not need the original author or any chat history; everything is in this r
 
 ## Testing
 - `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped.
-- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` (Studio API; the browser click-through runs where the web tools are installed).
+- `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` and `demo/phase2c/run.sh --check` (Studio API; the browser click-through runs where the web tools are installed).
 - CI runs the selftest on Linux, Windows and macOS for every push and pull request (GitHub, Actions tab).
 - Not covered by automated tests: real installs (`setup --install`), real Maestro/Newman/Playwright runs against an app, the agents' own work. Check those by hand when they change.
 

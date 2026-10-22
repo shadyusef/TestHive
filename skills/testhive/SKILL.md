@@ -54,7 +54,7 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/gate.sh` - definition-of-done check (IDs, required fields, priority, spec files exist; Done needs `reports/stable-<ID>.txt` and a spec with a real assertion). Never sign off on a failing gate.
 - `check-analysis`, `analysis-workbook`, `import-answers` - stage 1 registers and the Excel Q&A loop.
 - `check-design`, `design-workbook`, `import-review`, `design-impact` - stage 2 coverage check, Excel review loop, impact of changed requirements.
-- `studio` - TestHive Studio, a local web page where the user answers questions, reviews cases and approves stages without a terminal.
+- `studio` - TestHive Studio, a local web page where the user sets up the project, adds modules and documents, answers questions, reviews cases and approves stages without a terminal.
 - `scripts/check-intake.sh` - older projects: flags unfilled intake sections and business rules with no test case.
 - `setup` (`setup.sh` / `setup.ps1`) - prerequisites check and installer (git, node, python + requirements.txt, java 17, maestro, adb, newman, claude code; `--web` Playwright, `--ocr` Tesseract with Arabic).
 - `stage` - stage gates and approvals; `collect-run` - stores runs; `mask` - hides personal data (`suggest`/`review` are for the human only).

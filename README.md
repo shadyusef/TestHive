@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.5.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio lite, a local web page for people who do not use a terminal. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.6.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -87,12 +87,16 @@ See it with the fictional app: `.\hive demo/phase2/run.sh` (recorded agents, fre
 
 ## TestHive Studio (no terminal needed)
 `.\hive studio` opens a page in your browser, on this PC only. On it you can:
+- **first opening:** describe the project (name, app, platforms, test environment addresses). Studio writes `PROJECT_BRIEF.md`, `CONTEXT.md` and the non-secret `.env` values; passwords and tokens are never typed into Studio;
+- **New module:** give its code and title, and optionally the address of the built product (say whether it is a test environment);
+- **Sources:** drop the requirement documents (PDF, Word, Excel, text, OpenAPI, design images; an APK for Android), check what masking would hide and tick the real names, then **Read the documents** (free, no AI). A new version of a document keeps the old one in `_old/`; if the analysis was already approved, Studio offers to reopen it;
+- **Ready for automation:** a card on every module shows the three approvals (requirements, test cases, tools) and what is still assumed;
 - see every module and its six stages, with what to do next (and the exact agent command to copy);
 - **Analysis:** answer the analyst's questions, or ask your own;
 - **Design:** review the test cases (Accepted, Change with a comment, Remove), see each case's steps and expected result, see coverage and the open questions the cases rely on, add a case, or ask for more cases;
 - **Approvals:** see whether a stage passes its rules, then approve, reject or reopen it, signed with your name; the decision log is there too.
 
-Studio writes the same files with the same rules as the Excel workbooks (which still work: download and upload them from the page) and as the `stage` script. If an agent or Excel saved in the meantime, Studio refuses to overwrite and reloads. It does not run agents: it shows the command to run in Claude Code. Keep its window open while you use it; Ctrl+C stops it. Try it on the fictional project: `.\hive demo/phase2b/run.sh`.
+Studio writes the same files with the same rules as the Excel workbooks (which still work: download and upload them from the page) and as the `stage` script. If an agent or Excel saved in the meantime, Studio refuses to overwrite and reloads. It does not run agents: it shows the command to run in Claude Code. Keep its window open while you use it; Ctrl+C stops it. Try it: `.\hive demo/phase2c/run.sh` starts from an empty project (upload the files in `demo/phase1/sources/`); `.\hive demo/phase2b/run.sh` opens a project whose cases wait for approval.
 
 ## Scripts
 Run `.\hive` with no arguments for the full list with one-line descriptions. The main ones:

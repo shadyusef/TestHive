@@ -13,11 +13,12 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 1b | Jira / Azure DevOps / Figma connectors (read, then write-back) | When access is provided; samples only until then |
 | 2 | Test design: cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review and re-import, cases added by hand or on request, stage reopen and change impact; benchmark with 46 expert conditions | Done (v0.4.0) |
 | 2b | TestHive Studio lite: local web page to see stage status, answer gaps, approve stages, open the workbooks (for people who do not use a terminal) | Done (v0.5.0) |
+| 2c | Studio setup and intake: first-opening project setup, new module, document and APK upload, masking review, read the documents, sources with versions, readiness for automation | Done (v0.6.0) |
 | 3 | Tool advice: decision matrix per test type, human choice | Next |
 | 4 | Automation: framework scaffolds, reusable steps, E2E journeys, tags (smoke, sanity, regression, e2e), environments, test data, contract tests | Planned |
 | 5 | Execution: run picker (type, suite, environment, device, BrowserStack), video and step screenshots, API request/response logs, retest after fix, flaky quarantine | Planned |
 | 6 | Reporting: interactive HTML bug and test reports, management summary, trends, cost per stage, write-back to Jira / Azure | Planned |
-| 7 | TestHive Studio: local web UI over the same files (one user first, team later) | Planned |
+| 7 | TestHive Studio: local web UI over the same files (one user first, team later); run agents and the web/Android exploration from Studio (a "Run exploration" button) | Planned |
 | 8 | Scale: scheduled CI runs, team roles, notifications, device farms, iOS on a Mac | Planned |
 
 Owner decisions that shape the design: all input types plus a "no tools, one folder" mode; Excel export with human

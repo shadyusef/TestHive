@@ -2,6 +2,12 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.6.0 (2026-10-22)
+- Phase 2c, Studio setup and intake: first opening asks for the project (writes PROJECT_BRIEF, CONTEXT and the non-secret .env values: APP_ID, TEST_ENV, BASE_URL, API_BASE_URL); New module (code, title, URL of the built product and whether it is a test environment, masking choice); Sources tab: drag-and-drop upload of documents (and an APK), earlier versions kept in `_old/`, personal-data check (tick real names, untick false matches), Read the documents (`ingest`), reopen offer when documents change after approval; "Ready for automation" card per module.
+- The analyst command shown under Next includes the URL / APK to explore. Upload checks: file types, size (25 MB, APK 300 MB), safe names.
+- `ingest.py` importable and skips `_old/`; `mask.py` adds `suggest_names` and `add_lines`; agents may not start Studio (`.claude/settings.json`).
+- Demo `demo/phase2c/run.sh` (empty project; `--check` for CI, with a browser click-through when web tools are installed).
+
 ## 0.5.0 (2026-10-22)
 - Phase 2b, TestHive Studio lite: `.\hive studio` opens a local web page (127.0.0.1, access token per start) to see the stages of every module and what comes next, answer and ask questions, review cases (Accepted / Change / Remove, add cases, request cases), see coverage and open questions, and approve, reject or reopen stages; workbooks can be downloaded and uploaded from it. Python standard library and one HTML page: nothing new to install.
 - Studio and the Excel imports share the same code (`analysis.apply_answers`, `design.apply_review`); approvals go through `stage.sh`. A save from an out-of-date page is refused.
