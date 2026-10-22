@@ -1,9 +1,9 @@
-# Web exploration: file:///C:/Users/ShadyB/AppData/Local/Temp/claude/F--TestHive/19692286-551a-4b09-9b77-c3b9b85d3f3f/scratchpad/nakhla2/demo/phase1/site/index.html
+# Web exploration: file:///<project>/demo/phase1/site/index.html
 Explored 2026-10-21T20:24 with msedge. Pages: 2. Everything below is OBSERVED behaviour, not confirmed requirements.
 Values tried per form: empty; invalid (e.g. "not-an-email", "12", "1", numeric boxes "x"); valid (e.g. "Test User", "0551234567", numeric boxes "1", first option, boxes ticked). A real valid code or password is not known to the explorer.
 
 ## Page 01: Nakhla Rewards - Sign up
-- URL: file:///C:/Users/ShadyB/AppData/Local/Temp/claude/F--TestHive/19692286-551a-4b09-9b77-c3b9b85d3f3f/scratchpad/nakhla2/demo/phase1/site/index.html
+- URL: file:///<project>/demo/phase1/site/index.html
 - Language: en, direction: ltr
 - Screenshot: 01-page.png
 - Headings: Create your account
@@ -19,7 +19,7 @@ Values tried per form: empty; invalid (e.g. "not-an-email", "12", "1", numeric b
 | terms | I accept the terms and conditions | checkbox | yes |  |
 - Submitted **empty**: "Please enter your full name"; "Enter a Saudi mobile number starting with 05"; "Password must be at least 6 characters"; "You must be 18 or older"; "Please accept the terms and conditions" (screenshot 01-form0-empty.png)
 - Submitted **invalid**: "Enter a Saudi mobile number starting with 05"; "Password must be at least 6 characters"; "Please accept the terms and conditions" (screenshot 01-form0-invalid.png)
-- Submitted **valid**: no message shown -> went to file:///C:/Users/ShadyB/AppData/Local/Temp/claude/F--TestHive/19692286-551a-4b09-9b77-c3b9b85d3f3f/scratchpad/nakhla2/demo/phase1/site/otp.html (screenshot 01-form0-valid.png)
+- Submitted **valid**: no message shown -> went to file:///<project>/demo/phase1/site/otp.html (screenshot 01-form0-valid.png)
 
 <details><summary>Visible text</summary>
 
@@ -39,7 +39,7 @@ Sign up
 </details>
 
 ## Page 02: Nakhla Rewards - Verify your number
-- URL: file:///C:/Users/ShadyB/AppData/Local/Temp/claude/F--TestHive/19692286-551a-4b09-9b77-c3b9b85d3f3f/scratchpad/nakhla2/demo/phase1/site/otp.html
+- URL: file:///<project>/demo/phase1/site/otp.html
 - Language: en, direction: ltr
 - Screenshot: 02-page.png
 - Headings: Verify your mobile number

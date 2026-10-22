@@ -62,7 +62,7 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/selftest.sh` - proves the template is healthy (also runs in CI).
 
 ## Calling one agent
-Slash commands `/th-lead|manual|mobile|api|web|data|triage|review <task>`, `@agent-<name>`, or `bash scripts/th.sh <agent> "<task>"`. Each reads CONTEXT.md and the board itself. `/th-lead` makes the current session act as the Lead, because a subagent cannot start other agents.
+Slash commands `/th-lead|analyst|manual|mobile|api|web|data|triage|review <task>`, `@agent-<name>`, or `bash scripts/th.sh <agent> "<task>"`. Each reads CONTEXT.md and the board itself. `/th-lead` makes the current session act as the Lead, because a subagent cannot start other agents.
 
 ## Adding a module later
 Put its documents in `requirements/sources/<MODULE>/` (or a URL/APK) and start at the analysis stage. Older projects: the user fills `templates/MODULE_INTAKE.md` into `workflow/intake/<module>.md`; run `scripts/check-intake.sh` on it and ask for gaps before planning. Case titles carry `[R<n>]` rule numbers so coverage is checkable. Create `mobile/flows/<module>/`, new case IDs and board rows; do not touch existing flows.

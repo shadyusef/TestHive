@@ -115,7 +115,7 @@ export async function renderMask() {
   $('#maskbody').innerHTML = '<p class="muted">Checking…</p>';
   const m = await api('/api/mask-preview?m=' + encodeURIComponent(S.module));
   if (m.status !== 200) return $('#maskbody').innerHTML = `<div class="msg bad">${esc(m.error)}</div>`;
-  const counts = Object.entries(m.counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(', ') || 'nothing';
+  const counts = esc(Object.entries(m.counts).map(([k, v]) => `${v} ${k.toLowerCase()}`).join(', ') || 'nothing');
   $('#maskbody').innerHTML = `<p class="small muted">This stays on your PC: the agents cannot open Studio. Ticked names are added to the names to hide (.mask-terms); unticked values are left as they are (.mask-allow). Then read the documents again with "Mask personal data" on.</p>
     <h4>Names TestHive is not sure about (${m.names.length})</h4>
     ${m.names.length ? `<div class="table-wrap"><table><thead><tr><th>Hide</th><th>Name</th><th>Why</th><th>In</th></tr></thead><tbody>${m.names.map((n, i) =>

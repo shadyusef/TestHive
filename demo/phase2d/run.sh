@@ -21,7 +21,7 @@ echo "Demo project ready in $W: module SIGNUP with its 4 documents read, nothing
 MODE=recorded; [ "$1" = "--live" ] && MODE=live && shift
 [ "$MODE" = recorded ] && export TH_CLAUDE_FAKE="$SRC/demo/phase2d/fake-claude.py"
 if [ "$1" != "--check" ]; then
-  echo "Starting Studio ($MODE agents). Open SIGNUP and press the Run button under Next; answer questions and review cases between runs."
+  echo "Starting Studio ($MODE agents). Open SIGNUP and press its Run button (next to what to do next); answer questions and review cases between runs."
   bash scripts/studio.sh "$@"; exit
 fi
 export TH_FAKE_DELAY=0.4

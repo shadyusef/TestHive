@@ -2,7 +2,7 @@
 # Phase 2b demo: TestHive Studio on the fictional Nakhla Rewards project, where phase 2 left it (cases waiting for approval).
 # Usage: bash demo/phase2b/run.sh [--check | --no-browser]          Windows PowerShell: .\hive demo/phase2b/run.sh [--check]
 #   default  builds the demo project in a temporary folder and opens Studio in your browser (Ctrl+C stops it)
-#   --check  no browser: drives Studio's API like a user would (answer, review, approve) and prints what happened (used by CI)
+#   --check  no browser: drives Studio's API like a user would (see that answers are read-only after the analysis approval, review, approve) and prints what happened (used by CI)
 # Your project is not touched.
 set -e
 SRC="$(cd "$(dirname "$0")/../.." && pwd)"; P1="$SRC/demo/phase1/recorded"; P2="$SRC/demo/phase2/recorded"
@@ -19,7 +19,7 @@ bash scripts/stage.sh submit SIGNUP design >/dev/null
 echo "Demo project ready in $W: SIGNUP analysis approved, 123 test cases waiting for approval, 20 open questions."
 
 if [ "$1" != "--check" ]; then
-  echo "Starting Studio. In the browser: answer a question (Analysis), review cases (Design), approve the design (Approvals)."
+  echo "Starting Studio. In the browser: see the approved analysis (read-only), review cases (Design), approve the design (Approvals). To answer a question, reopen the analysis first."
   bash scripts/studio.sh "$@"; exit
 fi
 

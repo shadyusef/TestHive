@@ -2,10 +2,17 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.9.0 (2026-10-22)
+- Phase 2f, Studio's new design for the two stages TestHive has today (requirements, then test cases). A sidebar lists the project and every module with what it waits for (and folds into a menu on tablets and phones); each module opens on its title, one sentence saying what to do next with its one button, and a stage track showing who approved what, what comes in later phases and how close the module is to automation.
+- Requirements stage: Sources as clear blocks (documents, built product, earlier versions, personal data, archive); Analysis with a summary row and Questions / Requirements tabs. Test-case stage: a summary row (coverage, priority, your review) and an Accept / Change / Remove switch per case, with the comment box only when it is needed. Lists turn into two-line items on a phone; light and dark themes.
+- Answers are read-only once the analysis is approved, in Studio and in the Excel import, the same as an approved design: a change starts with a reopen, so the approved baseline always matches the answers it was approved with (0.8.0 kept such answers for the next round).
+- Fonts: IBM Plex Sans and Mono are kept in `studio/fonts/` (SIL Open Font License), so Studio works offline. The page is split into `style.css` (every colour and size is a token) and one script per screen in `studio/js/`; Studio serves only those page files.
+- Click-throughs cover answering, the review switch and the read-only analysis, and keep a screenshot of any check that fails.
+
 ## 0.8.0 (2026-10-22)
 - Phase 2e, Studio housekeeping: open any document or the text TestHive read from it; remove a document and bring back earlier versions or removed ones (kept in `_old/`, never deleted; `_old/history.csv` says who changed what). Reading the documents drops the text of removed ones.
 - Archive a module (typed code and a reason) and restore it from the start page; `stage archive` / `stage restore` do the same from a terminal, logged in the approvals log (with a fingerprint of the folder, so a changed or planted archive is refused) and refused for agents started from Studio. Everything goes to `archive/<MODULE>-<time>/`; a file that cannot be moved (a workbook open in Excel) undoes the whole step.
-- An approved design is read-only in Studio and in the Excel import (reopen to change it); answers given after the analysis is approved are kept for the next round. When a document changes after the analysis approval, Next and the readiness card say so.
+- An approved design is read-only in Studio and in the Excel import (reopen to change it); answers given after the analysis is approved are kept for the next round (read-only from 0.9.0). When a document changes after the analysis approval, Next and the readiness card say so.
 - Every module and tab has its own address (refresh and bookmarks work); requirement IDs open the requirement with its questions and cases; confirmations appear in the page (and say when agents are recorded). Studio's page logic is in `studio/app.js` and inline scripts are no longer allowed.
 - Security review fixes: the access key leaves the address bar after the page loads; document links send no referrer; a damaged change log or archive entry never stops a module or the start page from opening; names cannot become Excel formulas in the log.
 - Fixes: two changes to a document in the same second no longer overwrite the kept version; demos, selftest and `stable.sh` remove their temporary folders (about 650 were left behind), and demo copies never keep `.env`, masking files, `.private-names` or `HANDOVER.md`.

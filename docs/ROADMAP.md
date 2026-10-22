@@ -16,7 +16,9 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 2c | Studio setup and intake: first-opening project setup, new module, document and APK upload, masking review, read the documents, sources with versions, readiness for automation | Done (v0.6.0) |
 | 2d | Run the agents from Studio: Run buttons, live job panel, Stop, Activity log, one job per module, web exploration button; recorded stand-in for free demos and CI | Done (v0.7.0) |
 | 2e | Hardening before phase 3: view, remove and restore documents with a change history; archive and restore modules; approved design read-only; changes after approval shown in Next; page addresses and requirement links; demos clean up; unit tests; browser click-throughs in CI | Done (v0.8.0) |
-| 3 | Tool advice: decision matrix per test type, human choice | Next |
+| 2f | Studio design for the two stages: sidebar with every module, module header with the next step and a stage track, requirements and test-case screens with summary rows, review switch, phone layout, dark theme, fonts kept offline; answers read-only after the analysis approval | Done (v0.9.0) |
+| 2g | Studio on its own for colleagues: a single Studio program per system (Windows, Mac, Linux) built by CI, review mode without Claude Code, a hand-off guide; projects shared through a git repository, Excel review packs for reviewers who install nothing | Next |
+| 3 | Tool advice: decision matrix per test type, human choice | Planned |
 | 4 | Automation: framework scaffolds, reusable steps, E2E journeys, tags (smoke, sanity, regression, e2e), environments, test data, contract tests | Planned |
 | 5 | Execution: run picker (type, suite, environment, device, BrowserStack), video and step screenshots, API request/response logs, retest after fix, flaky quarantine | Planned |
 | 6 | Reporting: interactive HTML bug and test reports, management summary, trends, cost per stage, write-back to Jira / Azure | Planned |

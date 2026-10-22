@@ -100,4 +100,4 @@ show bash scripts/stage.sh status SIGNUP
 
 mkdir -p "$D/output"; cp "$W/SIGNUP-design-approved.xlsx" test-cases/TestCases.csv "$D/output/"
 cp "$f" "$D/output/" 2>/dev/null || true
-printf '\nDemo finished. Open demo/phase2/output/SIGNUP-design-approved.xlsx (the approved design) and %s (the AI pre-review). Temporary folder: %s\n' "$(basename "$f")" "$W"
+printf '\nDemo finished. Open demo/phase2/output/SIGNUP-design-approved.xlsx (the approved design) and %s (the AI pre-review). The temporary folder is removed now (TH_KEEP_DEMO=1 keeps it).\n' "$(basename "$f")"

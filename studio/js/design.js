@@ -70,12 +70,12 @@ function renderCases() {
   document.querySelectorAll('[data-open]').forEach(el => el.onclick = () => { S.open.has(el.dataset.open) ? S.open.delete(el.dataset.open) : S.open.add(el.dataset.open); renderCases(); });
   const mark = id => { const c = cases.find(x => x.ID === id), v = S.dirty[id] || {};
     if ((v.Review ?? c.Review) === c.Review && (v['Review Comment'] ?? c['Review Comment']) === c['Review Comment']) delete S.dirty[id];
-    document.querySelector(`[data-com="${id}"]`)?.closest('tr').classList.toggle('dirty', !!S.dirty[id]); updateSavebar(); };
+    document.querySelector(`[data-com="${CSS.escape(id)}"]`)?.closest('tr').classList.toggle('dirty', !!S.dirty[id]); updateSavebar(); };
   document.querySelectorAll('[data-rev]').forEach(b => b.onclick = () => {
     const id = b.dataset.rev, c = cases.find(x => x.ID === id), cur = S.dirty[id]?.Review ?? c.Review, v = cur === b.dataset.v ? '' : b.dataset.v;
     S.dirty[id] = { ...(S.dirty[id] || {}), Review: v };
     b.parentElement.querySelectorAll('button').forEach(x => { const on = x.dataset.v === v; x.className = on ? 'on ' + v.toLowerCase() : ''; x.setAttribute('aria-pressed', on); });
-    const t = document.querySelector(`[data-com="${id}"]`);
+    const t = document.querySelector(`[data-com="${CSS.escape(id)}"]`);
     t.hidden = !(v === 'Change' || v === 'Remove' || t.value); t.placeholder = v === 'Change' ? 'What should change? (required)' : 'Comment';
     if (v === 'Change') t.focus();
     mark(id);

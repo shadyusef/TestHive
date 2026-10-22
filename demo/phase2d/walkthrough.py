@@ -25,7 +25,7 @@ def module(): return call("/api/module?m=SIGNUP")[1]
 
 
 def press(expect):
-    """Presses the Run button shown under Next, waits for the job, prints its progress and result."""
+    """Presses the Run button next to what to do next, waits for the job, prints its progress and result."""
     d = module(); n = d["next"]
     step(f"Next says: {n['text']} -> button 'Run: {n.get('title')}'", n["run"] == expect)
     code, r = call("/api/run", {"module": "SIGNUP", "action": n["run"]})

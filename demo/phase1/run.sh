@@ -93,4 +93,4 @@ $PY scripts/lib/uiscreen.py summary demo/phase1/samples/android-signup.xml "01 s
 
 mkdir -p "$D/output"; cp analysis/SIGNUP-analysis.xlsx analysis/requirements.csv analysis/gaps.csv "$D/output/"
 bash scripts/analysis-workbook.sh SIGNUP "$D/output/SIGNUP-analysis-final.xlsx" >/dev/null
-printf '\nDemo finished. Open demo/phase1/output/SIGNUP-analysis.xlsx (answered workbook) and SIGNUP-analysis-final.xlsx (after the re-check). Temporary folder: %s\n' "$W"
+printf '\nDemo finished. Open demo/phase1/output/SIGNUP-analysis.xlsx (answered workbook) and SIGNUP-analysis-final.xlsx (after the re-check). The temporary folder is removed now (TH_KEEP_DEMO=1 keeps it).\n'
