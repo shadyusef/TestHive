@@ -62,7 +62,7 @@ export function panel(title, html) {  // a wide read-only window: document text,
   document.addEventListener('keydown', key); m.querySelector('#pn-x').focus();
 }
 /* Requirement IDs become links that show the requirement, its questions and its cases. */
-export const reqLinks = text => esc(text).replace(/REQ-[A-Z0-9]+-\d+/g, id => `<span class="crumb" data-req="${id}">${id}</span>`);
+export const reqLinks = text => esc(text).replace(/REQ-[A-Z0-9]+-\d+/g, id => `<button class="req" data-req="${id}">${id}</button>`);
 export const refs = cell => String(cell || '').split(/[;,]/).map(x => x.trim()).filter(Boolean);
 export function setTheme(t) { if (t) document.documentElement.dataset.theme = t; else delete document.documentElement.dataset.theme; }
 export const chip = (st, status) => `<span class="chip s-${status}" title="${esc(STAGE_LABEL[st])}: ${esc(STATUS_LABEL[status])}">${esc(STAGE_LABEL[st])} · ${esc(STATUS_LABEL[status])}</span>`;
@@ -75,10 +75,12 @@ export async function confirmLeave(go) {
   S.dirty = {}; go(); return true;
 }
 
-export function filterBar(key, fields) {
+/* The search and filter row above a table. fields: [name, label, options]; total: how many rows are shown. */
+export function filterBar(key, fields, total) {
   const f = S.filters[key] = S.filters[key] || {};
-  return `<div class="bar"><input class="grow" placeholder="Search" data-f="${key}:q" value="${esc(f.q || '')}">${fields.map(([name, label, opts]) =>
-    `<select data-f="${key}:${name}"><option value="">${esc(label)}: all</option>${opts.map(o => `<option ${f[name] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`).join('')}</div>`;
+  return `<div class="toolbar"><input type="search" class="search" placeholder="Search" aria-label="Search" data-f="${key}:q" value="${esc(f.q || '')}">${fields.map(([name, label, opts]) =>
+    `<select data-f="${key}:${name}" aria-label="${esc(label)}"><option value="">${esc(label)}: all</option>${opts.map(o => `<option ${f[name] === o ? 'selected' : ''}>${esc(o)}</option>`).join('')}</select>`).join('')}
+    <span class="grow"></span>${total === undefined ? '' : `<span class="total">${total} shown</span>`}</div>`;
 }
 export function bindFilters(rerender) {
   document.querySelectorAll('[data-f]').forEach(el => {
@@ -87,3 +89,15 @@ export function bindFilters(rerender) {
   });
 }
 export const matches = (row, f, cols) => (!f.q || cols.some(c => String(row[c] || '').toLowerCase().includes(f.q.toLowerCase())));
+
+/* A summary strip: one row of figures split by thin rules. cells: { label, value, of, bar, sub } (sub is HTML, escape it first). */
+export const strip = cells => `<div class="strip">${cells.map(c => `<div class="cell"><div class="l">${esc(c.label)}</div>
+  <div class="val">${esc(c.value)}${c.of === undefined ? '' : `<small>/ ${esc(c.of)}</small>`}</div>${c.bar ? sbar(c.bar) : ''}${c.sub ? `<div class="sub">${c.sub}</div>` : ''}</div>`).join('')}</div>`;
+/* A split bar with its legend. parts: [count, colour, label]. */
+export function sbar(parts) {
+  return `<div class="sbar" role="img" aria-label="${esc(parts.map(p => `${p[0]} ${p[2]}`).join(', '))}">${parts.filter(p => p[0]).map(p => `<i style="flex:${p[0]};background:${p[1]}"></i>`).join('')}</div>
+    <div class="legend">${parts.map(p => `<span><i class="sw" style="background:${p[1]}"></i><b>${p[0]}</b> ${esc(p[2])}</span>`).join('')}</div>`;
+}
+/* Sub-tabs inside a tab. items: [key, label, extra HTML]; the chosen key is in S[stateKey]. */
+export const subtabs = (stateKey, items) => `<div class="subtabs" role="tablist">${items.map(([k, l, x]) =>
+  `<button role="tab" data-sub="${stateKey}:${k}" aria-selected="${S[stateKey] === k}" class="${S[stateKey] === k ? 'on' : ''}">${esc(l)}${x || ''}</button>`).join('')}</div>`;

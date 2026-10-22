@@ -182,6 +182,9 @@ def apply_answers(module, rows):
     """Applies the human's answers and new questions to gaps.csv, all or nothing. rows: [(label, {column: value})] with
     ID, Answer, Answered By, Status (and Question, Kind, Severity, Requirement for a new question with an empty ID).
     Used by the Excel import and by TestHive Studio. Returns (changed, added, errors); nothing is written if errors."""
+    if stage_status(module, "analysis") == "approved":  # the approved analysis is a frozen baseline: a change starts with a reopen
+        return 0, 0, [f"The analysis of {module} is approved, so its questions and answers are read-only. "
+                      "To change them, reopen the analysis (Approvals) and say why."]
     gaps = read_csv(GAP_FILE, GAP_COLS)
     by_id = {g["ID"]: g for g in gaps}
     nums = [int(g["ID"].rsplit("-", 1)[1]) for g in gaps if re.fullmatch(rf"GAP-{module}-\d{{3}}", g["ID"])]

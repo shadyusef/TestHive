@@ -42,6 +42,10 @@ await check('a requirement ID opens the requirement, its questions and its cases
   await page.getByRole('tab', { name: /^Analysis/ }).click();
   await page.locator('[data-req]').first().click(); await page.getByRole('dialog').getByText(/^Questions \(/).waitFor();
   await shot('2b-requirement'); await page.keyboard.press('Escape'); });
+await check('typing an answer shows the save bar, and Save keeps it with your name', async () => {
+  await page.locator('textarea[data-gap]').first().fill('Arabic and English; the accepted version is stored with the account.');
+  await page.getByText('1 unsaved answer').waitFor(); await shot('2c-answer');
+  await page.getByRole('button', { name: 'Save', exact: true }).click(); await page.getByText(/Saved: 1 answer/).waitFor(); });
 await page.getByRole('tab', { name: 'Activity' }).click();
 await page.getByRole('button', { name: 'Log' }).first().click();
 await check('Activity lists the run and shows its log', async () => { await page.getByText('Task: Module SIGNUP').waitFor(); });

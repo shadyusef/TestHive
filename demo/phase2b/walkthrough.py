@@ -33,11 +33,11 @@ code, d = call("/api/module?m=SIGNUP")
 a, ds = d["analysis"], d["design"]
 step(f"module page: {len(a['requirements'])} requirements, {len(a['gaps'])} questions, {len(ds['cases'])} cases, {len(ds['coverage'])} requirements in coverage", code == 200)
 
-gap = next((g for g in a["gaps"] if g["ID"] == "GAP-SIGNUP-041" and g["Status"] == "Open"), None) or next(g for g in a["gaps"] if g["Status"] == "Open")
+gap = next(g for g in a["gaps"] if g["Status"] == "Open")
 code, r = call("/api/answers", {"module": "SIGNUP", "version": a["version"], "rows": [
     {"ID": gap["ID"], "Answer": "Yes: the demo issues a new random code after a resend.", "Answered By": "Sara (QA lead)", "Status": "Answered"}]})
-step(f"Analysis tab: answer {gap['ID']} -> {r.get('message')}", code == 200 and r.get("ok"))
-code, r = call("/api/answers", {"module": "SIGNUP", "version": a["version"], "rows": [{"ID": gap["ID"], "Answer": "x", "Answered By": "Sara", "Status": "Answered"}]})
+step(f"Analysis tab: the analysis is approved, so answering {gap['ID']} is refused until it is reopened: {(r.get('errors') or [''])[0][:70]}...", code == 400 and not r.get("ok"))
+code, r = call("/api/review", {"module": "SIGNUP", "version": "stale", "cases": [{"ID": "TC-SIGNUP-002", "Review": "Accepted", "Review Comment": ""}]})
 step(f"saving from a page that is out of date is refused (409): {r.get('error', '')[:70]}...", code == 409)
 
 code, r = call("/api/review", {"module": "SIGNUP", "version": ds["version"], "cases": [{"ID": "TC-SIGNUP-002", "Review": "Change", "Review Comment": ""}]})

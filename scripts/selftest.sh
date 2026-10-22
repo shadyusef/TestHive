@@ -228,7 +228,10 @@ call("/api/overview", host="evil.example:80")[0] == 403 or bad.append("foreign H
 s, m = call("/api/module?m=DEMO"); s == 200 and m["design"]["baseline"] == "v2" or bad.append(f"module {s}")
 call("/api/answers", "module=DEMO", ctype="application/x-www-form-urlencoded")[0] == 415 or bad.append("form post accepted")
 row = {"ID": "GAP-DEMO-001", "Answer": "The /help page", "Answered By": "tester", "Status": "Answered"}
-s, r = call("/api/answers", {"module": "DEMO", "version": m["analysis"]["version"], "rows": [row]}); s == 200 or bad.append(f"answer not saved {r}")
+s, r = call("/api/answers", {"module": "DEMO", "version": m["analysis"]["version"], "rows": [row]}); s == 400 or bad.append(f"answer accepted on an approved analysis {r}")
+s, r = call("/api/stage", {"module": "DEMO", "stage": "analysis", "action": "reopen", "by": "tester", "comment": "answer the help question"}); s == 200 or bad.append(f"reopen refused {r}")
+s, m = call("/api/module?m=DEMO")
+s, r = call("/api/answers", {"module": "DEMO", "version": m["analysis"]["version"], "rows": [row]}); s == 200 or bad.append(f"answer not saved after reopen {r}")
 call("/api/answers", {"module": "DEMO", "version": m["analysis"]["version"], "rows": [row]})[0] == 409 or bad.append("stale page accepted")
 s, r = call("/api/stage", {"module": "DEMO", "stage": "design", "action": "approve", "by": "tester"}); s == 400 or bad.append("approve of an unsubmitted design accepted")
 call("/api/shutdown", {})
