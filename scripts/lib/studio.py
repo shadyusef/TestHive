@@ -267,7 +267,8 @@ class Handler(BaseHTTPRequestHandler):
     def allowed(self, q):
         host = (self.headers.get("Host") or "").split(":")[0]
         if host not in ("127.0.0.1", "localhost"): return False  # blocks DNS-rebinding pages
-        return secrets.compare_digest(self.headers.get("X-TestHive-Token") or q.get("t", [""])[0], TOKEN)
+        given = (self.headers.get("X-TestHive-Token") or q.get("t", [""])[0]).encode("utf-8", "replace")
+        return secrets.compare_digest(given, TOKEN.encode())
 
     def do_GET(self):
         u = urlparse(self.path); q = parse_qs(u.query)
@@ -275,7 +276,7 @@ class Handler(BaseHTTPRequestHandler):
             host = (self.headers.get("Host") or "").split(":")[0]
             if host not in ("127.0.0.1", "localhost"): return self.send(403, {"error": "forbidden"})
             return self.send(200, open(PAGE, "rb").read(), "text/html; charset=utf-8",
-                             {"Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:"})
+                             {"Content-Security-Policy": "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; img-src 'self' data:; frame-ancestors 'none'; base-uri 'none'; form-action 'self'"})
         if not self.allowed(q): return self.send(403, {"error": "missing or wrong token: open the address printed by studio"})
         if u.path == "/api/overview":
             s = load_state()
@@ -308,18 +309,22 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/workbook":
             module, kind = q.get("m", [""])[0].upper(), q.get("kind", [""])[0]
             if kind not in ("analysis", "design") or module not in load_state()["modules"]: return self.send(400, {"error": "bad request"})
-            out = os.path.join(tempfile.mkdtemp(), f"{module}-{kind}.xlsx")
             lib = analysis if kind == "analysis" else design
-            try: lib.cmd_workbook([module, out])
-            except SystemExit: return self.send(400, {"error": f"no {kind} workbook for {module} yet"})
-            return self.send(200, open(out, "rb").read(), "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            with tempfile.TemporaryDirectory() as tmp:
+                out = os.path.join(tmp, f"{module}-{kind}.xlsx")
+                try: lib.cmd_workbook([module, out])
+                except SystemExit: return self.send(400, {"error": f"no {kind} workbook for {module} yet"})
+                data = open(out, "rb").read()
+            return self.send(200, data, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
                              {"Content-Disposition": f'attachment; filename="{module}-{kind}.xlsx"'})
         self.send(404, {"error": "not found"})
 
     def do_POST(self):
         u = urlparse(self.path); q = parse_qs(u.query)
         if not self.allowed(q): return self.send(403, {"error": "missing or wrong token"})
-        n = int(self.headers.get("Content-Length") or 0)
+        try: n = int(self.headers.get("Content-Length") or 0)
+        except ValueError: n = -1
+        if n < 0: return self.send(400, {"ok": False, "message": "bad Content-Length"})
         limit = intake.MAX_APK if u.path == "/api/source" and q.get("kind", [""])[0] == "apk" else intake.MAX_DOC
         if n > limit:  # read and drop the body first, so the browser receives the message instead of a broken connection
             while n > 0: n -= len(self.rfile.read(min(n, 1 << 20)) or b"x" * n)
@@ -330,18 +335,19 @@ class Handler(BaseHTTPRequestHandler):
         if u.path == "/api/upload":  # a filled workbook, read with the normal import scripts
             module, kind = q.get("m", [""])[0].upper(), q.get("kind", [""])[0]
             if kind not in ("analysis", "design") or module not in load_state()["modules"]: return self.send(400, {"error": "bad request"})
-            if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
-            with WRITE:
+            with WRITE, tempfile.TemporaryDirectory() as tmp:
+                if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
                 if q.get("version", [""])[0] != version(kind): return self.send(409, {"error": "the files changed since you opened the page; reload"})
-                path = os.path.join(tempfile.mkdtemp(), "upload.xlsx"); open(path, "wb").write(raw)
+                path = os.path.join(tmp, "upload.xlsx"); open(path, "wb").write(raw)
                 lib = os.path.join(HERE, "analysis.py" if kind == "analysis" else "design.py")
                 r = subprocess.run([sys.executable, lib, "import", module, path], capture_output=True, text=True, encoding="utf-8", errors="replace")
             return self.send(200 if r.returncode == 0 else 400, {"ok": r.returncode == 0, "message": (r.stdout + r.stderr).strip()})
         if u.path == "/api/source":  # one uploaded document or APK as raw bytes; its name comes in the address
             module = q.get("m", [""])[0].upper()
             if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
-            if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
-            with WRITE: ok, msg = intake.save_upload(module, q.get("name", [""])[0], raw, q.get("kind", ["source"])[0])
+            with WRITE:
+                if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
+                ok, msg = intake.save_upload(module, q.get("name", [""])[0], raw, q.get("kind", ["source"])[0])
             return self.send(200 if ok else 400, {"ok": ok, "message": msg})
         if (self.headers.get("Content-Type") or "").split(";")[0] != "application/json": return self.send(415, {"error": "JSON only"})
         try: body = json.loads(raw or b"{}")
@@ -364,15 +370,15 @@ class Handler(BaseHTTPRequestHandler):
         module = str(body.get("module", "")).upper()
         if module not in load_state()["modules"]: return self.send(404, {"error": "unknown module"})
         if u.path == "/api/run":
-            info = module_info(module)
-            job, err = start_action(module, str(body.get("action", "")), info)
+            with WRITE:  # no save can slip in between the checks and the start
+                job, err = start_action(module, str(body.get("action", "")), module_info(module))
             if err: return self.send(400 if "unknown" in err else 409, {"ok": False, "message": err})
             return self.send(200, {"ok": True, "message": f"{job['title']} started.", "job": {k: v for k, v in job.items() if not k.startswith("_")}})
         if u.path == "/api/stop":
             ok = jobs.stop(str(body.get("id", "")))
             return self.send(200 if ok else 400, {"ok": ok, "message": "Stopped. Files the agent already wrote stay as they are." if ok else "That job is not running."})
-        if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
         with WRITE:
+            if jobs.running(module): return self.send(423, {"ok": False, "message": busy(module)})
             if u.path == "/api/answers":
                 if body.get("version") != version("analysis"): return self.send(409, {"error": "the questions changed since you opened the page (an agent or Excel saved them); reload and try again"})
                 rows = [("question" if r.get("ID") else "new question", r) for r in body.get("rows", [])]
@@ -401,6 +407,7 @@ class Handler(BaseHTTPRequestHandler):
                 action, st, by, comment = body.get("action"), body.get("stage"), str(body.get("by", "")).strip(), str(body.get("comment", "")).strip()
                 if action not in ("approve", "reject", "reopen") or st not in STAGES: return self.send(400, {"error": "bad request"})
                 if not by: return self.send(400, {"error": "your name is needed: decisions are signed"})
+                if re.search(r"[\r\n|]", by + comment): return self.send(400, {"ok": False, "message": "Name and comment cannot contain line breaks or |"})
                 args = [action, module, st, "--by", by] + (["--comment", comment] if comment else [])
                 code, out = run_stage(args)
                 return self.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})

@@ -63,12 +63,16 @@ def project():
 def save_project(f):
     """Creates the project files if needed and fills in the facts. Returns (ok, message)."""
     name, app = str(f.get("project", "")).strip(), str(f.get("app", "")).strip()
+    f = dict(f, test_env=str(f.get("test_env", "")).strip() or "staging")
+    if not re.fullmatch(r"[\w.-]{1,30}", f["test_env"]): return False, "Environment name: letters, digits, . - _ only (for example staging)."
+    for k in ("project", "app", "base_url", "api_url", "app_id"):  # nothing may add lines or keys to .env, the brief or CONTEXT.md
+        if re.search(r"[\r\n|<>=`]", str(f.get(k, ""))): return False, "Fields cannot contain line breaks or the characters | < > = `"
     plats = [p for p in PLATFORMS if p in (f.get("platforms") or [])]
     if not name or not app: return False, "Enter the project name and the app name."
     if not plats: return False, "Choose at least one platform."
     for k in ("base_url", "api_url"):
         v = str(f.get(k, "")).strip()
-        if v and not re.match(r"^https?://\S+$", v): return False, f"{'Web' if k == 'base_url' else 'API'} address must start with http:// or https://"
+        if v and not re.fullmatch(r"https?://[^\s|<>`]+", v): return False, f"{'Web' if k == 'base_url' else 'API'} address must start with http:// or https://"
     app_id = str(f.get("app_id", "")).strip()
     if app_id and not re.fullmatch(r"[A-Za-z][\w]*(\.[A-Za-z][\w]*)+", app_id): return False, "Android package looks like com.company.app"
     if re.search(r"[\r\n|<>]", name + app): return False, "Names cannot contain line breaks or the characters | < >"
@@ -76,17 +80,17 @@ def save_project(f):
         code, out = run(["scripts/init-project.sh", name])
         if code: return False, out
     brief = read("PROJECT_BRIEF.md")
-    brief = re.sub(r"^# Project brief:.*$", f"# Project brief: {name}", brief, count=1, flags=re.M)
+    brief = re.sub(r"^# Project brief:.*$", lambda m: f"# Project brief: {name}", brief, count=1, flags=re.M)  # lambda: user text is never a pattern
     for label, value in (("Name", app), ("Platforms", " / ".join(plats)), ("Android package", app_id or "-"),
                          ("Test environment", " ".join(x for x in (f.get("test_env", ""), f.get("base_url", ""), f.get("api_url", "")) if x).strip() or "-")):
-        brief = re.sub(rf"^- {label}:.*$", f"- {label}: {value}", brief, count=1, flags=re.M)
+        brief = re.sub(rf"^- {label}:.*$", lambda m, l=label, v=value: f"- {l}: {v}", brief, count=1, flags=re.M)
     write("PROJECT_BRIEF.md", brief)
     if os.path.exists("CONTEXT.md"):
         ctx = read("CONTEXT.md")
-        ctx = re.sub(r"^App:.*?\| Package/bundle:.*?\| Platforms:.*$", f"App: {app} | Package/bundle: {app_id or '-'} | Platforms: {', '.join(p.lower() for p in plats)}",
-                     ctx, count=1, flags=re.M)
+        app_line = f"App: {app} | Package/bundle: {app_id or '-'} | Platforms: {', '.join(p.lower() for p in plats)}"
+        ctx = re.sub(r"^App:.*?\| Package/bundle:.*?\| Platforms:.*$", lambda m: app_line, ctx, count=1, flags=re.M)
         envtxt = " ".join(x for x in (f.get("test_env", ""), f.get("base_url", ""), f.get("api_url", "")) if x).strip() or "-"
-        ctx = re.sub(r"^Env:.*?\|", f"Env: {envtxt} |", ctx, count=1, flags=re.M)
+        ctx = re.sub(r"^Env:.*?\|", lambda m: f"Env: {envtxt} |", ctx, count=1, flags=re.M)
         write("CONTEXT.md", ctx)
     values = {"APP_ID": app_id, "TEST_ENV": str(f.get("test_env", "")).strip() or "staging",
               "BASE_URL": str(f.get("base_url", "")).strip(), "API_BASE_URL": str(f.get("api_url", "")).strip()}
@@ -115,8 +119,9 @@ def save_meta(module, m):
 def clean_meta(module, f):
     m = meta(module)
     url = str(f.get("url", m["url"])).strip()
-    if url and not re.match(r"^https?://\S+$", url): return None, "The URL must start with http:// or https://"
-    m.update({"title": str(f.get("title", m["title"])).strip()[:80], "url": url, "test_env": bool(f.get("test_env", m["test_env"])),
+    if url and not re.fullmatch(r"https?://[^\s|<>`]+", url): return None, "The URL must start with http:// or https:// and contain no spaces"
+    title = " ".join(str(f.get("title", m["title"])).split())[:80]  # one line: it goes into the agent's task
+    m.update({"title": title, "url": url, "test_env": bool(f.get("test_env", m["test_env"])),
               "mask": bool(f.get("mask", m["mask"]))})
     return m, None
 
@@ -125,6 +130,7 @@ def clean_meta(module, f):
 def safe_name(name):
     name = os.path.basename(str(name).replace("\\", "/")).strip()
     if not name or name.startswith(".") or ".." in name or not SAFE_NAME.match(name): return None
+    if re.fullmatch(r"(con|prn|aux|nul|com\d|lpt\d)(\..*)?", name, re.I): return None  # Windows device names
     return name
 
 
@@ -148,7 +154,8 @@ def save_upload(module, name, data, kind="source"):
         old = os.path.join(folder, "_old", time.strftime("%Y%m%d-%H%M%S"))
         os.makedirs(old, exist_ok=True); shutil.move(target, os.path.join(old, name))
         note = f" (the earlier version is kept in {old.replace(os.sep, '/')}/)"
-    with open(target, "wb") as f: f.write(data)
+    with open(target + ".part", "wb") as f: f.write(data)
+    os.replace(target + ".part", target)
     if kind == "apk":
         m = meta(module); m["apk"] = target.replace(os.sep, "/"); save_meta(module, m)
     return True, f"Saved {name}{note}."

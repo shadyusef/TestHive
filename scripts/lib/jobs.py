@@ -60,7 +60,9 @@ def claude_command(agent, task, model=None):
         exe = shutil.which("claude")
         if not exe: return None
         base = [exe]
+    # the project settings also allow maestro, adb, newman and playwright for the QA team; a background agent gets scripts only
     return base + ["--agent", agent, "--permission-mode", "acceptEdits", "--allowedTools", "Bash(bash scripts/*)",
+                   "--disallowedTools", "Bash(maestro *)", "Bash(adb *)", "Bash(newman *)", "Bash(npx *)",
                    "--output-format", "stream-json", "--verbose"] + (["--model", model] if model else []) + ["-p", task]
 
 
@@ -128,7 +130,7 @@ def start(module, kind, title, cmd, task="", agent=""):
                "title": title, "task": task, "status": "running", "started": now(), "ended": "", "summary": "", "cost_usd": None}
         save(job)
         kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-        env = dict(os.environ, PYTHONIOENCODING="utf-8")
+        env = dict(os.environ, PYTHONIOENCODING="utf-8", TH_JOB=job["id"])  # stage.sh and the hooks treat it as an agent, not a person
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True,
                                     encoding="utf-8", errors="replace", env=env, **kw)
@@ -138,6 +140,8 @@ def start(module, kind, title, cmd, task="", agent=""):
         job["_proc"], job["pid"] = proc, proc.pid
         JOBS[job["id"]] = job
     threading.Thread(target=_follow, args=(job, proc), daemon=True).start()
+    watchdog = threading.Timer(MAX_MINUTES * 60, stop, args=(job["id"], f"stopped after {MAX_MINUTES} minutes (TH_JOB_MAX_MINUTES)"))
+    watchdog.daemon = True; watchdog.start()  # also fires when the agent hangs without printing anything
     return job, None
 
 
@@ -152,5 +156,11 @@ def stop(job_id, why="stopped by the user"):
         else:
             try: os.killpg(proc.pid, signal.SIGTERM)
             except OSError: proc.terminate()
+            def finish():
+                try: proc.wait(5)
+                except subprocess.TimeoutExpired:
+                    try: os.killpg(proc.pid, signal.SIGKILL)
+                    except OSError: proc.kill()
+            threading.Thread(target=finish, daemon=True).start()
     job["ended"] = now(); save(job)
     return True

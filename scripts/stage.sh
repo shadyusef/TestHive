@@ -56,6 +56,7 @@ cmd, pos, opt, i = a[0], [], {}, 1
 while i < len(a):
     if a[i] in ("--by", "--comment"):
         if i + 1 >= len(a) or not a[i + 1].strip(): die(f"{a[i]} needs a value")
+        if re.search(r"[\r\n|]", a[i + 1]): die(f"{a[i]} cannot contain line breaks or |")
         opt[a[i][2:]] = a[i + 1]; i += 2
     else: pos.append(a[i]); i += 1
 s = load()
@@ -118,6 +119,8 @@ elif cmd == "submit":
     if not ready(pos[0].upper(), st):
         die("BLOCKED: not ready to submit. Give the workbook to the human, import the review, re-check, then submit.", 2)
     mark(m, st, "awaiting_approval"); save(s); print(f"{pos[0].upper()} {st}: waiting for human approval")
+elif cmd in ("approve", "reject", "reopen") and os.environ.get("TH_JOB"):
+    die(f"BLOCKED: {cmd} is a human decision; an agent started from TestHive Studio cannot make it", 2)
 elif cmd in ("approve", "reject"):
     if len(pos) != 2: die(f"Usage: stage.sh {cmd} <MODULE> <stage> --by <name> [--comment ...]")
     m, st = module(pos[0]), stage(pos[1])

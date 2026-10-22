@@ -76,6 +76,7 @@ You do not need the original author or any chat history; everything is in this r
 | `TH_CLAUDE_FAKE` | `studio` | A stand-in for Claude Code (`demo/phase2d/fake-claude.py`): Run buttons replay recordings |
 | `TH_FAKE_DELAY` | `fake-claude.py` | Seconds between recorded events (default 0.3) |
 | `TH_JOB_MAX_MINUTES` | `studio` | A job is stopped after this many minutes (default 90) |
+| `TH_JOB` | set by `jobs.py` for agents started from Studio | `stage.sh` refuses approve, reject and reopen; the `guard_records` hook also protects `scripts/`, `.claude/`, `templates/`, `.env` and the masking files |
 | `TH_SCRIPTS` | `stage` (set by itself) | Where the scripts are, to call `lib/analysis.py` |
 | `PLATFORM`, `INCLUDE_TAGS`, `EXCLUDE_TAGS` | `run-mobile` | iOS instead of Android; tag filters |
 | `TEST_ENV` and every other `.env` key | `run-*` | Environment name recorded with each run; all keys are passed to Maestro flows |
