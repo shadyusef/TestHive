@@ -90,6 +90,7 @@ while (queue.length && seen.size < maxPages) {
   try { await page.goto(url, { waitUntil: 'load', timeout: 30000 }); }
   catch (e) { report.push({ url, error: e.message.split('\n')[0] }); continue; }
   const n = String(seen.size).padStart(2, '0');
+  console.log(`page ${n}: ${url}`);  // progress for Studio's job panel
   const info = await page.evaluate(() => ({
     title: document.title,
     headings: [...document.querySelectorAll('h1, h2, h3')].map(h => h.innerText.trim()).filter(Boolean),
@@ -131,4 +132,6 @@ for (const p of report) {
   md.push('', '<details><summary>Visible text</summary>', '', '```', p.text, '```', '</details>', '');
 }
 fs.writeFileSync(path.join(out, 'exploration.md'), md.join('\n'));
-console.log(`EXPLORED ${report.length} pages -> ${out.replace(/\\/g, '/')}/exploration.md (and screenshots)`);
+const opened = report.filter(p => !p.error).length, failed = report.length - opened;
+if (!opened) { console.log(`NOT EXPLORED: ${start} could not be opened (${report[0]?.error || 'no page'}). Check that the address opens in a browser on this PC.`); process.exit(1); }
+console.log(`EXPLORED ${opened} pages${failed ? ` (${failed} could not be opened)` : ''} -> ${out.replace(/\\/g, '/')}/exploration.md (and screenshots)`);

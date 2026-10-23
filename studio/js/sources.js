@@ -25,15 +25,18 @@ export function renderSources() {
       </tbody></table></div>
       <div id="drop" class="drop"><b>Drop files here</b> or <label class="link accent" role="button" tabindex="0">choose files<input type="file" id="files" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.bmp,.webp"></label>
         <div class="small">PDF, Word (.docx), Excel, CSV, text, OpenAPI / Swagger (.json, .yaml), design images · up to 25 MB each · a file with the same name replaces the old one, which is kept</div></div></section>
-    <section class="block"><div class="blockhead"><div class="grow"><h2>Built product <span class="muted">optional</span></h2>
-      <p class="small muted">If the product is already built, the analyst also explores it during its first pass.</p></div></div>
+    <section class="block"><div class="blockhead"><div class="grow"><h2>Module details and built product</h2>
+      <p class="small muted">Saved as you type. If the product is already built, give its address or APK: the analyst explores it too.</p></div></div>
       <div class="form">
-      <label for="u-url">Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://test.example.com/page">
+      <label for="u-title">Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}" placeholder="What this part of the product does">
+      <label for="u-url">Web address <span class="muted">optional</span></label><span><input id="u-url" class="full" value="${esc(mt.url)}" placeholder="https://test.example.com/page">
+        ${!mt.url && d.project_url ? `<button class="link accent small" id="u-useproj">Use the project's address (${esc(d.project_url)})</button>` : ''}</span>
       <span></span><label class="check"><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
-      <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="link accent" role="button" tabindex="0">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
-      <label for="u-title">Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
-      <span></span><span class="bar"><button id="u-save">Save</button>${S.agents !== 'review' ? `<button id="u-explore" data-run="explore-web" data-title="Explore the built product" data-min="1-5">Explore the built product</button>` : ''}</span>
-      <span></span><p class="small muted">Explore opens the address in a hidden browser and records each screen (free, no AI); the analyst reads them with the documents.</p></div></section>
+      <label>Android app <span class="muted">optional</span></label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="link accent" role="button" tabindex="0">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
+      <span></span><div>${S.agents === 'review' ? '' : d.web_tools ? '<button id="u-explore" data-run="explore-web" data-title="Explore the built product" data-min="1-5">Explore the built product</button>'
+          : '<p class="msg warn">Explore needs the web tools on this PC. Someone at a terminal installs them once: setup --install --web (see docs/TEAM-GUIDE.md).</p>'}
+        ${d.exploration ? `<p class="small" dir="auto">Explored <span class="mono">${esc(d.exploration.url)}</span> on ${esc(d.exploration.at)}: ${d.exploration.pages} page(s)${d.exploration.failed ? `, ${d.exploration.failed} could not be opened` : ''} · <button class="link accent" id="u-report">Open the report</button></p>`
+          : '<p class="small muted">Explore opens the address in a hidden browser and records each screen (free, no AI); the analyst reads them with the documents.</p>'}</div></div></section>
     <details class="fold" id="vercard"><summary><b>Earlier versions and removed documents</b> <span class="small muted">${src.old_versions} kept · who changed what</span></summary><div id="verbody"></div></details>
     <details class="fold" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody"><button id="mprev">Check the documents</button></div></details>
     <details class="fold danger-zone"><summary><b>Archive this module</b> <span class="small muted">moves it and all its files out of the project; it can be restored from the start page</span></summary>
@@ -68,7 +71,20 @@ export function renderSources() {
   };
   const saveMeta = () => api('/api/module-meta', { method: 'POST', body: JSON.stringify({ module: d.module, url: $('#u-url').value.trim(), test_env: $('#u-test').checked,
       title: $('#u-title').value, mask: $('#rd-mask').checked }) });
-  $('#u-save').onclick = async () => { const r = await saveMeta(); toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(d.module, true); };
+  const autosave = async () => {  // every field saves on change: nothing typed here is lost by switching tab
+    const r = await saveMeta(); if (!r.ok) return toast(r.message || r.error, 'bad');
+    const urlNow = $('#u-url').value.trim(), refresh = !!urlNow !== !!mt.url;  // Next and the Run button depend on having an address
+    Object.assign(mt, { url: urlNow, test_env: $('#u-test').checked, title: $('#u-title').value, mask: $('#rd-mask').checked });
+    toast('Saved.');
+    if (refresh) setTimeout(() => { if (!document.querySelector('.modal')) openModule(d.module, true); }, 400);  // not under an Explore confirmation
+  };
+  ['#u-title', '#u-url', '#u-test', '#rd-mask'].forEach(id => $(id).onchange = autosave);
+  if ($('#u-useproj')) $('#u-useproj').onclick = () => { $('#u-url').value = d.project_url; autosave(); };
+  if ($('#u-report')) $('#u-report').onclick = async () => {
+    const r = await api('/api/exploration?m=' + encodeURIComponent(d.module));
+    if (r.status !== 200) return toast(r.error || 'No report yet.', 'warn');
+    panel('What Explore found', `<p class="small muted">Observed behaviour, not confirmed requirements. Screenshots are in ${esc(r.folder)}/.</p><pre class="log">${esc(r.text)}</pre>`);
+  };
   if ($('#u-explore')) $('#u-explore').onclick = async e => {  // saves a typed address first, then the usual Run confirmation
     const b = e.currentTarget; if (b.dataset.saved) { delete b.dataset.saved; return; }
     e.stopPropagation();

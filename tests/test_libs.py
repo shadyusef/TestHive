@@ -343,6 +343,30 @@ class StageLock(Project):
         self.assertFalse(os.path.exists("workflow/state.json.lock"))
 
 
+class StudioExplore(StudioApi):
+    """The built product: what Explore found is shown, Explore needs the web tools, and a module with only an address is analysed from it."""
+
+    def module(self):
+        shutil.copytree(os.path.join(ROOT, "templates"), "templates")
+        self.js("/api/project", {"project": "Demo", "app": "Demo", "platforms": ["Web"], "base_url": "https://test.example.com"})
+        self.js("/api/module-new", {"module": "LOGIN", "url": "https://test.example.com/login"})
+
+    def test_explore_result_and_report(self):
+        self.module(); d = self.js("/api/module?m=LOGIN")[1]
+        self.assertIsNone(d["exploration"]); self.assertEqual(d["project_url"], "https://test.example.com")
+        self.assertEqual(d["next"]["title"], "Analyse the built product")  # no documents, only an address
+        self.write("analysis/exploration/LOGIN/web/exploration.json", json.dumps([{"url": "https://test.example.com/login", "n": "01"}, {"url": "x", "error": "Timeout"}]))
+        self.write("analysis/exploration/LOGIN/web/exploration.md", "# Web exploration")
+        e = self.js("/api/module?m=LOGIN")[1]["exploration"]
+        self.assertEqual((e["pages"], e["failed"], e["url"]), (1, 1, "https://test.example.com/login"))
+        self.assertEqual(self.js("/api/exploration?m=LOGIN")[1]["text"], "# Web exploration")
+
+    def test_explore_needs_the_web_tools(self):
+        self.module(); self.assertFalse(self.js("/api/module?m=LOGIN")[1]["web_tools"])  # a temporary project has no web/node_modules
+        code, r = self.js("/api/run", {"module": "LOGIN", "action": "explore-web"})
+        self.assertEqual(code, 409); self.assertIn("web tools", r["message"])
+
+
 class StudioPort(unittest.TestCase):
     def test_a_second_studio_cannot_share_the_port(self):  # it takes a free one instead (Windows allowed sharing before)
         a = studio.Server(("127.0.0.1", 0), studio.Handler)

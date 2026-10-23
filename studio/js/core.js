@@ -53,6 +53,17 @@ export function ask(text, opts = {}) {
     document.addEventListener('keydown', key); (inp || ok).focus();
   });
 }
+/* A problem shown next to a form field (not in a corner message): the cursor goes there; it disappears when the field changes. */
+export function fieldError(el, text) {
+  el.closest('.form')?.querySelectorAll('.field-error').forEach(e => e.remove());
+  const m = document.createElement('div'); m.className = 'field-error'; m.id = (el.id || 'f') + '-err'; m.setAttribute('role', 'alert'); m.textContent = text;
+  const spacer = document.createElement('span'); spacer.className = 'field-error';
+  el.after(spacer); spacer.after(m);  // the form is a two-column grid: an empty label cell, then the message under the field
+  el.setAttribute('aria-invalid', 'true'); el.setAttribute('aria-describedby', m.id);
+  (el.matches('input, select, textarea') ? el : el.querySelector('input'))?.focus();
+  el.addEventListener('input', () => { m.remove(); spacer.remove(); el.removeAttribute('aria-invalid'); }, { once: true });
+  el.addEventListener('change', () => { m.remove(); spacer.remove(); el.removeAttribute('aria-invalid'); }, { once: true });
+}
 export function panel(title, html) {  // a wide read-only window: document text, requirement details
   const m = document.createElement('div'); m.className = 'modal'; m.setAttribute('role', 'dialog'); m.setAttribute('aria-modal', 'true');
   m.innerHTML = `<div class="dialog wide"><div class="dialoghead"><h2 class="grow" dir="auto">${esc(title)}</h2><button id="pn-x">Close</button></div>${html}</div>`;

@@ -2,6 +2,7 @@
 import { store, S, $, esc, api, toast, me, showMe, askName, ask, STAGE_LABEL } from './core.js';
 import { renderSide, setCrumbs, waits } from './shell.js';
 import { setHash, openModule, updateSavebar } from './module.js';
+import { fieldError } from './core.js';
 import { renderProjects } from './projects.js';
 
 /* The two stages TestHive has today, as a small track: done, now, or still to come. */
@@ -57,20 +58,23 @@ export function renderSetup(p, first) {
     <h1>${first ? 'Welcome to TestHive' : 'Project details'}</h1>
     <p class="finding">${first ? 'Tell TestHive about the product you are testing. You can change this later (Project, in the sidebar).' : 'These facts are shared with the agents (CONTEXT.md).'}</p>
     <div class="form">
-      <label for="p-project">Project name</label><input id="p-project" dir="auto" value="${esc(p.project)}" placeholder="Name of the project">
-      <label for="p-app">App name</label><input id="p-app" dir="auto" value="${esc(p.app)}" placeholder="Name of the product under test">
-      <label>Platforms</label><span class="bar">${plat.map(x => `<label class="check"><input type="checkbox" class="p-plat" value="${x}" ${p.platforms.includes(x) ? 'checked' : ''}> ${x}</label>`).join('')}</span>
+      <label for="p-project">Project name <span class="req" aria-hidden="true">*</span></label><input id="p-project" dir="auto" value="${esc(p.project)}" placeholder="Name of the project">
+      <label for="p-app">App name <span class="req" aria-hidden="true">*</span></label><input id="p-app" dir="auto" value="${esc(p.app)}" placeholder="Name of the product under test">
+      <label id="p-plat-l">Platforms <span class="req" aria-hidden="true">*</span></label><span class="bar" id="p-plats" role="group" aria-labelledby="p-plat-l">${plat.map(x => `<label class="check"><input type="checkbox" class="p-plat" value="${x}" ${p.platforms.includes(x) ? 'checked' : ''}> ${x}</label>`).join('')}</span>
       <label for="p-env">Environment name</label><input id="p-env" value="${esc(p.test_env)}" placeholder="staging">
       <label for="p-web">Web address</label><input id="p-web" value="${esc(p.base_url)}" placeholder="https://staging.example.com">
       <label for="p-api">API address</label><input id="p-api" value="${esc(p.api_url)}" placeholder="https://api.staging.example.com">
       <label for="p-appid">Android package</label><input id="p-appid" value="${esc(p.app_id)}" placeholder="com.company.app (optional)">
-      <label for="p-me">Your name</label><input id="p-me" value="${esc(me())}" placeholder="Your name and role">
-      <span></span><span class="small muted">Passwords and tokens are never typed here: add them to the .env file yourself when a test needs them.</span>
+      <label for="p-me">Your name <span class="req" aria-hidden="true">*</span></label><input id="p-me" value="${esc(me())}" placeholder="Your name and role">
+      <span></span><span class="small muted"><span class="req">*</span> needed. Passwords and tokens are never typed here: add them to the .env file yourself when a test needs them.</span>
       <span></span><span class="bar"><button class="primary" id="p-save">${first ? 'Create project' : 'Save'}</button>${first ? '' : '<button id="p-cancel">Cancel</button>'}</span>
     </div></div>`;
   if ($('#p-cancel')) $('#p-cancel').onclick = home;
   $('#p-save').onclick = async () => {
-    const name = $('#p-me').value.trim(); if (!name) return toast('Enter your name: it signs your decisions.', 'warn');
+    const need = [['#p-project', 'Enter the project name.'], ['#p-app', 'Enter the name of the product under test.']].find(([id]) => !$(id).value.trim());
+    if (need) return fieldError($(need[0]), need[1]);
+    if (!document.querySelector('.p-plat:checked')) return fieldError($('#p-plats'), 'Choose at least one platform.');
+    const name = $('#p-me').value.trim(); if (!name) return fieldError($('#p-me'), 'Enter your name: it signs your decisions.');
     store.set('th-name', name); showMe();
     const r = await api('/api/project', { method: 'POST', body: JSON.stringify({ project: $('#p-project').value, app: $('#p-app').value,
       platforms: [...document.querySelectorAll('.p-plat:checked')].map(x => x.value), test_env: $('#p-env').value.trim(), base_url: $('#p-web').value.trim(),
@@ -86,15 +90,18 @@ export function renderNewModule() {
   $('#main').innerHTML = `<div class="formpage">
     <h1>New module</h1><p class="finding">One part of the product, tested on its own. Next you add its documents (and an APK if you have one).</p>
     <div class="form">
-      <label for="m-code">Module code</label><input id="m-code" class="upper" placeholder="2 to 20 letters and digits">
+      <label for="m-code">Module code <span class="req" aria-hidden="true">*</span></label><input id="m-code" class="upper" placeholder="2 to 20 letters and digits">
       <label for="m-title">Title</label><input id="m-title" dir="auto" placeholder="What this part of the product does">
-      <label for="m-url">Built product (optional)</label><input id="m-url" placeholder="https://test.example.com/page">
+      <label for="m-url">Built product <span class="muted">optional</span></label><input id="m-url" placeholder="https://test.example.com/page">
       <span></span><label class="check"><input type="checkbox" id="m-test"> This address is a test environment (the analyst may submit forms with test data)</label>
       <span></span><label class="check"><input type="checkbox" id="m-mask"> The documents contain personal data: mask it before the AI reads them</label>
       <span></span><span class="bar"><button class="primary" id="m-save">Add module</button><button id="m-cancel">Cancel</button></span>
     </div></div>`;
   $('#m-cancel').onclick = home;
+  api('/api/project').then(p => { if (p.base_url && !$('#m-url').value) $('#m-url').value = p.base_url; });  // the project's address, as a start
   $('#m-save').onclick = async () => {
+    const code = $('#m-code').value.trim();
+    if (!/^[A-Za-z][A-Za-z0-9]{1,19}$/.test(code)) return fieldError($('#m-code'), code ? 'Use 2 to 20 letters and digits, starting with a letter (no spaces).' : 'Enter a short code for the module, for example LOGIN.');
     const r = await api('/api/module-new', { method: 'POST', body: JSON.stringify({ module: $('#m-code').value.trim().toUpperCase(), title: $('#m-title').value,
       url: $('#m-url').value.trim(), test_env: $('#m-test').checked, mask: $('#m-mask').checked }) });
     toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) { S.tab = 'sources'; openModule(r.module, true); }

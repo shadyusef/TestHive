@@ -16,7 +16,7 @@ PAGE_DIR = pyrun.bundle_dir("studio")  # the page: in the repository, or inside 
 STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 STATE = os.environ.get("TH_STATE", "workflow/state.json")
 LOG = os.path.join(os.path.dirname(STATE) or ".", "APPROVALS.md")
-RUN = os.environ.get("TH_CMD", "bash scripts/hive.sh")
+RUN = os.environ.get("TH_CMD") or (".\\hive" if os.name == "nt" else "bash scripts/hive.sh")
 TOKEN = secrets.token_urlsafe(18)
 WRITE = threading.Lock()
 
@@ -163,14 +163,36 @@ def start_action(module, action, info):
     a, mt = ACTIONS[action], info["meta"]
     if action == "explore-web":
         if not mt.get("url"): return None, "Give the web address of the built product first (Sources tab)."
+        if not web_tools(): return None, WEB_TOOLS_MISSING
         cmd = [intake.bash(), "scripts/explore-web.sh", module, mt["url"]] + (["--submit-valid"] if mt.get("test_env") else [])
         return jobs.start(module, "script", a["title"], cmd, task=" ".join(cmd[1:]))
     review = (sorted(glob.glob(os.path.join("reviews", f"DESIGN-{module}-*.md")), key=os.path.getmtime) or [""])[-1].replace(os.sep, "/")
     if action == "design-fix" and not review: return None, "There is no pre-review to fix yet."
     task = a["task"].format(m=module, review=review, explore=(" Explore the built product too:" + explore_note(mt) + ".") if mt.get("url") or mt.get("apk") else "")
+    if action == "analyse" and not info["sources"]["files"]:  # only a URL or APK: the requirements come from the built product
+        task = (f"Module {module} (started from TestHive Studio). There are no requirement documents: explore the built product:{explore_note(mt)}. "
+                "Draft the requirements as observed behaviour and the questions, and produce the registers and the workbook as your rules say.")
     cmd = jobs.claude_command(a["agent"], task, a.get("model"))
     if not cmd: return None, "Claude Code is not installed here. Run setup --install, then type claude once in a terminal to sign in."
     return jobs.start(module, "agent", a["title"], cmd, task=task, agent=a["agent"])
+
+
+WEB_TOOLS_MISSING = ("Explore needs the web tools on this PC. Someone at a terminal runs, once: "
+                     f"{RUN} setup --install --web (see docs/TEAM-GUIDE.md).")
+
+
+def web_tools(): return os.path.isdir(os.path.join("web", "node_modules", "@playwright", "test"))
+
+
+def exploration(module):
+    """The last web exploration of the module: when, how many pages opened, the address; or None."""
+    p = os.path.join(analysis.DIR, "exploration", module, "web", "exploration.json")
+    if not os.path.exists(p): return None
+    try:
+        with open(p, encoding="utf-8") as f: pages = json.load(f)
+    except ValueError: return None
+    return {"at": time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p))), "pages": sum(1 for x in pages if not x.get("error")),
+            "failed": sum(1 for x in pages if x.get("error")), "url": (pages[0].get("url") if pages else "")}
 
 
 def module_info(module):
@@ -206,6 +228,8 @@ def module_info(module):
     info["readiness"] = readiness(module, m, info)
     info["next"] = next_step(module, m, info)
     if info["next"]["run"]: info["next"].update(title=ACTIONS[info["next"]["run"]]["title"], minutes=ACTIONS[info["next"]["run"]]["minutes"])
+    if info["next"]["run"] == "analyse" and not info["sources"]["files"]: info["next"]["title"] = "Analyse the built product"
+    info["exploration"], info["web_tools"], info["project_url"] = exploration(module), web_tools(), intake.project()["base_url"]
     info["jobs"], info["agents"], info["agents_missing"] = jobs.listing(module)[:15], agents_mode(), agents_missing()
     job = jobs.running(module)
     info["job"] = dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None
@@ -421,6 +445,13 @@ def get_source_file(h, q, body, module):  # the original document (or an earlier
 
 @api("GET", "/api/source-text", module="query")
 def get_source_text(h, q, body, module): return h.send(200, intake.source_text(module, arg(q, "name")))
+
+
+@api("GET", "/api/exploration", module="query")
+def get_exploration(h, q, body, module):  # the explorer's report, as text (screenshots stay in the folder)
+    p = os.path.join(analysis.DIR, "exploration", module, "web", "exploration.md")
+    if not os.path.exists(p): return h.send(404, {"error": "not explored yet"})
+    with open(p, encoding="utf-8", errors="replace") as f: return h.send(200, {"text": f.read(), "folder": os.path.dirname(p).replace(os.sep, "/")})
 
 
 @api("GET", "/api/source-versions", module="query")
