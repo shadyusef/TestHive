@@ -88,6 +88,8 @@ See it end to end with a fictional app: `.\hive demo/phase1/run.sh` (recorded ag
 See it with the fictional app: `.\hive demo/phase2/run.sh` (recorded agents, free) or `--live`.
 
 ## TestHive Studio (no terminal needed)
+Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md).
+
 `.\hive studio` opens a page in your browser, on this PC only. On it you can:
 - **first opening:** describe the project (name, app, platforms, test environment addresses). Studio writes `PROJECT_BRIEF.md`, `CONTEXT.md` and the non-secret `.env` values; passwords and tokens are never typed into Studio;
 - **New module:** give its code and title, and optionally the address of the built product (say whether it is a test environment);
@@ -151,7 +153,7 @@ CLAUDE.md            rules every Claude session in this folder follows
 .claude/settings.json  allowed and blocked commands for agents
 scripts/             all scripts (lib/ holds their Python code)
 templates/           files init-project copies: brief, CONTEXT, intake, board, case sheet, registers, reports, env
-docs/                FORMATS, TROUBLESHOOTING, MAINTAINING, ROADMAP
+docs/                TEAM-GUIDE, FORMATS, TROUBLESHOOTING, MAINTAINING, ROADMAP
 demo/                one runnable demo per phase       studio/  the Studio page: index.html, style.css, fonts/, app.js and js/ (one file per screen), served by scripts/lib/studio.py
 mobile/ api/ web/    test code per platform
 requirements/sources/  your input documents          analysis/  requirements and gap registers
@@ -162,6 +164,7 @@ skills/testhive/     optional /testhive skill for the Claude app
 
 ## More documentation
 - [QUICKSTART.md](QUICKSTART.md): the same start, with more detail per step.
+- [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md): handing TestHive to colleagues: who needs what, the Studio program, sharing the project with git, Excel-only reviewers.
 - [docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md): common errors and fixes.
 - [docs/FORMATS.md](docs/FORMATS.md): every file format (state, registers, runs, masking).
 - [docs/MAINTAINING.md](docs/MAINTAINING.md): how TestHive is built, how to change it safely, how to release.
