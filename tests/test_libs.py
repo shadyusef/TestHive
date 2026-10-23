@@ -277,6 +277,14 @@ class StudioWithoutBash(StudioApi):
             if fake: os.environ["TH_CLAUDE_FAKE"] = fake
 
 
+class StudioPort(unittest.TestCase):
+    def test_a_second_studio_cannot_share_the_port(self):  # it takes a free one instead (Windows allowed sharing before)
+        a = studio.Server(("127.0.0.1", 0), studio.Handler)
+        try:
+            with self.assertRaises(OSError): studio.Server(("127.0.0.1", a.server_address[1]), studio.Handler)
+        finally: a.server_close()
+
+
 class StudioProgramRoute(StudioWithoutBash):
     """The same as StudioWithoutBash, but every library starts the others the way the single Studio program does (--lib)."""
 

@@ -3,7 +3,7 @@ Started by scripts/studio.sh. Serves studio/index.html and a small JSON API on 1
 Every write goes through the same code as the Excel imports (analysis.apply_answers, design.apply_review) or through
 scripts/lib/stage.py (what scripts/stage.sh runs), so the rules are identical. Every API call needs the random token printed at start.
 A save is refused (409) when the files changed since the page read them (an agent or Excel wrote in between)."""
-import sys, os, re, glob, json, time, hashlib, secrets, shutil, subprocess, tempfile, threading, webbrowser
+import sys, os, re, glob, json, time, hashlib, secrets, shutil, socket, subprocess, tempfile, threading, webbrowser
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
@@ -618,11 +618,21 @@ class Handler(BaseHTTPRequestHandler):
             return fn(self, q, body, module)
 
 
+class Server(ThreadingHTTPServer):
+    """Owns its port alone. On Windows the usual address reuse lets a second program open the same port and receive
+    some of the requests (an old Studio answering the new one's browser), so the port is taken exclusively there."""
+    allow_reuse_address = os.name != "nt"
+
+    def server_bind(self):
+        if os.name == "nt": self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_EXCLUSIVEADDRUSE, 1)
+        super().server_bind()
+
+
 def main():
     a = sys.argv[1:]
     port = int(a[a.index("--port") + 1]) if "--port" in a else 8765
-    try: srv = ThreadingHTTPServer(("127.0.0.1", port), Handler)
-    except OSError: srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)  # port in use: take a free one
+    try: srv = Server(("127.0.0.1", port), Handler)
+    except OSError: srv = Server(("127.0.0.1", 0), Handler)  # port in use (another Studio): take a free one
     url = f"http://127.0.0.1:{srv.server_address[1]}/?t={TOKEN}"
     p = projects.choose(a, os.getcwd())
     if p: open_project(p)

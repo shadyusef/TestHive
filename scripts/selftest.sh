@@ -5,6 +5,7 @@ set -eE
 # a failing line names itself (otherwise "set -e" exits silently, e.g. inside VAR=$(...))
 trap 'echo "SELFTEST FAIL at scripts/selftest.sh line $LINENO: $BASH_COMMAND" >&2' ERR
 TROOT=$(mktemp -d)  # every temporary folder lives here and goes at the end, after any Studio started here has closed
+export TH_STUDIO_CONFIG="$TROOT/studio.json"  # Studios started here leave your recent projects alone
 cleanup() {
   trap - ERR; cd /; for p in $(jobs -p); do for i in $(seq 1 30); do kill -0 "$p" 2>/dev/null || break; sleep 0.5; done; kill "$p" 2>/dev/null || true; done
   for i in 1 2 3 4 5; do rm -rf "$TROOT" 2>/dev/null; [ -d "$TROOT" ] || break; sleep 1; done

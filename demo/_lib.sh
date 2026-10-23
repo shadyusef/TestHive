@@ -13,6 +13,7 @@ demo_cleanup() {
 }
 demo_copy() {
   W=$(mktemp -d); trap demo_cleanup EXIT
+  export TH_STUDIO_CONFIG="$W/.studio.json"  # the demo's Studio does not add its throw-away folder to your recent projects
   (cd "$SRC" && tar --exclude=.git --exclude='./runs/R-*' --exclude=./runs/agents --exclude='./demo/*/output' "$@" -cf - .) | (cd "$W" && tar -xf -)
   drop_files .env .mask-terms .mask-allow .mask-map.json .private-names HANDOVER.md
   cd "$W"
