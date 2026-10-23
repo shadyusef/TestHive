@@ -37,6 +37,9 @@ document.addEventListener('click', async e => {
   toast(r.message || r.error, r.ok ? 'ok' : 'bad');
   if (r.ok) { S.module = mod; S.tab = S.view === 'module' ? S.tab : 'activity'; openModule(mod, true); }
 });
+document.addEventListener('keydown', e => {  // a file picker (label around a hidden input) opens with Enter or Space, like a button
+  const l = e.target.closest?.('label[role=button]'); if (l && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); l.querySelector('input')?.click(); }
+});
 document.addEventListener('click', e => { const c = e.target.closest('[data-copy]'); if (c) { navigator.clipboard?.writeText(c.dataset.copy).then(() => toast('Copied. Paste it in Claude Code.')).catch(() => toast('Select the text and copy it.', 'warn')); } });
 window.addEventListener('popstate', async () => {  // back / forward
   if (Object.keys(S.dirty).length && !await ask('You have unsaved changes. Leave without saving?', { ok: 'Leave', danger: true })) return setHash(true);

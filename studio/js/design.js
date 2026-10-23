@@ -29,7 +29,7 @@ export function renderDesign() {
     ])}
     <div class="tabhead">${subtabs('dtab', [['cases', 'Cases', `<span class="c">${act.length}</span>`], ['coverage', 'Coverage', gapsNeg ? `<span class="q">${gapsNeg} gaps</span>` : ''],
         ['assumptions', 'Open questions', d.assumptions.length ? `<span class="c">${d.assumptions.length}</span>` : ''], ['requests', 'Requests and new cases', openAsks ? `<span class="q">${openAsks} open</span>` : '']])}
-      <span class="small muted">Prefer Excel? <a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=design&t=${encodeURIComponent(TOKEN)}">Download the workbook</a>${frozen ? '' : ` · <label class="link accent">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="design"></label>`}</span></div>
+      <span class="small muted">Prefer Excel? <a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=design&t=${encodeURIComponent(TOKEN)}">Download the workbook</a>${frozen ? '' : ` · <label class="link accent" role="button" tabindex="0">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="design"></label>`}</span></div>
     <div id="dtab"></div>`;
   document.querySelectorAll('[data-sub^="dtab:"]').forEach(b => b.onclick = () => { S.dtab = b.dataset.sub.split(':')[1]; renderDesign(); updateSavebar(); });
   bindUploads();

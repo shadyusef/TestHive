@@ -23,16 +23,17 @@ export function renderSources() {
         <td class="rowacts"><button class="small" data-doc="${esc(f.name)}">Text</button><a class="btnlike small" href="${fileUrl(f.name)}" target="_blank" rel="noopener noreferrer">Original</a><button class="small danger" data-rm="${esc(f.name)}">Remove</button></td></tr>`).join('')
         || '<tr><td colspan="5" class="muted">No documents yet: add them below.</td></tr>'}
       </tbody></table></div>
-      <div id="drop" class="drop"><b>Drop files here</b> or <label class="link accent">choose files<input type="file" id="files" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.bmp,.webp"></label>
+      <div id="drop" class="drop"><b>Drop files here</b> or <label class="link accent" role="button" tabindex="0">choose files<input type="file" id="files" multiple hidden accept=".pdf,.docx,.xlsx,.xlsm,.csv,.txt,.md,.json,.yaml,.yml,.png,.jpg,.jpeg,.gif,.bmp,.webp"></label>
         <div class="small">PDF, Word (.docx), Excel, CSV, text, OpenAPI / Swagger (.json, .yaml), design images · up to 25 MB each · a file with the same name replaces the old one, which is kept</div></div></section>
     <section class="block"><div class="blockhead"><div class="grow"><h2>Built product <span class="muted">optional</span></h2>
       <p class="small muted">If the product is already built, the analyst also explores it during its first pass.</p></div></div>
       <div class="form">
       <label for="u-url">Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://test.example.com/page">
       <span></span><label class="check"><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
-      <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="link accent">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
+      <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="link accent" role="button" tabindex="0">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
       <label for="u-title">Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">
-      <span></span><span class="bar"><button id="u-save">Save</button>${mt.url && S.agents !== 'review' ? `<button data-run="explore-web" data-title="Explore the built product" data-min="1-5">Explore the built product</button>` : ''}</span></div></section>
+      <span></span><span class="bar"><button id="u-save">Save</button>${S.agents !== 'review' ? `<button id="u-explore" data-run="explore-web" data-title="Explore the built product" data-min="1-5">Explore the built product</button>` : ''}</span>
+      <span></span><p class="small muted">Explore opens the address in a hidden browser and records each screen (free, no AI); the analyst reads them with the documents.</p></div></section>
     <details class="fold" id="vercard"><summary><b>Earlier versions and removed documents</b> <span class="small muted">${src.old_versions} kept · who changed what</span></summary><div id="verbody"></div></details>
     <details class="fold" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody"><button id="mprev">Check the documents</button></div></details>
     <details class="fold danger-zone"><summary><b>Archive this module</b> <span class="small muted">moves it and all its files out of the project; it can be restored from the start page</span></summary>
@@ -65,10 +66,18 @@ export function renderSources() {
     toast(r.ok ? 'Documents read.' : 'Some documents could not be read.', r.ok ? 'ok' : 'bad');
     await openModule(d.module, true); const o = $('#readout'); o.textContent = r.message || r.error; o.hidden = false;
   };
-  $('#u-save').onclick = async () => {
-    const r = await api('/api/module-meta', { method: 'POST', body: JSON.stringify({ module: d.module, url: $('#u-url').value.trim(), test_env: $('#u-test').checked,
+  const saveMeta = () => api('/api/module-meta', { method: 'POST', body: JSON.stringify({ module: d.module, url: $('#u-url').value.trim(), test_env: $('#u-test').checked,
       title: $('#u-title').value, mask: $('#rd-mask').checked }) });
-    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(d.module, true);
+  $('#u-save').onclick = async () => { const r = await saveMeta(); toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(d.module, true); };
+  if ($('#u-explore')) $('#u-explore').onclick = async e => {  // saves a typed address first, then the usual Run confirmation
+    const b = e.currentTarget; if (b.dataset.saved) { delete b.dataset.saved; return; }
+    e.stopPropagation();
+    if (!$('#u-url').value.trim()) { toast('Type the web address of the built product first.', 'warn'); return $('#u-url').focus(); }
+    if ($('#u-url').value.trim() !== mt.url || $('#u-test').checked !== !!mt.test_env) {
+      const r = await saveMeta(); if (!r.ok) return toast(r.message || r.error, 'bad');
+      mt.url = $('#u-url').value.trim(); mt.test_env = $('#u-test').checked;
+    }
+    b.dataset.saved = '1'; b.click();
   };
   if ($('#ro')) $('#ro').onclick = async () => {
     if (!me()) return askName(); const c = $('#ro-c').value.trim(); if (!c) return toast('Say what changed.', 'warn');

@@ -21,7 +21,7 @@ export function renderAnalysis() {
       { label: 'Waiting for the analyst', value: n('Answered'), sub: n('Answered') ? 'Answered: run the re-check' : 'Nothing to re-check' },
     ])}
     <div class="tabhead">${subtabs('atab', [['questions', 'Questions', n('Open') ? `<span class="q">${n('Open')} open</span>` : ''], ['requirements', 'Requirements', `<span class="c">${reqs.length}</span>`]])}
-      <span class="small muted">Prefer Excel? <a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=analysis&t=${encodeURIComponent(TOKEN)}">Download the workbook</a>${locked ? '' : ` · <label class="link accent">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="analysis"></label>`}</span></div>
+      <span class="small muted">Prefer Excel? <a href="/api/workbook?m=${encodeURIComponent(S.module)}&kind=analysis&t=${encodeURIComponent(TOKEN)}">Download the workbook</a>${locked ? '' : ` · <label class="link accent" role="button" tabindex="0">upload a filled one<input type="file" accept=".xlsx" hidden data-upload="analysis"></label>`}</span></div>
     <div id="atab"></div>`;
   document.querySelectorAll('[data-sub^="atab:"]').forEach(b => b.onclick = () => { S.atab = b.dataset.sub.split(':')[1]; renderAnalysis(); });
   bindUploads();
