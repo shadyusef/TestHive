@@ -1,5 +1,7 @@
 """Checks a built TestHive Studio program on a fresh copy of this project: the page loads, and the actions that start other
-libraries inside the program (project setup, a new module, archive and restore) work. Used by CI after the build.
+libraries inside the program work (project setup, a new module, archive and restore), the bundled packages read PDF, Word
+and YAML documents and write Excel, and a recorded agent run (demo/phase2d/fake-claude.py, needs bash) runs through the
+program. Used by CI after the build.
 Usage: python tests/studio_program_check.py dist/testhive-studio[.exe]
        python tests/studio_program_check.py scripts/lib/studio_app.py      (the same route from source, no build needed)"""
 import sys, os, json, shutil, subprocess, tempfile, time, urllib.request
@@ -8,7 +10,6 @@ from urllib.parse import urlparse, parse_qs
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 prog = os.path.abspath(sys.argv[1])
 env = dict(os.environ, TH_STUDIO_CONFIG=os.path.join(tempfile.mkdtemp(), "studio.json"))
-env.pop("TH_CLAUDE_FAKE", None)
 if prog.endswith(".py"): cmd = [sys.executable, prog]; env["TH_LAUNCHER"] = prog
 else: cmd = [prog]
 proj = os.path.join(tempfile.mkdtemp(), "project")
@@ -16,6 +17,7 @@ shutil.copytree(ROOT, proj, ignore=shutil.ignore_patterns(".git", "dist", "build
                                                          ".env", ".mask-*", ".private-names", "HANDOVER.md"))
 for p in ("workflow/state.json", "PROJECT_BRIEF.md", "CONTEXT.md"):
     if os.path.exists(os.path.join(proj, p)): os.remove(os.path.join(proj, p))
+env["TH_CLAUDE_FAKE"] = os.path.join(proj, "demo", "phase2d", "fake-claude.py"); env["TH_FAKE_DELAY"] = "0.05"
 failed = []
 def step(text, ok):
     print(("  ok    " if ok else "  WRONG ") + text, flush=True)
@@ -41,6 +43,11 @@ def call(path, body=None):
         with e: return e.code, e.read()
 def js(path, body=None):
     code, raw = call(path, body); return code, json.loads(raw or b"{}")
+def upload(name):
+    with open(os.path.join(proj, "demo", "phase1", "sources", name), "rb") as f: data = f.read()
+    req = urllib.request.Request(f"{BASE}/api/source?m=SIGNUP&name={name}&by=CI", data=data, method="POST",
+                                 headers={"X-TestHive-Token": TOKEN, "Content-Type": "application/octet-stream"})
+    with urllib.request.urlopen(req) as r: return r.status
 
 code, page = call("/?t=" + TOKEN); step("the page loads from inside the program", code == 200 and b"app.js" in page)
 code, _ = call("/js/core.js"); step("its scripts load", code == 200)
@@ -51,6 +58,19 @@ code, r = js("/api/module-archive", {"module": "LOGIN", "by": "CI", "comment": "
 step("archive (a library starting another one)", code == 200)
 arch = js("/api/archive")[1].get("archived", [])
 code, r = js("/api/module-restore", {"archive": arch[0]["name"] if arch else "", "by": "CI"}); step("restore", code == 200)
+print("--- documents, a recorded agent run and Excel (packages bundled in the program)")
+js("/api/module-new", {"module": "SIGNUP", "title": "Sign-up"})
+step("upload a PDF, a Word file and an OpenAPI file", all(upload(n) == 200 for n in ("prd.pdf", "user-stories.docx", "openapi.yaml")))
+code, r = js("/api/ingest", {"module": "SIGNUP", "mask": False}); step(f"read them: {r.get('message', r)}", code == 200)
+for n in ("prd.pdf", "user-stories.docx", "openapi.yaml"):
+    words = len(js(f"/api/source-text?m=SIGNUP&name={n}")[1].get("text", "").split()); step(f"{n}: {words} words of text", words > 100)
+code, r = js("/api/run", {"module": "SIGNUP", "action": "analyse"}); step("Run: Analyse the documents (recorded agent)", code == 200)
+for _ in range(240):
+    time.sleep(0.5); j = js("/api/jobs?m=SIGNUP")[1]
+    if not j.get("job"): break
+last = j.get("last") or {}
+step(f"the run finished: {last.get('status')} -> {last.get('summary')}", last.get("status") == "done")
+code, raw = call("/api/workbook?m=SIGNUP&kind=analysis"); step(f"the analysis workbook downloads ({len(raw)} bytes)", code == 200 and raw[:2] == b"PK")
 js("/api/shutdown", {})
 try: p.wait(timeout=20)
 except subprocess.TimeoutExpired: p.kill()
