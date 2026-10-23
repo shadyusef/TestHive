@@ -29,3 +29,8 @@ runs/agents/
 archive/*/files/requirements/apps/
 archive/*/files/runs/agents/
 archive/_restored/*/files/
+
+# Studio program build (python scripts/build-studio.py)
+/build/
+/dist/
+/testhive-studio.spec

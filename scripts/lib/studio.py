@@ -7,13 +7,12 @@ import sys, os, re, glob, json, time, hashlib, secrets, shutil, subprocess, temp
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, intake, jobs, projects
+import analysis, design, intake, jobs, projects, pyrun
 import modules as archive
 from analysis import read_csv, refs
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
-HERE = os.path.dirname(os.path.abspath(__file__))
-PAGE_DIR = os.path.join(HERE, "..", "..", "studio")
+PAGE_DIR = pyrun.bundle_dir("studio")  # the page: in the repository, or inside the Studio program
 STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 STATE = os.environ.get("TH_STATE", "workflow/state.json")
 LOG = os.path.join(os.path.dirname(STATE) or ".", "APPROVALS.md")
@@ -43,7 +42,7 @@ def load_state():
 
 def project_name():
     if os.path.exists("PROJECT_BRIEF.md"):
-        m = re.match(r"#\s*Project brief:\s*(.+)", open("PROJECT_BRIEF.md", encoding="utf-8").readline())
+        with open("PROJECT_BRIEF.md", encoding="utf-8") as f: m = re.match(r"#\s*Project brief:\s*(.+)", f.readline())
         if m and "<" not in m.group(1): return m.group(1).strip()
     return os.path.basename(os.getcwd())
 
@@ -395,8 +394,7 @@ def post_upload(h, q, body, module):  # a filled workbook, read with the normal 
     if arg(q, "version") != version(kind): return h.send(409, {"error": "the files changed since you opened the page; reload"})
     with tempfile.TemporaryDirectory() as tmp:
         path = os.path.join(tmp, "upload.xlsx"); open(path, "wb").write(body)
-        lib = os.path.join(HERE, "analysis.py" if kind == "analysis" else "design.py")
-        r = subprocess.run([sys.executable, lib, "import", module, path], capture_output=True, text=True, encoding="utf-8", errors="replace")
+        r = subprocess.run(pyrun.lib_cmd("analysis.py" if kind == "analysis" else "design.py", "import", module, path), capture_output=True, text=True, encoding="utf-8", errors="replace")
     return h.send(200 if r.returncode == 0 else 400, {"ok": r.returncode == 0, "message": (r.stdout + r.stderr).strip()})
 
 

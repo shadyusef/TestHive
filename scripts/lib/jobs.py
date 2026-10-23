@@ -7,6 +7,8 @@ Agents run as: claude --agent <name> --permission-mode acceptEdits --allowedTool
 --verbose -p <task>. They cannot answer permission prompts: anything outside bash scripts/* and file edits fails and is reported.
 TH_CLAUDE_FAKE=<script.py> replaces Claude Code with a recorded stand-in (demos, selftest and CI spend nothing)."""
 import sys, os, re, json, time, shutil, signal, subprocess, threading
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pyrun
 
 DIR = os.path.join("runs", "agents")
 MAX_MINUTES = int(os.environ.get("TH_JOB_MAX_MINUTES", "90"))
@@ -55,7 +57,7 @@ def progress(job_id, last=None):
 
 def claude_command(agent, task, model=None):
     fake = os.environ.get("TH_CLAUDE_FAKE")
-    if fake: base = [sys.executable, fake]
+    if fake: base = pyrun.script_cmd(fake)
     else:
         exe = shutil.which("claude")
         if not exe: return None

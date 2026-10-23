@@ -277,5 +277,27 @@ class StudioWithoutBash(StudioApi):
             if fake: os.environ["TH_CLAUDE_FAKE"] = fake
 
 
+class StudioProgramRoute(StudioWithoutBash):
+    """The same as StudioWithoutBash, but every library starts the others the way the single Studio program does (--lib)."""
+
+    def setUp(self):
+        super().setUp(); os.environ["TH_LAUNCHER"] = os.path.join(ROOT, "scripts", "lib", "studio_app.py")
+
+    def tearDown(self):
+        os.environ.pop("TH_LAUNCHER", None); super().tearDown()
+
+    def test_archive_and_restore(self):  # stage.py runs modules.py: a library started by a library
+        self.js("/api/project", {"project": "Demo", "app": "Demo", "platforms": ["Web"]}); self.js("/api/module-new", {"module": "LOGIN"})
+        code, r = self.js("/api/module-archive", {"module": "LOGIN", "by": "Sara", "comment": "test", "confirm": "LOGIN"})
+        self.assertEqual(code, 200, r)
+        arch = self.js("/api/archive")[1]["archived"]
+        code, r = self.js("/api/module-restore", {"archive": arch[0]["name"], "by": "Sara"})
+        self.assertEqual(code, 200, r); self.assertIn("LOGIN", self.js("/api/overview")[1]["modules"][0]["module"])
+
+    def test_unknown_library_refused(self):
+        r = subprocess.run([sys.executable, os.environ["TH_LAUNCHER"], "--lib", "../x.py"], capture_output=True, text=True)
+        self.assertNotEqual(r.returncode, 0); self.assertIn("Unknown library", r.stderr)
+
+
 if __name__ == "__main__":
     unittest.main()

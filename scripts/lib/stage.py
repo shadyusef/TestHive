@@ -2,7 +2,8 @@
 Usage: python scripts/lib/stage.py <command> ...   (the commands are listed at the top of scripts/stage.sh)
 Runs with Python only, so Studio needs no bash for viewing, answering, reviewing and approving."""
 import sys, json, os, re, time, subprocess
-os.environ.setdefault("TH_SCRIPTS", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))  # scripts/
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+from pyrun import lib_cmd  # runs analysis.py, design.py, modules.py from source or inside the Studio program
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 STAGES = ["analysis", "design", "tools", "automation", "execution", "reporting"]
 SF = os.environ.get("TH_STATE", "workflow/state.json")
@@ -25,8 +26,7 @@ def ready(name, st):
     """Runs the stage's own --for-approval check when the stage has one and its files exist. True if fine."""
     if st not in LIBS or not os.path.exists(LIBS[st][1]): return True
     sys.stdout.flush()
-    lib = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", LIBS[st][0])
-    return subprocess.run([sys.executable, lib, "check", name, "--for-approval"]).returncode == 0
+    return subprocess.run(lib_cmd(LIBS[st][0], "check", name, "--for-approval")).returncode == 0
 def log(module, st, decision, by, comment):
     new = not os.path.exists(LOG)
     with open(LOG, "a", encoding="utf-8", newline="\n") as f:
@@ -118,7 +118,7 @@ elif cmd in ("approve", "reject"):
     print(f"{pos[0].upper()} {st}: {'approved' if cmd == 'approve' else 'rejected, back to in progress'} by {opt['by']}")
     if cmd == "approve" and has_files:
         sys.stdout.flush()
-        subprocess.run([sys.executable, os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", LIBS[st][0]), "baseline", pos[0].upper(), opt["by"]])
+        subprocess.run(lib_cmd(LIBS[st][0], "baseline", pos[0].upper(), opt["by"]))
 elif cmd == "reopen":
     if len(pos) != 2: die("Usage: stage.sh reopen <MODULE> <stage> --by <name> --comment \"why\"")
     m, st = module(pos[0]), stage(pos[1])
@@ -132,14 +132,14 @@ elif cmd == "reopen":
 elif cmd in ("archive", "restore"):
     if len(pos) != 1 or "by" not in opt or (cmd == "archive" and "comment" not in opt):
         die(f"Usage: stage.sh archive <MODULE> --by <name> --comment \"why\"  |  stage.sh restore <MODULE>-<time> --by <name>")
-    lib, arch = os.path.join(os.environ.get("TH_SCRIPTS", "scripts"), "lib", "modules.py"), os.environ.get("TH_ARCHIVE", "archive")
+    arch = os.environ.get("TH_ARCHIVE", "archive")
     sys.stdout.flush()
     if cmd == "archive":
         name = pos[0].upper(); m = module(name)
         dest = os.path.join(arch, f"{name}-{time.strftime('%Y%m%d-%H%M%S')}")
-        if subprocess.run([sys.executable, lib, "archive", name, dest, opt["by"], opt["comment"]]).returncode: die("Not archived.", 2)
+        if subprocess.run(lib_cmd("modules.py", "archive", name, dest, opt["by"], opt["comment"])).returncode: die("Not archived.", 2)
         with open(os.path.join(dest, "state.json"), "w", encoding="utf-8", newline="\n") as f: json.dump(m, f, indent=2, ensure_ascii=False)
-        fp = subprocess.run([sys.executable, lib, "fingerprint", dest], capture_output=True, text=True).stdout.strip()
+        fp = subprocess.run(lib_cmd("modules.py", "fingerprint", dest), capture_output=True, text=True).stdout.strip()
         del s["modules"][name]; save(s)  # the fingerprint lets restore refuse a folder changed or planted later
         log(name, "-", "Archived", opt["by"], f"{opt['comment']} (kept in {dest.replace(os.sep, '/')}/, fingerprint {fp})")
         print(f"{name}: archived by {opt['by']}. Restore with: {RUN} restore {os.path.basename(dest)} --by <name>")
@@ -150,7 +150,7 @@ elif cmd in ("archive", "restore"):
         with open(os.path.join(dest, "state.json"), encoding="utf-8") as f: m = json.load(f)
         name = pos[0].rsplit("-", 2)[0]
         if name in s["modules"]: die(f"{name} exists again: archive or rename it first", 2)
-        if subprocess.run([sys.executable, lib, "restore", dest]).returncode: die("Not restored.", 2)
+        if subprocess.run(lib_cmd("modules.py", "restore", dest)).returncode: die("Not restored.", 2)
         s["modules"][name] = m; save(s)
         log(name, "-", "Restored", opt["by"], opt.get("comment") or f"from {dest.replace(os.sep, '/')}/")
         print(f"{name}: restored by {opt['by']}")

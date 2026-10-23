@@ -8,6 +8,7 @@
   requirements/apps/<M>/           uploaded APKs (git-ignored)"""
 import sys, os, re, json, csv, time, glob, shutil, subprocess, calendar
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+import pyrun
 
 SOURCES, MODULES, APPS = "requirements/sources", "requirements/modules", "requirements/apps"
 ANALYSIS = os.environ.get("TH_ANALYSIS", "analysis")
@@ -28,8 +29,8 @@ def run(args):
 
 
 def run_py(lib, args):
-    """Runs scripts/lib/<lib> with this Python (no bash needed)."""
-    r = subprocess.run([sys.executable, os.path.join(os.path.dirname(os.path.abspath(__file__)), lib)] + args,
+    """Runs scripts/lib/<lib> with this Python, or inside the Studio program (no bash needed)."""
+    r = subprocess.run(pyrun.lib_cmd(lib, *args),
                        capture_output=True, text=True, encoding="utf-8", errors="replace")
     return r.returncode, (r.stdout + r.stderr).strip()
 
