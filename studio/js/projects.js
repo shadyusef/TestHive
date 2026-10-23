@@ -1,5 +1,5 @@
 // Choosing the project folder: one Studio program serves any TestHive project (a clone of your team's project repository).
-import { S, $, esc, api, toast } from './core.js';
+import { S, $, esc, api, toast, ask } from './core.js';
 import { renderSide, setCrumbs } from './shell.js';
 import { home } from './home.js';
 import { updateSavebar } from './module.js';
@@ -28,8 +28,9 @@ export async function renderProjects() {
       <p>Your team keeps each project in a git repository. Copy it to this PC once, then open its folder here:</p>
       <pre class="log">git clone &lt;your team's project repository&gt;</pre>
       <p class="small muted">A new project starts from the TestHive template repository the same way; the person who sets it up shares it with the team.</p></details></div>`;
-  const open = async path => {
-    const x = await api('/api/open-project', { method: 'POST', body: JSON.stringify({ path }) });
+  const open = async (path, confirm = false) => {
+    const x = await api('/api/open-project', { method: 'POST', body: JSON.stringify({ path, confirm }) });
+    if (x.confirm) return await ask(x.message, { ok: 'Open it' }) && open(path, true);  // a folder never opened on this PC
     toast(x.message || x.error, x.ok ? 'ok' : 'bad');
     if (x.ok) { S.data = null; home(); }
   };

@@ -275,7 +275,9 @@ class StudioProjects(StudioApi):
         code, r = self.js("/api/overview"); self.assertEqual((code, r.get("no_project")), (409, True))
         self.assertEqual(self.js("/api/open-project", {"path": os.path.join(self.dir, "nothing")})[0], 400)
         other = os.path.join(self.dir, "other"); os.makedirs(os.path.join(other, "templates")); shutil.copytree("scripts", os.path.join(other, "scripts"))
-        code, r = self.js("/api/open-project", {"path": other}); self.assertEqual(code, 200, r)
+        code, r = self.js("/api/open-project", {"path": other}); self.assertEqual((code, r.get("confirm")), (409, True), r)  # never opened here
+        self.assertEqual(os.path.realpath(os.getcwd()), os.path.realpath(self.dir), "nothing opened before the confirmation")
+        code, r = self.js("/api/open-project", {"path": other, "confirm": True}); self.assertEqual(code, 200, r)
         self.assertEqual(os.path.realpath(os.getcwd()), os.path.realpath(other))
         self.assertEqual(self.js("/api/overview")[0], 200)
         self.assertIn(os.path.realpath(other), self.js("/api/projects")[1]["recent"])

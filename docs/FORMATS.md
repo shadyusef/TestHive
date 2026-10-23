@@ -44,7 +44,8 @@ Both are logged in `workflow/APPROVALS.md` (stage `-`). APKs and agent logs stay
 rules, messages after empty / invalid / valid submissions); for Android one `NN-name.png` + `NN-name.xml` (UI dump)
 per recorded screen. Everything there is observed behaviour, not confirmed requirements. The web `exploration.md` has a
 `Login:` line (not set, not tried, failed, or logged in with `TEST_USER` from `.env`); the password is never written. If the start
-page cannot be opened, the explorer prints `NOT EXPLORED:` and exits with an error.
+page cannot be opened, the explorer prints `NOT EXPLORED:` and exits with an error. `analysis/exploration/` is git-ignored (it can show
+logged-in account details); run Explore again on another PC.
 
 ## Studio settings: `studio.json` (per user, outside any project)
 `%APPDATA%\TestHive\studio.json` on Windows, `~/.config/testhive/studio.json` elsewhere (`TH_STUDIO_CONFIG` overrides):

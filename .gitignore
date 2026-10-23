@@ -24,6 +24,7 @@ workflow/state.json.lock
 demo/*/output/
 __pycache__/
 requirements/apps/
+analysis/exploration/
 runs/agents/
 .private-names
 # archived modules keep their files; the large or local ones stay out of git, as before archiving

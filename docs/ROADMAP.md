@@ -22,7 +22,7 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 4 | Automation: framework scaffolds, reusable steps, E2E journeys, tags (smoke, sanity, regression, e2e), environments, test data, contract tests | Planned |
 | 5 | Execution: run picker (type, suite, environment, device, BrowserStack), video and step screenshots, API request/response logs, retest after fix, flaky quarantine | Planned |
 | 6 | Reporting: interactive HTML bug and test reports, management summary, trends, cost per stage, write-back to Jira / Azure | Planned |
-| 7 | TestHive Studio: local web UI over the same files (one user first, team later); answer agent permission prompts from the browser (Claude Agent SDK), Android exploration from Studio | Planned |
+| 7 | More Studio: answer agent permission prompts from the browser (Claude Agent SDK), Android exploration from Studio | Planned |
 | 8 | Scale: scheduled CI runs, team roles, notifications, device farms, iOS on a Mac | Planned |
 
 Owner decisions that shape the design: all input types plus a "no tools, one folder" mode; Excel export with human

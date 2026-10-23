@@ -27,6 +27,7 @@ await check('a folder that is not a TestHive project is refused', async () => {
   await page.getByText(/not a TestHive project/).waitFor(); });
 await check('the project folder opens and shows its modules', async () => {
   await page.getByLabel('Project folder path').fill(folder); await page.getByLabel('Project folder path').press('Enter');
+  await page.getByRole('dialog').getByText(/for the first time/).waitFor(); await page.getByRole('button', { name: 'Open it' }).click();  // a new folder is confirmed once
   await page.locator('.module-card').first().waitFor(); await page.locator('#main h1', { hasText: 'Modules' }).waitFor(); });
 await shot('p2-opened');
 await check('Switch project lists it as the project open now', async () => {

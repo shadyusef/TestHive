@@ -32,13 +32,17 @@ jobs:
       - run: python scripts/build-studio.py
       - name: Check the program on a fresh project copy
         run: python tests/studio_program_check.py dist/${{ matrix.file }}
-      - name: Name it for this system
+      - name: Name it for this system, with its SHA-256 checksum
         shell: bash
-        run: mv "dist/${{ matrix.file }}" "dist/${{ matrix.asset }}"
+        run: |
+          mv "dist/${{ matrix.file }}" "dist/${{ matrix.asset }}"
+          python -c "import hashlib,sys; p=sys.argv[1]; print(hashlib.sha256(open(p,'rb').read()).hexdigest() + '  ' + p.split('/')[-1])" "dist/${{ matrix.asset }}" > "dist/${{ matrix.asset }}.sha256"
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.asset }}
-          path: dist/${{ matrix.asset }}
+          path: |
+            dist/${{ matrix.asset }}
+            dist/${{ matrix.asset }}.sha256
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
@@ -46,4 +50,4 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |  # the three builds may all try to create the release; the ones that lose the race just upload
           gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md" || true
-          gh release upload "$GITHUB_REF_NAME" "dist/${{ matrix.asset }}" --clobber
+          gh release upload "$GITHUB_REF_NAME" "dist/${{ matrix.asset }}" "dist/${{ matrix.asset }}.sha256" --clobber

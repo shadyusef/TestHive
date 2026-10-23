@@ -355,6 +355,9 @@ def post_open_project(h, q, body, module):
                                                      "(clone your team's project repository, then open its folder)."})
     if any(j["status"] == "running" for j in jobs.JOBS.values()):
         return h.send(409, {"ok": False, "message": "An agent is working: wait until it finishes (or stop it) before opening another project."})
+    if os.path.realpath(p) not in projects.recent() and body.get("confirm") is not True:  # never opened here before
+        return h.send(409, {"ok": False, "confirm": True, "message": f"Open {os.path.realpath(p)} for the first time? Its scripts and agents "
+                            "run on this PC when you press Run: open only a copy of your team's own project repository."})
     open_project(p)
     return h.send(200, {"ok": True, "message": f"Opened {os.path.basename(PROJECT['path'])}.", "current": PROJECT["path"]})
 

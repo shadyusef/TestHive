@@ -46,11 +46,14 @@ while i < len(a):
 def lock():
     """One stage command at a time: Studio, the agents and a person may change state.json in the same moment."""
     p = SF + ".lock"; os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    from jobs import alive
     for _ in range(300):
-        try: os.close(os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+        try:
+            fd = os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY); os.write(fd, str(os.getpid()).encode()); os.close(fd)
         except FileExistsError:
             try:
-                if time.time() - os.path.getmtime(p) > 120: os.remove(p)  # left by a command that crashed
+                with open(p, encoding="utf-8") as f: holder = f.read().strip()
+                if not alive(holder) and time.time() - os.path.getmtime(p) > 2: os.remove(p)  # left by a command that crashed
             except OSError: pass
             time.sleep(0.1); continue
         atexit.register(lambda: os.path.exists(p) and os.remove(p)); return

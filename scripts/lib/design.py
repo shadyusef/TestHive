@@ -315,7 +315,7 @@ def cmd_import(a):
                 for n, row in enumerate(rows[1:], 2) if any(row)]
 
     cols = EDITABLE + ["Review", "Review Comment"]
-    cases, conflicts = reviewer_changes(wb, table("Cases", ["ID", "Title", "Steps", "Expected Result", "Review", "Review Comment"], "row"),
+    cases, conflicts, same = reviewer_changes(wb, table("Cases", ["ID", "Title", "Steps", "Expected Result", "Review", "Review Comment"], "row"),
                                         {c["ID"]: c for c in read_csv(CASE_FILE, CASE_COLS)}, cols)
     if conflicts: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in conflicts) +
                       "\nCompare those cases with Studio, then delete those rows from the workbook (or make them match Studio) and upload again.")
@@ -324,7 +324,7 @@ def cmd_import(a):
         table("Requests", ["ID", "Request", "Requested By"], "Requests row"))
     if errors: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in errors))
     print(f"IMPORTED {path.replace(os.sep, '/')}: {decided['Accepted']} accepted, {decided['Change']} to change, {decided['Remove']} to remove, "
-          f"{edited} edited in Excel, {new_cases} new cases, {new_asks} new requests. Next: the designer re-checks.")
+          f"{edited} edited in Excel, {new_cases} new cases, {new_asks} new requests{f', {same} rows you did not change left as they are' if same else ''}. Next: the designer re-checks.")
 
 
 def cmd_impact(a):

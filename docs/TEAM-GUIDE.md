@@ -24,6 +24,7 @@ The person who sets it up reads all of it; everyone else reads their own row and
   `testhive-studio-linux`. One file, no Python needed to open it. Keep it anywhere (Desktop, Downloads).
   No release yet? The QA lead builds it: `python scripts/build-studio.py` (needs `pip install pyinstaller`) makes `dist/testhive-studio.exe`.
 - **Windows** shows "Windows protected your PC" the first time (the program is not code-signed): **More info > Run anyway**.
+  Each download has a `.sha256` file next to it: compare it with `certutil -hashfile testhive-studio-windows.exe SHA256`.
 - **macOS**: right-click the file > **Open** the first time (or `chmod +x testhive-studio-macos` and
   `xattr -d com.apple.quarantine testhive-studio-macos` in Terminal). **Linux**: `chmod +x testhive-studio-linux`.
 - Starting it opens your browser on the last project you opened; the first time it asks for the project folder.
@@ -34,7 +35,7 @@ The person who sets it up reads all of it; everyone else reads their own row and
 1. Install Git (Windows: `winget install --id Git.Git -e`) or GitHub Desktop.
 2. Clone the project repository once, for example into `C:\Projects\<project>`
    (GitHub Desktop: **File > Clone repository**; terminal: `git clone <repository address>`).
-3. Open the Studio program, paste the folder's path on the **Open a project** page (File Explorer: hold Shift, right-click the
+3. Open the Studio program, paste the folder's path on the **Open a project** page (the first time, Studio asks you to confirm the folder) (File Explorer: hold Shift, right-click the
    folder, **Copy as path**). Next time it opens there by itself; **Switch project** in the sidebar changes it.
 
 ## Every day
@@ -71,6 +72,8 @@ The person who sets it up reads all of it; everyone else reads their own row and
 - **Secrets stay on each PC.** Passwords and tokens go into `.env` by hand when a test needs them (for example `TEST_USER` and
   `TEST_USER_PASSWORD`, the test account Explore logs in with); it is never committed, and
   agents cannot read it. Each QA engineer keeps their own.
+- **Explore's findings stay on the PC that ran it** (`analysis/exploration/` is not committed: logged-in pages can show account
+  details). The analyst's requirements made from them are shared as usual; run Explore again on another PC if needed.
 - **Masking lists are per PC too** (`.mask-terms`, `.mask-allow`): whoever reads documents with masking keeps the list of real
   names to hide. Read documents before committing them if they contain personal data.
 - **Approved stages are read-only.** To change approved answers or cases, reopen the stage in **Approvals** and say why;

@@ -146,21 +146,21 @@ def reviewer_changes(wb, table, current, cols):
     """The rows of table the reviewer changed, and conflicts: rows changed in the workbook and also in TestHive since it was made.
     Rows the reviewer left as they were are dropped, so a late workbook never undoes newer work. Without a pack sheet (older
     workbooks) every row counts, as before. current: {ID: row now in the CSV}."""
-    if PACK not in wb.sheetnames: return table, []
+    if PACK not in wb.sheetnames: return table, [], 0
     rows = list(wb[PACK].iter_rows(values_only=True))
-    if not rows: return table, []  # a damaged snapshot: treat it as an older workbook
+    if not rows: return table, [], 0  # a damaged snapshot: treat it as an older workbook
     head = [str(h or "") for h in rows[0]]
     snap = {str(r[0]): {h: "" if v is None else str(v).strip() for h, v in zip(head, r)} for r in rows[1:] if r and r[0]}
-    out, conflicts = [], []
+    out, conflicts, same = [], [], 0
     for n, row in table:
         orig = snap.get(row.get("ID", ""))
         if orig is None: out.append((n, row)); continue  # a new row, or an ID the workbook did not have
-        if all(row.get(c, "") == orig.get(c, "") for c in cols): continue
+        if all(row.get(c, "") == orig.get(c, "") for c in cols): same += 1; continue
         now = current.get(row["ID"])
         if now and any((now.get(c) or "").strip() != orig.get(c, "") for c in cols):
             conflicts.append(f"{n} ({row['ID']}): changed in this workbook and also in TestHive after the workbook was made"); continue
         out.append((n, row))
-    return out, conflicts
+    return out, conflicts, same
 
 
 def dropdown(ws, col, values, last=1000):
@@ -262,12 +262,13 @@ def cmd_import(a):
     if any(h not in head for h in need): die("The 'Gaps' sheet is missing a column: " + ", ".join(h for h in need if h not in head))
     table = [(f"row {n}", {h: ("" if row[i] is None else str(row[i]).strip()) for i, h in enumerate(head) if h})
              for n, row in enumerate(rows[1:], 2) if any(row)]
-    table, conflicts = reviewer_changes(wb, table, {g["ID"]: g for g in read_csv(GAP_FILE, GAP_COLS)}, PACK_GAP)
+    table, conflicts, same = reviewer_changes(wb, table, {g["ID"]: g for g in read_csv(GAP_FILE, GAP_COLS)}, PACK_GAP)
     if conflicts: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in conflicts) +
                       "\nCompare those rows with Studio, then delete those rows from the workbook (or make them match Studio) and upload again.")
     changed, added, errors = apply_answers(module, table)
     if errors: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in errors))
-    print(f"IMPORTED {path.replace(os.sep, '/')}: {changed} gaps updated, {added} new questions added. Next: the analyst reviews the answers.")
+    print(f"IMPORTED {path.replace(os.sep, '/')}: {changed} gaps updated, {added} new questions added"
+          f"{f', {same} rows you did not change left as they are' if same else ''}. Next: the analyst reviews the answers.")
 
 
 def cmd_score(a):

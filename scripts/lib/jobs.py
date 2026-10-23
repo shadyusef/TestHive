@@ -19,7 +19,7 @@ def now(): return time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
 
 
 def save(job):
-    d = os.path.join(DIR, job["id"]); os.makedirs(d, exist_ok=True)
+    d = job.get("_dir") or os.path.join(DIR, job["id"]); os.makedirs(d, exist_ok=True)
     keep = {k: v for k, v in job.items() if not k.startswith("_")}
     with open(os.path.join(d, "meta.json") + ".tmp", "w", encoding="utf-8", newline="\n") as f: json.dump(keep, f, indent=2, ensure_ascii=False)
     os.replace(os.path.join(d, "meta.json") + ".tmp", os.path.join(d, "meta.json"))
@@ -117,7 +117,7 @@ def describe(event):
 
 
 def _follow(job, proc):
-    d = os.path.join(DIR, job["id"])
+    d = job["_dir"]
     started = time.time()
     with open(os.path.join(d, "progress.txt"), "a", encoding="utf-8", newline="\n") as prog, \
          open(os.path.join(d, "transcript.jsonl"), "a", encoding="utf-8", newline="\n") as raw:
@@ -156,6 +156,7 @@ def start(module, kind, title, cmd, task="", agent=""):
         if running(module): return None, f"{running(module)['title']} is still working on {module}. Wait for it or stop it first."
         job = {"id": time.strftime("%Y%m%d-%H%M%S") + f"-{module}-{(agent or kind)}", "module": module, "kind": kind, "agent": agent,
                "title": title, "task": task, "status": "running", "started": now(), "ended": "", "summary": "", "cost_usd": None}
+        job["_dir"] = os.path.abspath(os.path.join(DIR, job["id"]))  # stays in this project even if Studio switches project later
         save(job)
         kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
         env = dict(os.environ, PYTHONIOENCODING="utf-8", TH_JOB=job["id"])  # stage.sh and the hooks treat it as an agent, not a person
