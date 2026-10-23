@@ -242,6 +242,7 @@ class StudioProjects(StudioApi):
         self.assertEqual(os.path.realpath(os.getcwd()), os.path.realpath(other))
         self.assertEqual(self.js("/api/overview")[0], 200)
         self.assertIn(os.path.realpath(other), self.js("/api/projects")[1]["recent"])
+        self.assertEqual(studio.jobs.JOBS, {})  # the runs of the project left behind are not shown in this one
         os.chdir(self.dir)
 
 
@@ -275,6 +276,34 @@ class StudioWithoutBash(StudioApi):
             self.assertEqual(code, 409); self.assertIn("Review mode", r["message"])
         finally:
             if fake: os.environ["TH_CLAUDE_FAKE"] = fake
+
+
+class JobsOfAnotherStudio(Project):
+    """A second Studio on the same project sees a running job of the first one and does not mark it interrupted."""
+
+    def job(self, pid):
+        studio.jobs.JOBS.clear()
+        studio.jobs.save({"id": "J1", "module": "LOGIN", "kind": "agent", "status": "running", "started": "x", "pid": pid})
+        studio.jobs.load_history(); return studio.jobs.JOBS["J1"]["status"]
+
+    def test_live_job_stays_running(self):
+        p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
+        try:
+            self.assertEqual(self.job(p.pid), "running"); self.assertTrue(studio.jobs.running("LOGIN"))
+            self.assertTrue(studio.jobs.stop("J1")); p.wait(10)  # Stop reaches a job this Studio did not start
+        finally: p.kill(); studio.jobs.JOBS.clear()
+
+    def test_dead_job_is_interrupted(self):
+        p = subprocess.Popen([sys.executable, "-c", "pass"]); p.wait()
+        self.assertEqual(self.job(p.pid), "interrupted"); studio.jobs.JOBS.clear()
+
+
+class StageLock(Project):
+    def test_lock_left_by_a_crash_is_taken_over(self):
+        self.assertEqual(self.stage("init", "LOGIN").returncode, 0)
+        self.write("workflow/state.json.lock", ""); os.utime("workflow/state.json.lock", (1, 1))
+        r = self.stage("status", "LOGIN"); self.assertEqual(r.returncode, 0, r.stdout + r.stderr)
+        self.assertFalse(os.path.exists("workflow/state.json.lock"))
 
 
 class StudioPort(unittest.TestCase):

@@ -1,7 +1,7 @@
 """Stage gates and approvals for TestHive (the logic behind scripts/stage.sh; Studio calls it too).
 Usage: python scripts/lib/stage.py <command> ...   (the commands are listed at the top of scripts/stage.sh)
 Runs with Python only, so Studio needs no bash for viewing, answering, reviewing and approving."""
-import sys, json, os, re, time, subprocess
+import sys, json, os, re, time, atexit, subprocess
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from pyrun import lib_cmd  # runs analysis.py, design.py, modules.py from source or inside the Studio program
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -42,6 +42,20 @@ while i < len(a):
         if re.search(r"[\r\n|]", a[i + 1]): die(f"{a[i]} cannot contain line breaks or |")
         opt[a[i][2:]] = a[i + 1]; i += 2
     else: pos.append(a[i]); i += 1
+
+def lock():
+    """One stage command at a time: Studio, the agents and a person may change state.json in the same moment."""
+    p = SF + ".lock"; os.makedirs(os.path.dirname(p) or ".", exist_ok=True)
+    for _ in range(300):
+        try: os.close(os.open(p, os.O_CREAT | os.O_EXCL | os.O_WRONLY))
+        except FileExistsError:
+            try:
+                if time.time() - os.path.getmtime(p) > 120: os.remove(p)  # left by a command that crashed
+            except OSError: pass
+            time.sleep(0.1); continue
+        atexit.register(lambda: os.path.exists(p) and os.remove(p)); return
+    die(f"Another stage command is still running ({p}). Try again in a moment.", 2)
+lock()
 s = load()
 
 def module(name):

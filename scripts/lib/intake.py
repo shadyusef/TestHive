@@ -23,11 +23,6 @@ def bash():
     return os.environ.get("TH_BASH") or "bash"
 
 
-def run(args):
-    r = subprocess.run([bash()] + args, capture_output=True, text=True, encoding="utf-8", errors="replace")
-    return r.returncode, (r.stdout + r.stderr).strip()
-
-
 def run_py(lib, args):
     """Runs scripts/lib/<lib> with this Python, or inside the Studio program (no bash needed)."""
     r = subprocess.run(pyrun.lib_cmd(lib, *args),

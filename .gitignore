@@ -20,6 +20,7 @@ HANDOVER.md
 .mask-terms
 runs/*/evidence/
 workflow/state.json.tmp
+workflow/state.json.lock
 demo/*/output/
 __pycache__/
 requirements/apps/

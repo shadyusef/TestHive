@@ -25,16 +25,35 @@ def save(job):
     os.replace(os.path.join(d, "meta.json") + ".tmp", os.path.join(d, "meta.json"))
 
 
+def alive(pid):
+    """Is this process still running? (os.kill(pid, 0) would end it on Windows.)"""
+    if not pid: return False
+    if os.name == "nt":
+        import ctypes
+        k = ctypes.windll.kernel32
+        h = k.OpenProcess(0x1000, False, int(pid))  # PROCESS_QUERY_LIMITED_INFORMATION
+        if not h: return False
+        code = ctypes.c_ulong(); ok = k.GetExitCodeProcess(h, ctypes.byref(code)); k.CloseHandle(h)
+        return bool(ok) and code.value == 259  # STILL_ACTIVE
+    try: os.kill(int(pid), 0)
+    except PermissionError: return True
+    except OSError: return False
+    return True
+
+
 def load_history():
-    """Jobs from earlier Studio sessions; a job that was running when Studio stopped is 'interrupted'."""
+    """Jobs from disk: earlier Studio sessions, and jobs another Studio on this project runs right now (read again each time).
+    A job marked running whose process is gone is 'interrupted'."""
     if not os.path.isdir(DIR): return
     for name in os.listdir(DIR):
-        p = os.path.join(DIR, name, "meta.json")
-        if name in JOBS or not os.path.exists(p): continue
+        p, mine = os.path.join(DIR, name, "meta.json"), JOBS.get(name)
+        if mine and (mine.get("_proc") or mine["status"] != "running") or not os.path.exists(p): continue
         try:
             with open(p, encoding="utf-8") as f: job = json.load(f)
         except ValueError: continue
-        if job.get("status") == "running": job["status"] = "interrupted"; job["summary"] = "Studio was closed while this job ran."; save(job)
+        # shortcut: a reused process number keeps a dead job "running" until that process ends; rare, fine for a desktop tool
+        if job.get("status") == "running" and not alive(job.get("pid")):
+            job["status"] = "interrupted"; job["summary"] = "Studio was closed while this job ran."; save(job)
         JOBS[job["id"]] = job
 
 
@@ -155,19 +174,20 @@ def stop(job_id, why="stopped by the user"):
 def _stop(job_id, why):
     job = JOBS.get(job_id)
     if not job or job["status"] != "running": return False
-    proc = job.get("_proc")
+    proc, pid = job.get("_proc"), job.get("pid")
     job["status"], job["summary"] = "stopped", why
-    if proc and proc.poll() is None:
+    if proc.poll() is None if proc else alive(pid):  # no proc: another Studio on this project started it
         if os.name == "nt":  # the whole tree: claude.cmd starts node, node starts the tools
-            subprocess.run(["taskkill", "/T", "/F", "/PID", str(proc.pid)], capture_output=True)
+            subprocess.run(["taskkill", "/T", "/F", "/PID", str(pid)], capture_output=True)
         else:
-            try: os.killpg(proc.pid, signal.SIGTERM)
-            except OSError: proc.terminate()
+            try: os.killpg(pid, signal.SIGTERM)
+            except OSError:
+                if proc: proc.terminate()
             def finish():
                 try: proc.wait(5)
                 except subprocess.TimeoutExpired:
-                    try: os.killpg(proc.pid, signal.SIGKILL)
+                    try: os.killpg(pid, signal.SIGKILL)
                     except OSError: proc.kill()
-            threading.Thread(target=finish, daemon=True).start()
+            if proc: threading.Thread(target=finish, daemon=True).start()
     job["ended"] = now(); save(job)
     return True

@@ -312,6 +312,7 @@ NO_PROJECT_OK = {"/api/projects", "/api/open-project", "/api/shutdown"}
 
 def open_project(path):
     os.chdir(path); PROJECT["path"] = os.path.realpath(path); projects.remember(path)
+    jobs.JOBS.clear()  # the runs of the project left behind (none is running: switching waits for them)
 
 
 @api("GET", "/api/projects")
