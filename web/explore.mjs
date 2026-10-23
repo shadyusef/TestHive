@@ -29,6 +29,25 @@ const page = await browser.newPage({ viewport: { width: 1280, height: 900 } });
 const origin = u => { try { const x = new URL(u); return x.protocol === 'file:' ? path.dirname(x.pathname) : x.origin; } catch { return ''; } };
 const home = origin(start);
 const queue = [start], seen = new Set(), report = [];
+// A test login from .env (TEST_USER, TEST_USER_PASSWORD), passed by explore-web.sh: used once on the first page with a password
+// field, after that page's own forms are recorded. The values never go into the report.
+const LOGIN = { user: process.env.TH_LOGIN_USER || '', password: process.env.TH_LOGIN_PASSWORD || '' };
+let login = LOGIN.user && LOGIN.password ? 'not tried (no login form found)' : 'not set (add TEST_USER and TEST_USER_PASSWORD to .env)';
+const LOGOUT = /log-?out|sign-?out|log-?off/i;  // never followed once logged in
+
+async function logIn(url) {  // returns the page it lands on, or null
+  await page.goto(url, { waitUntil: 'load', timeout: 30000 });
+  const pass = page.locator('input[type=password]:visible').first();
+  const user = page.locator('input[type=email]:visible, input[type=text]:visible, input:not([type]):visible').first();
+  if (!await pass.count() || !await user.count()) return null;
+  await user.fill(LOGIN.user); await pass.fill(LOGIN.password); await pass.press('Enter');
+  await page.waitForLoadState('load').catch(() => {}); await page.waitForTimeout(1500);
+  if (await page.locator('input[type=password]:visible').count()) {
+    const msg = (await visibleMessages()).join('; ');
+    login = `failed: the login form was still shown${msg ? ` ("${msg}")` : ''}`; return null;
+  }
+  login = `logged in with TEST_USER from .env, landed on ${page.url()}`; return page.url();
+}
 
 async function snapshotForms() {
   return page.evaluate(() => {
@@ -109,13 +128,19 @@ while (queue.length && seen.size < maxPages) {
       if (r.navigated_to && origin(r.navigated_to) === home && !seen.has(r.navigated_to)) queue.push(r.navigated_to);
     }
   }
-  for (const l of info.links) if (origin(l) === home && !seen.has(l) && !l.includes('#')) queue.push(l);
   report.push({ n, url, ...info, links: undefined, forms });
+  if (login.startsWith('not tried') && forms.some(f => f.fields.some(x => x.type === 'password'))) {
+    const landed = await logIn(url);
+    console.log(`login: ${login}`);
+    if (landed) { seen.delete(landed); queue.unshift(landed); }
+  }
+  for (const l of info.links) if (origin(l) === home && !seen.has(l) && !l.includes('#') && !(login.startsWith('logged in') && LOGOUT.test(l))) queue.push(l);
 }
 await browser.close();
 
 fs.writeFileSync(path.join(out, 'exploration.json'), JSON.stringify(report, null, 2));
 const md = [`# Web exploration: ${start}`, `Explored ${new Date().toISOString().slice(0, 16)} with ${channel}. Pages: ${report.length}. Everything below is OBSERVED behaviour, not confirmed requirements.`,
+  `Login: ${login}.`,
   `Values tried per form: empty; invalid (e.g. "${INVALID.email}", "${INVALID.tel}", "${INVALID.password}", numeric boxes "x"); valid (e.g. "${VALID.text}", "${VALID.tel}", numeric boxes "1", first option, boxes ticked). A real valid code or password is not known to the explorer.`, ''];
 for (const p of report) {
   if (p.error) { md.push(`## ${p.url}\nCould not open: ${p.error}\n`); continue; }

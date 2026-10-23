@@ -67,6 +67,16 @@ def env_values():
     return out
 
 
+def test_login_set():
+    """Is a test account in .env for Explore? Only whether both values are there: the values never leave this function."""
+    if not os.path.exists(".env"): return False
+    got = {}
+    for line in read(".env").splitlines():
+        k, _, v = line.partition("=")
+        if k.strip() in ("TEST_USER", "TEST_USER_PASSWORD"): got[k.strip()] = v.strip()
+    return bool(got.get("TEST_USER")) and got.get("TEST_USER_PASSWORD", "") not in ("", "change-me")
+
+
 def project():
     """The project facts for the setup form. setup_needed: no brief yet (first opening)."""
     brief = read("PROJECT_BRIEF.md") if os.path.exists("PROJECT_BRIEF.md") else ""

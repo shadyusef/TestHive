@@ -36,7 +36,9 @@ export function renderSources() {
       <span></span><div>${S.agents === 'review' ? '' : d.web_tools ? '<button id="u-explore" data-run="explore-web" data-title="Explore the built product" data-min="1-5">Explore the built product</button>'
           : '<p class="msg warn">Explore needs the web tools on this PC. Someone at a terminal installs them once: setup --install --web (see docs/TEAM-GUIDE.md).</p>'}
         ${d.exploration ? `<p class="small" dir="auto">Explored <span class="mono">${esc(d.exploration.url)}</span> on ${esc(d.exploration.at)}: ${d.exploration.pages} page(s)${d.exploration.failed ? `, ${d.exploration.failed} could not be opened` : ''} · <button class="link accent" id="u-report">Open the report</button></p>`
-          : '<p class="small muted">Explore opens the address in a hidden browser and records each screen (free, no AI); the analyst reads them with the documents.</p>'}</div></div></section>
+          : '<p class="small muted">Explore opens the address in a hidden browser and records each screen (free, no AI); the analyst reads them with the documents.</p>'}
+        <p class="small muted">${d.test_login ? 'Behind a login: Explore logs in with the test account in .env (TEST_USER).'
+          : 'Behind a login? Add a test account to the .env file yourself (TEST_USER and TEST_USER_PASSWORD; never typed here) and Explore logs in first.'}</p></div></div></section>
     <details class="fold" id="vercard"><summary><b>Earlier versions and removed documents</b> <span class="small muted">${src.old_versions} kept · who changed what</span></summary><div id="verbody"></div></details>
     <details class="fold" id="maskcard"><summary><b>Personal data</b> <span class="small muted">check what masking hides before the AI reads anything</span></summary><div id="maskbody"><button id="mprev">Check the documents</button></div></details>
     <details class="fold danger-zone"><summary><b>Archive this module</b> <span class="small muted">moves it and all its files out of the project; it can be restored from the start page</span></summary>

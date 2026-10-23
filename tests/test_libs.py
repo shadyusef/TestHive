@@ -360,11 +360,36 @@ class StudioExplore(StudioApi):
         e = self.js("/api/module?m=LOGIN")[1]["exploration"]
         self.assertEqual((e["pages"], e["failed"], e["url"]), (1, 1, "https://test.example.com/login"))
         self.assertEqual(self.js("/api/exploration?m=LOGIN")[1]["text"], "# Web exploration")
+        self.assertFalse(self.js("/api/module?m=LOGIN")[1]["test_login"], "the template's change-me is not a login")
+        with open(".env", "a", encoding="utf-8") as f: f.write("TEST_USER=tester\nTEST_USER_PASSWORD=Secret-123\n")
+        d = self.js("/api/module?m=LOGIN")[1]; self.assertTrue(d["test_login"]); self.assertNotIn("Secret-123", json.dumps(d))
 
     def test_explore_needs_the_web_tools(self):
         self.module(); self.assertFalse(self.js("/api/module?m=LOGIN")[1]["web_tools"])  # a temporary project has no web/node_modules
         code, r = self.js("/api/run", {"module": "LOGIN", "action": "explore-web"})
         self.assertEqual(code, 409); self.assertIn("web tools", r["message"])
+
+
+@unittest.skipUnless(os.path.isdir(os.path.join(ROOT, "web", "node_modules", "@playwright", "test")), "web tools not installed")
+class ExploreLogin(unittest.TestCase):
+    """Explore logs in with the test account from .env, never follows logout, and never writes the password down."""
+
+    def explore(self, password):
+        out = tempfile.mkdtemp(); site = os.path.join(ROOT, "tests", "fixtures", "login-site", "login.html")
+        url = "file:///" + site.replace(os.sep, "/").lstrip("/")
+        env = dict(os.environ, TH_LOGIN_USER="tester", TH_LOGIN_PASSWORD=password)
+        subprocess.run(["node", os.path.join(ROOT, "web", "explore.mjs"), url, out], capture_output=True, text=True, env=env, cwd=os.path.join(ROOT, "web"), timeout=180)
+        with open(os.path.join(out, "exploration.md"), encoding="utf-8") as f: md = f.read()
+        shutil.rmtree(out, ignore_errors=True); return md
+
+    def test_logs_in_and_explores_behind_the_login(self):
+        md = self.explore("Secret-123")
+        self.assertIn("Login: logged in with TEST_USER", md); self.assertIn("Welcome to the dashboard", md); self.assertIn("Settings page", md)
+        self.assertNotIn("You are logged out", md, "the logout link is not followed"); self.assertNotIn("Secret-123", md)
+
+    def test_a_wrong_password_is_reported(self):
+        md = self.explore("wrong-one")
+        self.assertIn("Login: failed", md); self.assertNotIn("Welcome to the dashboard", md); self.assertNotIn("wrong-one", md)
 
 
 class StudioPort(unittest.TestCase):

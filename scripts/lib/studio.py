@@ -230,6 +230,7 @@ def module_info(module):
     if info["next"]["run"]: info["next"].update(title=ACTIONS[info["next"]["run"]]["title"], minutes=ACTIONS[info["next"]["run"]]["minutes"])
     if info["next"]["run"] == "analyse" and not info["sources"]["files"]: info["next"]["title"] = "Analyse the built product"
     info["exploration"], info["web_tools"], info["project_url"] = exploration(module), web_tools(), intake.project()["base_url"]
+    info["test_login"] = intake.test_login_set()
     info["jobs"], info["agents"], info["agents_missing"] = jobs.listing(module)[:15], agents_mode(), agents_missing()
     job = jobs.running(module)
     info["job"] = dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None

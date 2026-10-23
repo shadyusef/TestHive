@@ -1,0 +1,10 @@
+<!doctype html><meta charset="utf-8"><title>Sign in</title>
+<h1>Sign in</h1>
+<form id="f"><label for="u">User name</label><input id="u" name="user" required>
+<label for="p">Password</label><input id="p" name="pass" type="password" required>
+<button type="submit">Sign in</button><div role="alert" id="err"></div></form>
+<script>
+document.getElementById('f').onsubmit = e => { e.preventDefault();
+  if (u.value === 'tester' && p.value === 'Secret-123') location.href = 'home.html';
+  else document.getElementById('err').textContent = 'Wrong user name or password'; };
+</script>

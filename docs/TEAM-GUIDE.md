@@ -68,7 +68,8 @@ The person who sets it up reads all of it; everyone else reads their own row and
 4. Commit and push.
 
 ## Things to know
-- **Secrets stay on each PC.** Passwords and tokens go into `.env` by hand when a test needs them; it is never committed, and
+- **Secrets stay on each PC.** Passwords and tokens go into `.env` by hand when a test needs them (for example `TEST_USER` and
+  `TEST_USER_PASSWORD`, the test account Explore logs in with); it is never committed, and
   agents cannot read it. Each QA engineer keeps their own.
 - **Masking lists are per PC too** (`.mask-terms`, `.mask-allow`): whoever reads documents with masking keeps the list of real
   names to hide. Read documents before committing them if they contain personal data.

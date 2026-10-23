@@ -68,7 +68,7 @@ Call one agent directly inside Claude Code with `/th-lead`, `/th-analyst`, `/th-
 Maintainer tools (not part of the QA team): the `studio-security-reviewer` and `docs-consistency-reviewer` agents, and the `/release-phase` and `/rerecord-demo` skills. See [docs/MAINTAINING.md](docs/MAINTAINING.md).
 
 ## Analyse a module (stage 1)
-1. Put the module's documents in `requirements/sources/<MODULE>/` (PDF, Word, Excel, text, OpenAPI/Swagger, design images). No documents? Give the analyst a URL or an APK instead: it explores the built product and drafts the requirements as **observed** behaviour for you to confirm.
+1. Put the module's documents in `requirements/sources/<MODULE>/` (PDF, Word, Excel, text, OpenAPI/Swagger, design images). No documents? Give the analyst a URL or an APK instead: it explores the built product and drafts the requirements as **observed** behaviour for you to confirm. Behind a login? Put a test account in `.env` (`TEST_USER`, `TEST_USER_PASSWORD`): Explore records the login page, logs in, and explores from there without writing the password down.
 2. In Claude Code: `/th-analyst SIGNUP` (add e.g. `url=https://staging.example.com, test environment`), or ask the Lead.
 3. Open `analysis/SIGNUP-analysis.xlsx`, sheet **Gaps**: answer the questions in the yellow columns (you may add your own questions in a new row). Save.
 4. Ask the analyst to re-check (`/th-analyst re-check SIGNUP`). Repeat 3-4 until no High question is open.
