@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Checks and installs the tools TestHive needs (macOS/Linux; on Windows hive runs setup.ps1).
+# Checks and installs the tools TestHive needs (bash version; on Windows hive runs setup.ps1).
 # Usage: bash scripts/setup.sh [--check | --install] [--web]
 #   --check    (default) report what is missing, install nothing; writes .testhive-ready when all required tools are present
 #   --install  install what is missing (asks nothing more: run it only after the user agreed)

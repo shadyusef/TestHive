@@ -7,6 +7,7 @@ import { renderSetup } from './js/home.js';
 import { bindShell } from './js/shell.js';
 import { saveAnswers } from './js/analysis.js';
 import { saveReview } from './js/design.js';
+import { saveTools } from './js/tools.js';
 
 document.addEventListener('click', e => {
   const el = e.target.closest('[data-req]'); if (!el || !S.data) return;
@@ -47,7 +48,7 @@ window.addEventListener('popstate', async () => {  // back / forward
 });
 $('#projbtn').onclick = async () => confirmLeave(async () => { const p = await api('/api/project'); if (p.status === 200) renderSetup(p, p.setup_needed); });
 window.addEventListener('beforeunload', e => { if (Object.keys(S.dirty).length) { e.preventDefault(); e.returnValue = ''; } });
-$('#save').onclick = () => S.tab === 'analysis' ? saveAnswers() : saveReview();
+$('#save').onclick = () => S.tab === 'analysis' ? saveAnswers() : S.tab === 'tools' ? saveTools() : saveReview();
 $('#discard').onclick = () => { S.dirty = {}; render(); };
 
 showMe(); bindShell();

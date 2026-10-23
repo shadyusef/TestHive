@@ -246,6 +246,12 @@ a.btnlike:hover { border-color: var(--text); }
 .check input { min-height: 0; margin: 0; }
 .form .check { padding-top: 0; }
 .form .req { color: var(--bad-ink); }
+/* Tools tab: the decision matrix and the weights */
+table.list th.num, table.list td.num { text-align: end; font-variant-numeric: tabular-nums; }
+span.req { color: var(--bad-ink); }
+input[data-why] { width: 100%; margin-top: 4px; }
+.wgrid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 8px 16px; margin: 8px 0 12px; }
+.wgrid input[type=number] { width: 60px; margin-inline-start: 6px; }
 .field-error { color: var(--bad-ink); font-size: 14px; margin-top: -4px; } span.field-error { margin: 0; }
 [aria-invalid="true"] { border-color: var(--bad-ink) !important; }
 .upper::placeholder { text-transform: none; }
@@ -320,6 +326,7 @@ td.rev { min-width: 230px; }
   table.list.cases td.rev { grid-column: 1 / -1; margin-top: 10px; min-width: 0; }
   .seg { display: flex; width: 100%; } .seg button { flex: 1; height: 40px; }
   table.list tr.detail { display: block; } .detail dl { grid-template-columns: 1fr; } .detail dt { margin-top: 6px; }
+  table.list.tools td.num:not(.strong) { display: none; } table.list.tools td.num.strong { text-align: start; }
   .track div.stage.later { display: none; }  /* stages of later phases: the desktop shows them */
 }
 @media (prefers-reduced-motion: reduce) { .side { transition: none; } }

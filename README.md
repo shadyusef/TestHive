@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.10.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single program for colleagues (Windows, macOS, Linux) with review mode, Excel review packs and a team guide. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.11.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines); phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single Windows program for colleagues with review mode, Excel review packs and a team guide, and phase 3, tool advice (a decision matrix per test type for the functional cases, the human's choice with a reason, approval). Still being built phase by phase: automation scaffolds, execution and HTML reports: see [docs/ROADMAP.md](docs/ROADMAP.md). TestHive targets Windows (tested on Windows 11; CI runs on Windows); the bash scripts run in Git Bash.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -20,7 +20,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 | Administrator rights on Windows, or IT help | Several installers (Git, Node.js, Python, Java, Tesseract) install for all users and ask for admin rights. Maestro, adb, Newman and Claude Code do not. | You / IT |
 
 ## Start in 10 minutes
-Commands are shown for **Windows PowerShell** (`.\hive ...`). On macOS/Linux type `bash scripts/hive.sh ...` instead of `.\hive ...`.
+Commands are shown for **Windows PowerShell** (`.\hive ...`). In Git Bash type `bash scripts/hive.sh ...` instead of `.\hive ...`.
 
 1. **Get your copy.** On GitHub click **Use this template** to make a **private** repo for your project (your requirements and test evidence should not be public), then clone it and open a terminal in the folder.
 2. **Check the tools:** `.\hive setup --check`. Install what is missing with `.\hive setup --install` (add `--ocr` for screenshot masking, `--web` for web tests). Open a **new** terminal afterwards.
@@ -87,10 +87,23 @@ See it end to end with a fictional app: `.\hive demo/phase1/run.sh` (recorded ag
 
 See it with the fictional app: `.\hive demo/phase2/run.sh` (recorded agents, free) or `--live`.
 
+## Choose the tools (stage 3)
+After the design is approved, TestHive groups the module's functional cases marked for automation (Positive, Negative, Localization; Automation Yes or Candidate) into test types (Web UI, API, Android, iOS; a case on Both counts for Android and iOS) and scores the tools for each on fit, ready-made TestHive support, upkeep, running on Windows, your team's skills, evidence and cost. The best total is recommended; you choose, with a reason when it is not the recommended one. No agent is involved, so it is free and the same every time. Accessibility, security and performance cases are counted; tool advice for them comes later.
+```
+.\hive tool-advice SIGNUP                                   the decision matrix
+.\hive tool-advice settings --skills Java,TypeScript         your team's languages (and --weights fit=3,testhive=3,...)
+.\hive stage start SIGNUP tools
+.\hive tool-advice choose SIGNUP "Web UI" Playwright --by "<your name>"
+.\hive tool-advice choose SIGNUP API "REST Assured" --by "<your name>" --reason "<why>"
+.\hive stage submit SIGNUP tools
+.\hive stage approve SIGNUP tools --by "<name>"            frozen as tools/baseline/SIGNUP/v1/
+```
+If the design is approved again later, the choice must be checked and saved again before the tools can be approved. In Studio this is the **Tools** tab: choose per test type, change the weights and skills, **Save the choices** (which submits the stage when every type has a tool), then approve in **Approvals**. See it: `.\hive demo/phase3/run.sh`.
+
 ## TestHive Studio (no terminal needed)
 Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md).
 
-- **As a program (no Python, no terminal):** `testhive-studio-windows.exe`, `-macos` or `-linux` from the Releases page (or build it: `python scripts/build-studio.py`). It opens the last project, or asks for the project folder (**Open a project**, recent projects; **Switch project** in the sidebar); `--project <folder>` opens one directly.
+- **As a program (no Python, no terminal):** `testhive-studio-windows.exe` from the Releases page (or build it: `python scripts/build-studio.py`). It opens the last project, or asks for the project folder (**Open a project**, recent projects; **Switch project** in the sidebar); `--project <folder>` opens one directly.
 - **Review mode:** on a PC without Claude Code or Git Bash the Run buttons are off and the command to hand over is shown; documents, answers, reviews, approvals and Excel work.
 - **Explore the built product** (Sources): records each screen of the address in a hidden browser (free, no AI), logs in first with `TEST_USER` / `TEST_USER_PASSWORD` from `.env` when set, and shows what it found (**Open the report**). A module with only an address runs **Analyse the built product**. Module details save as you type.
 
@@ -102,6 +115,7 @@ Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TE
 - what to do next. Where an agent is needed, **Run** starts it in the background (Claude Code, on your plan, after you confirm): a panel shows its steps live, **Stop** ends it, and saving on that module pauses while it works. **Activity** lists every run with its result, time, cost and log (`runs/agents/`). The same command is still shown, to run it in Claude Code yourself if you prefer;
 - **Analysis:** answer the analyst's questions, or ask your own; the **Requirements** tab lists what the analyst wrote. Once the analysis is approved its questions and answers are read-only until it is reopened;
 - **Design:** review the test cases (**Accept**, **Change** with a comment, **Remove**), see each case's steps and expected result, see coverage and the open questions the cases rely on, add a case, or ask for more cases. Once the design is approved its cases are read-only until it is reopened. A requirement ID anywhere opens the requirement with its questions and cases;
+- **Tools:** the decision matrix per test type, with the recommended tool; choose one per type (a reason when it is not the recommended one), set the criteria weights and your team's languages, and save to submit the stage. Read-only once approved;
 - **Approvals:** see whether a stage passes its rules, then approve, reject or reopen it, signed with your name; the decision log is there too;
 - **Archive a module** added by mistake or no longer tested (bottom of Sources; you type its code and a reason): the module, its documents, questions, cases, baselines and logs move to `archive/<MODULE>-<time>/`, and **Restore** on the start page puts everything back. The same from a terminal: `.\hive stage archive <MODULE> --by "<name>" --comment "<why>"` and `.\hive stage restore <MODULE>-<time> --by "<name>"`.
 
@@ -127,6 +141,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `design-workbook` / `import-review` | Excel workbook for reviewing the cases, and reading your decisions, edits, new cases and requests back |
 | `design-impact` | Lists (and with `--apply` flags) the cases affected when approved requirements change |
 | `score-design` | Benchmark: how many expert test conditions the cases cover |
+| `tool-advice` | Stage 3: the decision matrix per test type, the choice (`choose`), its check (`check`) and the project's weights and team skills (`settings`) |
 | `studio` | Opens TestHive Studio in the browser (local only); `--project <folder>`, `--port N`, `--no-browser` |
 | `check-private` | Fails if a private name from your git-ignored `.private-names` list is in a file that would be published |
 | `run-mobile` / `run-api` / `run-web` | Run a module's tests; each run is stored in `runs/` |
@@ -162,6 +177,7 @@ demo/                one runnable demo per phase       studio/  the Studio page:
 mobile/ api/ web/    test code per platform
 requirements/sources/  your input documents          analysis/  requirements and gap registers
 workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv, requests.csv, baseline/
+tools/               choices.csv, settings.json, baseline/ (the approved tool choice per module)
 runs/                one folder per test run           reports/ reviews/  reports and reviews
 skills/testhive/     optional /testhive skill for the Claude app
 ```

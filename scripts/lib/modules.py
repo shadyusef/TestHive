@@ -7,7 +7,7 @@ Nothing is deleted. Called by scripts/stage.sh (archive, restore), which also mo
 An archive folder holds files/<original path> and rows/<register path> (the module's rows of the shared registers)."""
 import sys, os, re, json, glob, shutil, time, hashlib, fnmatch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design
+import analysis, design, tools
 from analysis import read_csv, write_csv, die
 
 ARCHIVE = os.environ.get("TH_ARCHIVE", "archive")
@@ -17,7 +17,7 @@ NAME = re.compile(r"[A-Z][A-Z0-9]*-\d{8}-\d{6}")  # SIGNUP-20261022-153000
 def registers():
     """The shared registers: one row per item, with a Module column."""
     return [(analysis.REQ_FILE, analysis.REQ_COLS), (analysis.GAP_FILE, analysis.GAP_COLS),
-            (design.CASE_FILE, design.CASE_COLS), (design.ASK_FILE, design.ASK_COLS)]
+            (design.CASE_FILE, design.CASE_COLS), (design.ASK_FILE, design.ASK_COLS), (tools.CHOICE_FILE, tools.CHOICE_COLS)]
 
 
 def owned(m):
@@ -30,7 +30,7 @@ def fixed_paths(m):
     return [os.path.join("requirements", "sources", m), os.path.join("requirements", "modules", f"{m}.json"),
             os.path.join("requirements", "apps", m), os.path.join(analysis.DIR, "sources-text", m),
             os.path.join(analysis.DIR, "exploration", m), os.path.join(analysis.DIR, "baseline", m),
-            os.path.join(design.TC_DIR, "baseline", m), os.path.join(analysis.DIR, f"{m}-analysis.xlsx"),
+            os.path.join(design.TC_DIR, "baseline", m), os.path.join(tools.DIR, "baseline", m), os.path.join(analysis.DIR, f"{m}-analysis.xlsx"),
             os.path.join(design.TC_DIR, f"{m}-design.xlsx")]
 
 
@@ -118,7 +118,8 @@ def restore(dest):
         src = os.path.join(dest, "rows", path)
         if not os.path.exists(src): continue
         rows, extra = read_csv(path, cols), read_csv(src, cols)
-        clash = sorted({r["ID"] for r in rows} & {r["ID"] for r in extra})
+        key = lambda r: r.get("ID") or f"{r['Module']} {r.get('Test Type')}"  # the tool choices have one row per module and test type
+        clash = sorted({key(r) for r in rows} & {key(r) for r in extra})
         if clash: die(f"Not restored: {path} already has {', '.join(clash[:5])}.")
         if any(not mine(r, m) for r in extra): die(f"Not restored: {src} holds rows of another module.")
         plan.append((path, cols, rows + extra))

@@ -1,5 +1,5 @@
 name: studio-program
-# Builds the single TestHive Studio program per operating system, checks it on a fresh project copy, and keeps it as a
+# Builds the single TestHive Studio program for Windows, checks it on a fresh project copy, and keeps it as a
 # download on the run (Actions > the run > Artifacts). On a version tag (v*) it is also attached to that GitHub release.
 on:
   workflow_dispatch:
@@ -9,20 +9,10 @@ permissions:
   contents: write
 jobs:
   build:
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: windows-latest
-            file: testhive-studio.exe
-            asset: testhive-studio-windows.exe
-          - os: macos-latest
-            file: testhive-studio
-            asset: testhive-studio-macos
-          - os: ubuntu-latest
-            file: testhive-studio
-            asset: testhive-studio-linux
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest
+    env:
+      FILE: testhive-studio.exe
+      ASSET: testhive-studio-windows.exe
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -31,23 +21,23 @@ jobs:
       - run: python -m pip install -r requirements.txt pyinstaller
       - run: python scripts/build-studio.py
       - name: Check the program on a fresh project copy
-        run: python tests/studio_program_check.py dist/${{ matrix.file }}
-      - name: Name it for this system, with its SHA-256 checksum
+        run: python tests/studio_program_check.py dist/${{ env.FILE }}
+      - name: Name it, with its SHA-256 checksum
         shell: bash
         run: |
-          mv "dist/${{ matrix.file }}" "dist/${{ matrix.asset }}"
-          python -c "import hashlib,sys; p=sys.argv[1]; print(hashlib.sha256(open(p,'rb').read()).hexdigest() + '  ' + p.split('/')[-1])" "dist/${{ matrix.asset }}" > "dist/${{ matrix.asset }}.sha256"
+          mv "dist/${{ env.FILE }}" "dist/${{ env.ASSET }}"
+          python -c "import hashlib,sys; p=sys.argv[1]; print(hashlib.sha256(open(p,'rb').read()).hexdigest() + '  ' + p.split('/')[-1])" "dist/${{ env.ASSET }}" > "dist/${{ env.ASSET }}.sha256"
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.asset }}
+          name: ${{ env.ASSET }}
           path: |
-            dist/${{ matrix.asset }}
-            dist/${{ matrix.asset }}.sha256
+            dist/${{ env.ASSET }}
+            dist/${{ env.ASSET }}.sha256
       - name: Attach to the release
         if: startsWith(github.ref, 'refs/tags/v')
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-        run: |  # the three builds may all try to create the release; the ones that lose the race just upload
-          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md" || true
-          gh release upload "$GITHUB_REF_NAME" "dist/${{ matrix.asset }}" "dist/${{ matrix.asset }}.sha256" --clobber
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --title "$GITHUB_REF_NAME" --notes "See CHANGELOG.md"
+          gh release upload "$GITHUB_REF_NAME" "dist/${{ env.ASSET }}" "dist/${{ env.ASSET }}.sha256" --clobber

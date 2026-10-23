@@ -13,7 +13,7 @@ function block(name, s, chk) {
       ${s.status === 'approved' ? `<p class="small muted">Approved by ${esc(s.by)} on ${esc(s.at)}</p>` : ''}</div></div>
     ${state}
     ${chk.warnings.length ? `<details class="fold"><summary><b>${chk.warnings.length} warnings</b> <span class="small muted">worth a look; they do not block the approval</span></summary>${list(chk.warnings, 200)}</details>` : ''}
-    ${s.status === 'in_progress' || s.status === 'pending' ? '<p class="small muted">Approval becomes possible when the agent submits this stage.</p>' :
+    ${s.status === 'in_progress' || s.status === 'pending' ? `<p class="small muted">Approval becomes possible when ${name === 'tools' ? 'every choice is saved in the Tools tab' : 'the agent submits this stage'}.</p>` :
       `<div class="decide"><input class="grow" id="c-${name}" placeholder="Comment (required to reject or reopen)" aria-label="Comment on the ${STAGE_LABEL[name].toLowerCase()}">
       ${s.status === 'awaiting_approval' ? `<button class="primary" data-act="approve" data-st="${name}" ${chk.ok ? '' : 'disabled'}>Approve</button><button class="danger" data-act="reject" data-st="${name}">Reject</button>` : ''}
       ${s.status === 'approved' ? `<button data-act="reopen" data-st="${name}">Reopen (requirements changed)</button>` : ''}</div>`}</section>`;
@@ -23,6 +23,7 @@ export function renderApprovals() {
   const d = S.data, st = Object.fromEntries(d.stages.map(s => [s.stage, s]));
   $('#tab').innerHTML = block('analysis', st.analysis, d.analysis.check) +
     block('design', st.design, d.design.check || (d.design.baseline ? null : { ok: false, errors: ['The analysis must be approved first.'], warnings: [] })) +
+    block('tools', st.tools, d.tools.check || { ok: false, errors: ['The design must be approved first.'], warnings: [] }) +
     `<section class="block"><div class="blockhead"><div class="grow"><h2>Decisions</h2><p class="small muted">Also kept in workflow/APPROVALS.md, with the name of whoever decided.</p></div></div>
     <div class="table-wrap"><table class="list"><thead><tr><th>When (UTC)</th><th>Stage</th><th>Decision</th><th>By</th><th class="wide">Comment</th></tr></thead><tbody>
     ${d.approvals.map(a => `<tr><td class="small">${esc(a.When)}</td><td>${esc(a.Stage)}</td><td>${esc(a.Decision)}</td><td class="small">${esc(a.By)}</td><td dir="auto">${esc(a.Comment)}</td></tr>`).join('') || '<tr><td colspan="5" class="muted">No decisions yet.</td></tr>'}

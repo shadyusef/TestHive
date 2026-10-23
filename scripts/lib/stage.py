@@ -21,10 +21,12 @@ def save(s):
     with open(SF + ".tmp", "w", encoding="utf-8", newline="\n") as f: json.dump(s, f, indent=2, ensure_ascii=False)
     os.replace(SF + ".tmp", SF)
 LIBS = {"analysis": ("analysis.py", os.path.join(os.environ.get("TH_ANALYSIS", "analysis"), "requirements.csv")),
-        "design": ("design.py", os.path.join(os.environ.get("TH_CASES", "test-cases"), "TestCases.csv"))}
+        "design": ("design.py", os.path.join(os.environ.get("TH_CASES", "test-cases"), "TestCases.csv")),
+        "tools": ("tools.py", None)}  # None: always checked (the check itself needs the approved design)
+def has_files(st): return st in LIBS and (LIBS[st][1] is None or os.path.exists(LIBS[st][1]))
 def ready(name, st):
     """Runs the stage's own --for-approval check when the stage has one and its files exist. True if fine."""
-    if st not in LIBS or not os.path.exists(LIBS[st][1]): return True
+    if not has_files(st): return True
     sys.stdout.flush()
     return subprocess.run(lib_cmd(LIBS[st][0], "check", name, "--for-approval")).returncode == 0
 def log(module, st, decision, by, comment):
@@ -117,7 +119,8 @@ elif cmd == "submit":
     i = STAGES.index(st)
     if i and m["stages"][STAGES[i - 1]]["status"] != "approved": die(f"BLOCKED: {STAGES[i - 1]} is not approved (it was reopened); approve it first", 2)
     if not ready(pos[0].upper(), st):
-        die("BLOCKED: not ready to submit. Give the workbook to the human, import the review, re-check, then submit.", 2)
+        die("BLOCKED: not ready to submit. " + ("Choose a tool for each test type (tool-advice), then submit." if st == "tools" else
+            "Give the workbook to the human, import the review, re-check, then submit."), 2)
     mark(m, st, "awaiting_approval"); save(s); print(f"{pos[0].upper()} {st}: waiting for human approval")
 elif cmd in ("approve", "reject", "reopen", "archive", "restore") and os.environ.get("TH_JOB"):
     die(f"BLOCKED: {cmd} is a human decision; an agent started from TestHive Studio cannot make it", 2)
@@ -127,13 +130,12 @@ elif cmd in ("approve", "reject"):
     if "by" not in opt: die(f"{cmd} needs --by <name>: decisions are made by a named human")
     if cmd == "reject" and "comment" not in opt: die("reject needs --comment saying what to change")
     if m["stages"][st]["status"] != "awaiting_approval": die(f"{st} is not waiting for approval (it is {m['stages'][st]['status']})", 2)
-    has_files = st in LIBS and os.path.exists(LIBS[st][1])
     if cmd == "approve" and not ready(pos[0].upper(), st): die(f"BLOCKED: the {st} is not ready for approval (see above)", 2)
     status = "approved" if cmd == "approve" else "in_progress"
     mark(m, st, status, opt["by"], opt.get("comment")); save(s)
     log(pos[0].upper(), st, "Approved" if cmd == "approve" else "Rejected", opt["by"], opt.get("comment"))
     print(f"{pos[0].upper()} {st}: {'approved' if cmd == 'approve' else 'rejected, back to in progress'} by {opt['by']}")
-    if cmd == "approve" and has_files:
+    if cmd == "approve" and has_files(st):
         sys.stdout.flush()
         subprocess.run(lib_cmd(LIBS[st][0], "baseline", pos[0].upper(), opt["by"]))
 elif cmd == "reopen":

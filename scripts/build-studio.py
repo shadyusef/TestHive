@@ -1,4 +1,4 @@
-"""Builds the single TestHive Studio program for this operating system with PyInstaller (CI does it for Windows, macOS and Linux).
+"""Builds the single TestHive Studio program with PyInstaller (TestHive targets Windows; CI builds it there).
 Usage: python scripts/build-studio.py      needs: pip install pyinstaller (plus requirements.txt)
 Output: dist/testhive-studio.exe on Windows, dist/testhive-studio elsewhere. The program carries the page (studio/) and every
 library in scripts/lib; it works on any TestHive project folder (--project, the folder it starts in, or the last one opened)."""

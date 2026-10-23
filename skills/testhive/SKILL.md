@@ -35,7 +35,7 @@ Agent definitions live in `.claude/agents/`. In Claude Code the user can also ru
 - Never assume app behaviour; verify on the real app.
 
 ## Workflow
-Stages with a human approval after each (`scripts/stage.sh`): analysis (registers, Excel Q&A, baseline) -> design (cases, pre-review, Excel review, baseline) -> tools -> automation -> execution -> reporting.
+Stages with a human approval after each (`scripts/stage.sh`): analysis (registers, Excel Q&A, baseline) -> design (cases, pre-review, Excel review, baseline) -> tools (decision matrix per test type, human choice, baseline) -> automation -> execution -> reporting.
 Plan -> analysis -> designed cases -> automate P0/P1 first -> run -> triage failures -> review -> fix -> stability run (3 passes in a row) -> final run -> bug report, final test report, brief.
 Loop until the reviewer has no open Blocker or Major finding, then sign off.
 
@@ -54,9 +54,10 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/gate.sh` - definition-of-done check (IDs, required fields, priority, spec files exist; Done needs `reports/stable-<ID>.txt` and a spec with a real assertion). Never sign off on a failing gate.
 - `check-analysis`, `analysis-workbook`, `import-answers` - stage 1 registers and the Excel Q&A loop.
 - `check-design`, `design-workbook`, `import-review`, `design-impact` - stage 2 coverage check, Excel review loop, impact of changed requirements.
-- `studio` - TestHive Studio, a local web page where the user sets up the project, adds modules and documents, answers questions, reviews cases, runs the agents with a button and approves stages without a terminal; it also views, removes and restores documents and archives and restores modules.
+- `studio` - TestHive Studio, a local web page where the user sets up the project, adds modules and documents, answers questions, reviews cases, chooses the tools, runs the agents with a button and approves stages without a terminal; it also views, removes and restores documents and archives and restores modules.
 - `scripts/check-intake.sh` - older projects: flags unfilled intake sections and business rules with no test case.
 - `setup` (`setup.sh` / `setup.ps1`) - prerequisites check and installer (git, node, python + requirements.txt, java 17, maestro, adb, newman, claude code; `--web` Playwright, `--ocr` Tesseract with Arabic).
+- `tool-advice` - stage 3: the decision matrix per test type for the functional cases, the human's choice (`choose`), `check`, `settings` (weights, team skills).
 - `stage` - stage gates and approvals, and archive/restore of a module; `collect-run` - stores runs; `mask` - hides personal data (`suggest`/`review` are for the human only).
 - On Windows every script runs as `.\hive <name> ...`; see README and docs/TROUBLESHOOTING.md.
 - `scripts/selftest.sh` - proves the template is healthy (also runs in CI).

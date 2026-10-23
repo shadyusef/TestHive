@@ -2,7 +2,7 @@
 
 First run these two; most problems show up in them:
 ```
-.\hive setup --check      (macOS/Linux: bash scripts/hive.sh setup --check)
+.\hive setup --check      (Git Bash: bash scripts/hive.sh setup --check)
 .\hive selftest
 ```
 

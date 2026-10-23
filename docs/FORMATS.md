@@ -147,6 +147,20 @@ Written when a human approves the design stage: `TestCases.csv` and `requests.cs
 (`module`, `version`, `approved_by`, `approved_at`, `analysis_baseline` = the analysis version the cases were designed from, counts).
 `scripts/design-impact.sh` compares that analysis version with the latest one and lists the cases linked to changed or removed requirements.
 
+## Tool advice: `tools/` (written by `scripts/tool-advice.sh` and Studio)
+Functional tests only for now. The matrix is computed, not stored: from the latest design baseline, the active cases with Type Positive, Negative,
+Localization (or Functional) and Automation Yes or Candidate, grouped by Platform into test types (Web -> Web UI, API -> API, Android, iOS;
+Both -> Android and iOS). Each tool of the catalogue in `scripts/lib/tools.py` has scores 1-5 per criterion (fit, testhive = ready-made in
+TestHive, upkeep, windows, evidence, cost; skills = 5 when the team knows one of its languages or it needs no code, 1 when it does not, 3 when
+no skills are given); the total is the weighted sum in percent and the highest is recommended.
+- `tools/settings.json` (project-wide): `weights` (each criterion 0-5; defaults fit 3, testhive 3, upkeep 2, windows 2, skills 2, evidence 1,
+  cost 1) and `skills` (languages from the catalogue).
+- `tools/choices.csv`: Module, Test Type, Cases, Recommended, Chosen, Reason (required when Chosen is not the recommended tool), Chosen By,
+  Chosen At, Design Baseline (the design version the choice was made on; a newer design baseline makes the choice stale).
+- `tools/baseline/<MODULE>/v<n>/`: written when a human approves the tools stage: `choices.csv` (the module's rows) and `meta.json`
+  (`module`, `version`, `approved_by`, `approved_at`, `design_baseline`, `settings`, `tools` = test type -> chosen tool).
+Submitting or approving the tools stage needs a valid, current choice for every test type with cases.
+
 ## Design benchmark key (e.g. `demo/phase2/condition-key.csv`)
 Columns `Key`, `Condition`, `Requirement` (`|`-separated REQ IDs; a matching case must link one of them; empty = any case),
 `Keywords` (as in the analysis key; a number must match a whole number, so `7` does not match `17`). `scripts/score-design.sh`

@@ -2,11 +2,7 @@ name: selftest
 on: [push, pull_request]
 jobs:
   selftest:
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
+    runs-on: windows-latest  # TestHive targets Windows; the bash scripts run in Git Bash
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -15,8 +11,7 @@ jobs:
       - run: python -m pip install -r requirements.txt
       - run: bash scripts/selftest.sh
         shell: bash
-      - name: Web tools, so the Studio demos also click through the pages in a real browser (Linux only, to keep the run short)
-        if: runner.os == 'Linux'
+      - name: Web tools, so the Studio demos also click through the pages in a real browser
         run: cd web && npm ci && npx playwright install --with-deps chromium
         shell: bash
       - name: Phase 1 demo (recorded agent run)
@@ -34,14 +29,15 @@ jobs:
       - name: Phase 2d demo (Run buttons, recorded agents)
         run: bash demo/phase2d/run.sh --check
         shell: bash
+      - name: Phase 3 demo (tool advice)
+        run: bash demo/phase3/run.sh --check
+        shell: bash
       - name: Windows launcher
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           .\hive.cmd gen-user
           if ($LASTEXITCODE -ne 0) { exit 1 }
       - name: PowerShell scripts parse
-        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           Get-ChildItem scripts/*.ps1 | ForEach-Object {

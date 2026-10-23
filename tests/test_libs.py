@@ -6,7 +6,7 @@ import os, sys, json, shutil, tempfile, threading, subprocess, unittest, urllib.
 for k in ("TH_STATE", "TH_ANALYSIS", "TH_CASES", "TH_JOB", "TH_ARCHIVE", "TH_CLAUDE_FAKE"): os.environ.pop(k, None)  # defaults only
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
-import analysis, design, intake, modules, studio  # noqa: E402
+import analysis, design, intake, modules, studio, tools  # noqa: E402
 
 BASH = os.environ.get("TH_BASH") or shutil.which("bash")  # selftest passes the Git Bash path on Windows (not WSL's bash)
 REQ_HEAD = ",".join(analysis.REQ_COLS) + "\n"
@@ -265,6 +265,82 @@ class StudioApi(Project):
         self.assertEqual(self.js("/api/module-restore", {"archive": "../../x", "by": "Sara"})[0], 400)
         self.assertEqual(self.js("/api/module-restore", {"archive": a["name"], "by": "Sara"})[0], 200)
         self.assertEqual([m["module"] for m in self.js("/api/overview")[1]["modules"]], ["SIGNUP"])
+
+
+class ToolAdvice(StudioApi):
+    """Stage 3: the matrix from the approved design, the human's choice through Studio, approval, and staleness."""
+    test_page_and_guards = test_module_documents_and_archive = None  # StudioApi's own tests need an empty project
+
+    def setUp(self):
+        super().setUp(); self.stage("init", "SIGNUP")
+        with open(studio.STATE, encoding="utf-8") as f: s = json.load(f)
+        for st in ("analysis", "design"): s["modules"]["SIGNUP"]["stages"][st]["status"] = "approved"
+        self.write(studio.STATE, json.dumps(s))
+        def case(n, platform, typ, auto="Yes", status="Draft"):
+            c = dict.fromkeys(design.CASE_COLS, ""); c.update(ID=f"TC-SIGNUP-00{n}", Module="SIGNUP", Platform=platform, Type=typ, Automation=auto, Status=status, Priority="P1", Tags="smoke")
+            return c
+        self.cases = [case(1, "Web", "Positive"), case(2, "API", "Negative"), case(3, "Both", "Positive", "Candidate"), case(4, "Web", "Security"),
+                      case(5, "Web", "Positive", "No"), case(6, "API", "Positive", status="Removed")]
+        self.v(1)
+
+    def v(self, n):
+        d = os.path.join(design.TC_DIR, "baseline", "SIGNUP", f"v{n}"); os.makedirs(d)
+        analysis.write_csv(os.path.join(d, "TestCases.csv"), design.CASE_COLS, self.cases)
+
+    def save(self, picks, settings=None):
+        return self.js("/api/tools", {"module": "SIGNUP", "version": studio.version("tools"), "by": "Sara", "picks": picks, "settings": settings})
+
+    def test_matrix_groups_functional_cases_by_test_type(self):
+        a = tools.advice("SIGNUP")
+        self.assertEqual([(x["type"], x["cases"]) for x in a["types"]], [("Web UI", 1), ("API", 1), ("Android", 1), ("iOS", 1)])
+        self.assertEqual((a["other"], a["manual"]), (1, 1))
+        self.assertEqual([x["recommended"] for x in a["types"]], ["Playwright", "Postman + Newman", "Maestro", "Maestro"])
+        self.assertEqual(tools.save_settings({}, ["Java"]), [])
+        api = next(x for x in tools.advice("SIGNUP")["types"] if x["type"] == "API")
+        self.assertEqual(next(o for o in api["options"] if o["tool"] == "REST Assured")["scores"]["skills"], 5)
+        self.assertTrue(tools.save_settings({"fit": 9}, ["Cobol"]))
+
+    def test_choose_submit_approve_and_stale(self):
+        all4 = [{"type": t, "tool": tool} for t, tool in (("Web UI", "Playwright"), ("API", "REST Assured"), ("Android", "Maestro"), ("iOS", "maestro"))]
+        code, r = self.save(all4)
+        self.assertEqual(code, 400); self.assertIn("say why", r["errors"][0])
+        all4[1]["reason"] = "The team writes Java"
+        code, r = self.save(all4[:2])
+        self.assertEqual(code, 200, r); self.assertIn("Still to do", r["message"])
+        self.assertEqual(load(studio.STATE)["modules"]["SIGNUP"]["stages"]["tools"]["status"], "in_progress")
+        code, r = self.save(all4[2:])
+        self.assertIn("submitted", r["message"])
+        self.assertEqual(self.stage("approve", "SIGNUP", "tools", "--by", "Omar").returncode, 0)
+        self.assertTrue(os.path.exists(os.path.join(tools.DIR, "baseline", "SIGNUP", "v1", "choices.csv")))
+        self.assertEqual(self.save(all4)[0], 409, "an approved choice is read-only")
+        self.assertTrue(self.js("/api/module?m=SIGNUP")[1]["readiness"]["ready"])
+        self.v(2)  # the design was approved again
+        err = tools.problems("SIGNUP")[0]
+        self.assertEqual(len(err), 4); self.assertIn("changed since", err[0])
+
+    def test_agents_cannot_choose_and_reasons_stay_text(self):
+        r = subprocess.run([BASH, "scripts/tool-advice.sh", "choose", "SIGNUP", "Web UI", "Playwright", "--by", "Sara"], capture_output=True, text=True,
+                           encoding="utf-8", env=dict(os.environ, TH_JOB="x"))
+        self.assertEqual(r.returncode, 2); self.assertIn("human decision", r.stdout); self.assertEqual(tools.choices("SIGNUP"), [])
+        self.assertFalse(tools.choose("SIGNUP", [("Web UI", "Cypress", "=HYPERLINK(1)"), ("API", "Postman + Newman", "")], "Sara"))
+        self.assertEqual([c["Reason"] for c in tools.choices("SIGNUP")], ["'=HYPERLINK(1)", ""])
+        self.assertTrue(tools.choose("SIGNUP", [("Web UI", "Cypress", "x" * 301)], "Sara"))
+        before = studio.version("tools")
+        code, r = self.save([{"type": "Web UI", "tool": "Cypress"}], {"weights": {"fit": 1}, "skills": []})
+        self.assertEqual(code, 400); self.assertEqual(studio.version("tools"), before, "refused picks leave the weights as they were")
+        self.assertEqual(self.save("nope")[0], 400)
+
+    def test_archive_and_restore_keep_the_choices(self):
+        self.assertFalse(tools.choose("SIGNUP", [("Web UI", "Playwright", "")], "Sara"))
+        self.assertEqual(self.stage("archive", "SIGNUP", "--by", "Sara", "--comment", "x").returncode, 0)
+        self.assertEqual(tools.choices("SIGNUP"), [])
+        name = os.listdir(modules.ARCHIVE)[0]
+        r = self.stage("restore", name, "--by", "Sara"); self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertEqual([c["Chosen"] for c in tools.choices("SIGNUP")], ["Playwright"])
+
+
+def load(p):
+    with open(p, encoding="utf-8") as f: return json.load(f)
 
 
 class StudioProjects(StudioApi):

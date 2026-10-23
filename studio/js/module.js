@@ -5,6 +5,7 @@ import { renderSide, setCrumbs } from './shell.js';
 import { renderSources } from './sources.js';
 import { renderAnalysis } from './analysis.js';
 import { renderDesign } from './design.js';
+import { renderTools } from './tools.js';
 import { renderApprovals } from './approvals.js';
 
 /* ---------- Page address: #/MODULE/tab, so a refresh or a bookmark opens the same place ---------- */
@@ -28,7 +29,7 @@ export async function openModule(mod, keepTab) {
   if (!keepTab) { S.tab = d.stages[0].status === 'pending' ? 'sources' : 'analysis'; S.open.clear(); }
   render(); setHash(push); renderSide();
 }
-export const TABS = [['sources', 'Sources'], ['analysis', 'Analysis'], ['design', 'Design'], ['approvals', 'Approvals'], ['activity', 'Activity']];
+export const TABS = [['sources', 'Sources'], ['analysis', 'Analysis'], ['design', 'Design'], ['tools', 'Tools'], ['approvals', 'Approvals'], ['activity', 'Activity']];
 let POLL = null;
 export function jobCard(j) {
   if (!j) return '';
@@ -74,8 +75,8 @@ export function renderActivity() {
   });
 }
 /* ---------- The module header: title, what to do next with its one action, and the stage track ---------- */
-const PHASE = { tools: 3, automation: 4, execution: 5, reporting: 6 };  // stages built in later TestHive phases
-const STAGE_TAB = { analysis: 'analysis', design: 'design' };
+const PHASE = { automation: 4, execution: 5, reporting: 6 };  // stages built in later TestHive phases
+const STAGE_TAB = { analysis: 'analysis', design: 'design', tools: 'tools' };
 const day = iso => { const t = new Date(iso + 'T12:00:00'); return isNaN(t) ? iso : t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
 function stageCell(s, now) {
   const v = s.status === 'approved' ? `Approved${s.by ? ' by ' + s.by : ''}${s.at ? ', ' + day(s.at) : ''}` : s.status === 'awaiting_approval' ? 'Waits for your approval'
@@ -113,7 +114,8 @@ function moduleHeader(d) {
 function tabLabel(t, l, d) {
   const open = d.analysis.gaps.filter(g => g.Status === 'Open').length, cases = d.design.cases.filter(c => c.Status !== 'Removed').length;
   const extra = { sources: d.sources.files.length ? `<span class="c">${d.sources.files.length}</span>` : '',
-    analysis: open ? `<span class="q">${open} open</span>` : '', design: cases ? `<span class="c">${cases}</span>` : '' }[t] || '';
+    analysis: open ? `<span class="q">${open} open</span>` : '', design: cases ? `<span class="c">${cases}</span>` : '',
+    tools: d.tools.advice ? `<span class="c">${d.tools.choices.length}/${d.tools.advice.types.length}</span>` : '' }[t] || '';
   return `<button role="tab" data-tab="${t}" aria-selected="${S.tab === t}" class="${S.tab === t ? 'on' : ''}">${l}${extra}</button>`;
 }
 export function render() {
@@ -126,7 +128,7 @@ export function render() {
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
   document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => go(b.dataset.goto));
   $('#readybtn').onclick = () => showReadiness(d.readiness);
-  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, approvals: renderApprovals, activity: renderActivity })[S.tab]();
+  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, tools: renderTools, approvals: renderApprovals, activity: renderActivity })[S.tab]();
   updateSavebar(); bindStop(); watchJob();
 }
 
@@ -147,5 +149,5 @@ export async function afterSave(r) {
 export function updateSavebar() {
   const n = Object.keys(S.dirty).length, bar = $('#savebar');
   bar.classList.toggle('show', n > 0 && S.view === 'module');
-  $('#savetext').textContent = `${n} unsaved ${S.tab === 'analysis' ? 'answer' : 'review'}${n === 1 ? '' : 's'}`;
+  $('#savetext').textContent = `${n} unsaved ${S.tab === 'analysis' ? 'answer' : S.tab === 'tools' ? 'change' : 'review'}${n === 1 ? '' : 's'}`;
 }

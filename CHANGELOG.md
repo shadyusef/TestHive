@@ -2,6 +2,12 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.11.0 (2026-10-23)
+- Phase 3, tool advice for functional tests: after the design is approved, `tool-advice <MODULE>` (and Studio's new **Tools** tab) groups the functional cases marked for automation into test types (Web UI, API, Android, iOS) and scores the tools for each (Playwright, Selenium, Cypress; Postman + Newman, REST Assured; Maestro, Appium, Espresso, XCUITest) on fit, ready-made TestHive support, upkeep, running on Windows, team skills, evidence and cost. The best total is recommended; a person chooses, with a reason when it is another tool. Weights and the team's languages are set per project (`tools/settings.json`). No agent runs, so it is free.
+- The tools stage is real: it cannot be submitted or approved until every test type has a valid choice made on the current design; approval freezes `tools/baseline/<MODULE>/v<n>/`; a later design approval makes the choice stale until it is checked again. Ready for automation now needs all three approvals. Choices move with a module when it is archived and restored.
+- Windows only from now on: CI runs the selftest and every demo (with the browser click-throughs) on Windows, and builds only `testhive-studio-windows.exe`; the docs no longer describe macOS or Linux.
+- New demo `demo/phase3/run.sh` (also in the selftest and CI).
+
 ## 0.10.0 (2026-10-23)
 - Phase 2g, Studio on its own for colleagues: a single Studio program per system (`testhive-studio.exe` on Windows, also macOS and Linux) that needs no Python. `python scripts/build-studio.py` builds it with PyInstaller; the `studio-program` GitHub workflow builds and checks all three and attaches them to a `v*` release. Studio opens any project folder (`--project`, the folder it starts in, the last one opened, or an **Open a project** page with recent projects and **Switch project**).
 - Review mode: on a PC without Claude Code or Git Bash the Run buttons are off and the command to hand over is shown; documents, answers, reviews, approvals and Excel all work. Studio itself needs no bash (stage rules in `scripts/lib/stage.py`).

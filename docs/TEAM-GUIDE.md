@@ -20,13 +20,11 @@ The person who sets it up reads all of it; everyone else reads their own row and
 4. Commit and push (see **Every day**). Add your colleagues to the GitHub repository (Settings > Collaborators or your organisation's team).
 
 ## Get the Studio program
-- Download it from the TestHive repository's **Releases** page: `testhive-studio-windows.exe`, `testhive-studio-macos` or
-  `testhive-studio-linux`. One file, no Python needed to open it. Keep it anywhere (Desktop, Downloads).
+- Download it from the TestHive repository's **Releases** page: `testhive-studio-windows.exe` (TestHive runs on Windows).
+  One file, no Python needed to open it. Keep it anywhere (Desktop, Downloads).
   No release yet? The QA lead builds it: `python scripts/build-studio.py` (needs `pip install pyinstaller`) makes `dist/testhive-studio.exe`.
 - **Windows** shows "Windows protected your PC" the first time (the program is not code-signed): **More info > Run anyway**.
   Each download has a `.sha256` file next to it: compare it with `certutil -hashfile testhive-studio-windows.exe SHA256`.
-- **macOS**: right-click the file > **Open** the first time (or `chmod +x testhive-studio-macos` and
-  `xattr -d com.apple.quarantine testhive-studio-macos` in Terminal). **Linux**: `chmod +x testhive-studio-linux`.
 - Starting it opens your browser on the last project you opened; the first time it asks for the project folder.
   Keep its window open while you work; closing it stops Studio (and any agent it started).
 - QA engineers can also start Studio from the project folder with `.\hive studio`; both work the same.
@@ -41,7 +39,7 @@ The person who sets it up reads all of it; everyone else reads their own row and
 ## Every day
 1. **Get the latest work first:** GitHub Desktop **Fetch origin > Pull**, or `git pull` in the project folder.
    Do this before you answer, review or press Run.
-2. **Work in Studio.** Sign with your real name (top of the page asks once): answers, reviews and approvals carry it.
+2. **Work in Studio.** Sign with your real name (top of the page asks once): answers, reviews, tool choices and approvals carry it.
 3. **Share your work when you finish** (or before a break): GitHub Desktop **Commit to main > Push origin**, or
    ```
    git add -A
@@ -53,7 +51,7 @@ The person who sets it up reads all of it; everyone else reads their own row and
 **Avoid stepping on each other**
 - Agree who works on which module. One agent run per module at a time across the team: pull, check the module's
   **Activity** tab, then press Run.
-- Answers and reviews of different modules live in the same files (`analysis/gaps.csv`, `test-cases/TestCases.csv`);
+- Answers, reviews and tool choices of different modules live in the same files (`analysis/gaps.csv`, `test-cases/TestCases.csv`, `tools/choices.csv`);
   git usually merges them. If it reports a **conflict**, do not guess: ask the QA lead. After fixing it, run
   `.\hive check-analysis <MODULE>` or `.\hive check-design <MODULE>` and push.
 - Approvals are recorded in `workflow/state.json` and `workflow/APPROVALS.md`; push right after approving so nobody works on

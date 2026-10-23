@@ -7,7 +7,7 @@ import sys, os, re, glob, json, time, hashlib, secrets, shutil, socket, subproce
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, intake, jobs, projects, pyrun
+import analysis, design, intake, jobs, projects, pyrun, tools
 import modules as archive
 from analysis import read_csv, refs
 
@@ -32,7 +32,9 @@ def digest(*paths):
     return h.hexdigest()[:16]
 
 
-def version(kind): return digest(analysis.GAP_FILE) if kind == "analysis" else digest(design.CASE_FILE, design.ASK_FILE)
+def version(kind):
+    return {"analysis": lambda: digest(analysis.GAP_FILE), "design": lambda: digest(design.CASE_FILE, design.ASK_FILE),
+            "tools": lambda: digest(tools.CHOICE_FILE, tools.SETTINGS_FILE)}[kind]()
 
 
 def load_state():
@@ -60,6 +62,8 @@ def check(kind, module):
     try:
         if kind == "analysis":
             err, warn = analysis.problems(module, True)[:2]
+        elif kind == "tools":
+            err, warn = tools.problems(module, True)
         else:
             err, warn = design.problems(module, True)[:2]
     except Exception as e:  # a broken file must not stop the page
@@ -90,10 +94,12 @@ def next_step(module, m, info):
         if status == "approved": continue
         if status == "awaiting_approval":
             chk = info.get(st, {}).get("check")
+            if chk and not chk["ok"] and st == "tools":
+                return step(f"The tool choice waits for approval, but {len(chk['errors'])} things must be handled first (see Approvals and the Tools tab).")
             if chk and not chk["ok"]:
                 act = "analyst-recheck" if st == "analysis" else "design-recheck"
                 return step(f"The {st} waits for approval, but {len(chk['errors'])} things must be handled first (see Approvals).", ACTIONS[act]["command"].format(m=module), act)
-            return step(f"The {st} is ready: check it and approve or reject it in the Approvals tab.")
+            return step(f"The {'tool choice' if st == 'tools' else st} is ready: check it and approve or reject it in the Approvals tab.")
         if st == "analysis":
             if status == "pending":
                 src, mt = info["sources"], info["meta"]
@@ -124,6 +130,12 @@ def next_step(module, m, info):
             if todo or asks:
                 return step(f"Your review is saved ({len(todo)} cases to handle, {len(asks)} open requests): the manual-tester re-checks.", f"/th-manual re-check {module}", "design-recheck")
             return step("Review the cases in the Design tab (Accept, Change or Remove; add cases or requests), then run the manual-tester's re-check.", f"/th-manual re-check {module}", "design-recheck")
+        if st == "tools":
+            n = len(info["tools"]["advice"]["types"]) if info["tools"]["advice"] else 0
+            return step(f"Choose the automation tool for each of the {n} test types in the Tools tab: TestHive recommends one; "
+                        "saving every choice submits it for approval." if n else "No functional cases are marked for automation: "
+                        "submit the tools stage in the Tools tab with nothing to choose, or mark cases for automation (reopen the design).",
+                        f"{RUN} tool-advice {module}")
         return step(f"Stage '{st}' comes in a later TestHive phase.")
     return step("All stages are approved.")
 
@@ -221,6 +233,9 @@ def module_info(module):
             "assumptions": [{"ID": g["ID"], "Severity": g["Severity"], "Question": g["Question"],
                              "Cases": [c["ID"] for c in act if g["ID"] in refs(c["Assumption"])]} for g in allg if g["Status"] == "Open"],
             "check": check("design", module)})
+    adv = tools.advice(module)
+    info["tools"] = {"version": version("tools"), "advice": adv, "choices": tools.choices(module), "criteria": tools.CRITERIA, "langs": tools.LANGS,
+                     "settings": tools.settings(), "check": check("tools", module) if adv else None}
     info["approvals"] = approvals(module)
     a_hist = [h for h in m["stages"]["analysis"]["history"] if h["status"] == "approved"]
     info["meta"] = intake.meta(module)
@@ -257,7 +272,8 @@ def readiness(module, m, info):
         {"label": "Test cases approved", "ok": st["design"] == "approved",
          "detail": f"design baseline {db['version']}, {db.get('active', len(act))} cases" if db and st["design"] == "approved" else "design " + st["design"].replace("_", " ")},
         {"label": "Tools chosen", "ok": st["tools"] == "approved",
-         "detail": "tool advice comes in phase 3" if st["tools"] == "pending" else "tools " + st["tools"].replace("_", " ")}]
+         "detail": "; ".join(f"{c['Test Type']}: {c['Chosen']}" for c in info["tools"]["choices"]) or "nothing to automate"
+                   if st["tools"] == "approved" else "tools " + st["tools"].replace("_", " ")}]
     notes = []
     if act:
         notes.append(f"{sum(1 for c in act if 'smoke' in refs(c['Tags']))} smoke cases to automate first")
@@ -566,6 +582,37 @@ def post_review(h, q, body, module):
     if errors: return h.send(400, {"ok": False, "errors": errors})
     return h.send(200, {"ok": True, "version": version("design"), "message":
                         f"Saved: {decided['Accepted']} accepted, {decided['Change']} to change, {decided['Remove']} to remove, {new_cases} new cases, {new_asks} new requests."})
+
+
+@api("POST", "/api/tools", module="body", busy_check=True)
+def post_tools(h, q, body, module):
+    """Saves the tool choices (and the project's weights and skills); when every test type has a valid choice, submits the stage."""
+    if body.get("version") != version("tools"): return h.send(409, {"error": "the tool choices changed since you opened the page; reload and try again"})
+    st = load_state()["modules"][module]["stages"]
+    if st["design"]["status"] != "approved": return h.send(409, {"ok": False, "message": "Approve the test cases (design) first."})
+    if st["tools"]["status"] == "approved": return h.send(409, {"ok": False, "message": "The tool choice is approved: reopen the tools stage (Approvals) to change it."})
+    cfg, picks = body.get("settings"), body.get("picks") or []
+    if not isinstance(picks, list) or cfg is not None and not (isinstance(cfg, dict) and isinstance(cfg.get("weights", {}), dict) and isinstance(cfg.get("skills", []), list)):
+        return h.send(400, {"ok": False, "errors": ["bad request"]})
+    old = read_bytes(tools.SETTINGS_FILE) if os.path.exists(tools.SETTINGS_FILE) else None
+    if cfg is not None:
+        err = tools.save_settings(cfg.get("weights", {}), [str(x) for x in cfg.get("skills", [])])
+        if err: return h.send(400, {"ok": False, "errors": err})
+    err = tools.choose(module, [(str(p.get("type", "")), str(p.get("tool", "")), str(p.get("reason", ""))) for p in picks if isinstance(p, dict)], str(body.get("by", "")))
+    if err:  # nothing saved: the weights and skills go back too, so the page's version stays right
+        if old is None: os.path.exists(tools.SETTINGS_FILE) and os.remove(tools.SETTINGS_FILE)
+        else:
+            with open(tools.SETTINGS_FILE, "wb") as f: f.write(old)
+        return h.send(400, {"ok": False, "errors": err})
+    if st["tools"]["status"] == "pending":
+        code, out = run_stage(["start", module, "tools"])
+        if code: return h.send(200, {"ok": True, "version": version("tools"), "message": "Saved, but the tools stage did not start: " + out})
+    chk = check("tools", module)
+    if chk["ok"] and load_state()["modules"][module]["stages"]["tools"]["status"] == "in_progress":
+        code, out = run_stage(["submit", module, "tools"])
+        if code == 0: return h.send(200, {"ok": True, "version": version("tools"), "message": "Saved and submitted: approve the tool choice in the Approvals tab."})
+    left = "" if chk["ok"] else f" Still to do: {len(chk['errors'])} (see the Tools tab)."
+    return h.send(200, {"ok": True, "version": version("tools"), "message": "Saved." + left})
 
 
 @api("POST", "/api/module-meta", module="body", busy_check=True)
