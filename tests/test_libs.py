@@ -83,6 +83,43 @@ class Documents(Project):
         self.assertEqual(sorted(f for f in os.listdir(out) if f.endswith(".md")), ["c.txt.md"], "reading again drops text of files that are gone")
 
 
+class ReviewPacks(Project):
+    """An Excel workbook sent to reviewers may come back late, or in two copies: only what each reviewer changed is taken."""
+
+    def setUp(self):
+        super().setUp(); self.stage("init", "LOGIN")
+        self.write(analysis.GAP_FILE, ",".join(analysis.GAP_COLS) + "\n" +
+                   "".join(f"GAP-LOGIN-00{i},LOGIN,,Missing,High,Question {i}?,,,Open\n" for i in (1, 2, 3)))
+
+    def pack(self, name, edits):
+        import openpyxl
+        analysis.cmd_workbook(["LOGIN", name]); wb = openpyxl.load_workbook(name); ws = wb["Gaps"]
+        head = [c.value for c in ws[1]]
+        for row in ws.iter_rows(min_row=2):
+            for col, v in edits.get(row[0].value, {}).items(): row[head.index(col)].value = v
+        wb.save(name)
+
+    def answers(self): return {g["ID"]: g["Answer"] for g in analysis.read_csv(analysis.GAP_FILE, analysis.GAP_COLS)}
+
+    def studio(self, gid, text):
+        self.assertFalse(analysis.apply_answers("LOGIN", [("s", {"ID": gid, "Answer": text, "Answered By": "Sara", "Status": "Answered"})])[2])
+
+    def test_late_packs_keep_newer_answers(self):
+        self.pack("a.xlsx", {"GAP-LOGIN-001": {"Answer": "A1", "Answered By": "Ann"}})
+        self.pack("b.xlsx", {"GAP-LOGIN-002": {"Answer": "B2", "Answered By": "Bob"}})
+        self.studio("GAP-LOGIN-003", "S3")  # answered in Studio after both packs went out
+        analysis.cmd_import(["LOGIN", "a.xlsx"]); analysis.cmd_import(["LOGIN", "b.xlsx"])
+        self.assertEqual(self.answers(), {"GAP-LOGIN-001": "A1", "GAP-LOGIN-002": "B2", "GAP-LOGIN-003": "S3"})
+
+    def test_the_same_answer_changed_twice_is_refused(self):
+        self.pack("c.xlsx", {"GAP-LOGIN-001": {"Answer": "C1", "Answered By": "Cam"}})
+        self.studio("GAP-LOGIN-001", "S1")
+        import io, contextlib
+        out = io.StringIO()
+        with self.assertRaises(SystemExit), contextlib.redirect_stdout(out): analysis.cmd_import(["LOGIN", "c.xlsx"])
+        self.assertIn("also in TestHive", out.getvalue()); self.assertEqual(self.answers()["GAP-LOGIN-001"], "S1")
+
+
 class Archive(Project):
     def setUp(self):
         super().setUp()

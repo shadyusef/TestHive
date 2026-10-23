@@ -133,6 +133,35 @@ def add_sheet(ws, cols, rows, widths, editable=()):
     ws.freeze_panes = "A2"; ws.auto_filter.ref = ws.dimensions
 
 
+PACK = "_pack"  # hidden sheet: the editable values when the workbook was made
+
+
+def add_pack(wb, cols, rows):
+    """Keeps the editable values as they are now, so the import can tell what the reviewer changed (a review pack may come back late)."""
+    ws = wb.create_sheet(PACK); ws.sheet_state = "hidden"; ws.append(cols)
+    for r in rows: ws.append(r)
+
+
+def reviewer_changes(wb, table, current, cols):
+    """The rows of table the reviewer changed, and conflicts: rows changed in the workbook and also in TestHive since it was made.
+    Rows the reviewer left as they were are dropped, so a late workbook never undoes newer work. Without a pack sheet (older
+    workbooks) every row counts, as before. current: {ID: row now in the CSV}."""
+    if PACK not in wb.sheetnames: return table, []
+    rows = list(wb[PACK].iter_rows(values_only=True))
+    head = [str(h or "") for h in rows[0]]
+    snap = {str(r[0]): {h: "" if v is None else str(v).strip() for h, v in zip(head, r)} for r in rows[1:] if r and r[0]}
+    out, conflicts = [], []
+    for n, row in table:
+        orig = snap.get(row.get("ID", ""))
+        if orig is None: out.append((n, row)); continue  # a new row, or an ID the workbook did not have
+        if all(row.get(c, "") == orig.get(c, "") for c in cols): continue
+        now = current.get(row["ID"])
+        if now and any((now.get(c) or "").strip() != orig.get(c, "") for c in cols):
+            conflicts.append(f"{n} ({row['ID']}): changed in this workbook and also in TestHive after the workbook was made"); continue
+        out.append((n, row))
+    return out, conflicts
+
+
 def dropdown(ws, col, values, last=1000):
     from openpyxl.worksheet.datavalidation import DataValidation
     dv = DataValidation(type="list", formula1='"' + ",".join(values) + '"', allow_blank=True)
@@ -156,10 +185,10 @@ def cmd_workbook(a):
     for row in [("TestHive analysis workbook", ""), ("Module", module), ("Created", time.strftime("%Y-%m-%d %H:%M")),
                 ("Requirements", len(reqs)), ("Gaps", len(gaps)), ("Open gaps", sum(1 for g in gaps if g["Status"] == "Open")),
                 ("High gaps not closed", open_high), ("", ""),
-                ("How to answer", "Go to the 'Gaps' sheet. Fill the yellow columns: Answer, Answered By, Status (set Answered)."),
+                ("How to answer", "Go to the 'Gaps' sheet. Fill the yellow columns: Answer, Answered By (your name), Status (set Answered)."),
                 ("", "To add a question of your own, add a row with an empty ID and fill Question, Kind and Severity."),
-                ("", "Save the file, then run: import-answers " + module + " (TestHive reads your answers back)."),
-                ("", "Do not change IDs or the sheet names.")]:
+                ("", "Save the file and send it back to the person who sent it. They upload it in TestHive Studio (Analysis tab, 'upload a filled one')."),
+                ("", "Only the rows you change are taken; answers others gave meanwhile stay. Do not change IDs or the sheet names.")]:
         ws.append(row)
     ws["A1"].font = Font(bold=True, size=14); ws.column_dimensions["A"].width = 24; ws.column_dimensions["B"].width = 100
     sheet(wb.create_sheet("Gaps"), ["ID", "Requirement", "Requirement text", "Kind", "Severity", "Question", "Answer", "Answered By", "Status"],
@@ -174,6 +203,7 @@ def cmd_workbook(a):
     if os.path.exists(src_idx):
         with open(src_idx, encoding="utf-8-sig", newline="") as f: src_rows = [list(r.values()) for r in csv.DictReader(f)]
     sheet(wb.create_sheet("Sources"), ["Source", "Type", "Read from", "Words", "Masked"], src_rows, [45, 10, 55, 8, 8])
+    add_pack(wb, ["ID"] + PACK_GAP, [[g["ID"]] + [g[c] for c in PACK_GAP] for g in gaps])
     wb.save(out)
     print(f"WORKBOOK {out.replace(os.sep, '/')}: {len(reqs)} requirements, {len(gaps)} gaps ({open_high} High not closed)")
 
@@ -214,6 +244,9 @@ def apply_answers(module, rows):
     return changed, added, errors
 
 
+PACK_GAP = ["Answer", "Answered By", "Status"]  # what a reviewer edits on the Gaps sheet
+
+
 def cmd_import(a):
     import openpyxl
     if not a: die("Usage: import-answers.sh <MODULE> [workbook.xlsx]")
@@ -228,6 +261,9 @@ def cmd_import(a):
     if any(h not in head for h in need): die("The 'Gaps' sheet is missing a column: " + ", ".join(h for h in need if h not in head))
     table = [(f"row {n}", {h: ("" if row[i] is None else str(row[i]).strip()) for i, h in enumerate(head) if h})
              for n, row in enumerate(rows[1:], 2) if any(row)]
+    table, conflicts = reviewer_changes(wb, table, {g["ID"]: g for g in read_csv(GAP_FILE, GAP_COLS)}, PACK_GAP)
+    if conflicts: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in conflicts) +
+                      "\nCompare those rows with Studio, then delete those rows from the workbook (or make them match Studio) and upload again.")
     changed, added, errors = apply_answers(module, table)
     if errors: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in errors))
     print(f"IMPORTED {path.replace(os.sep, '/')}: {changed} gaps updated, {added} new questions added. Next: the analyst reviews the answers.")

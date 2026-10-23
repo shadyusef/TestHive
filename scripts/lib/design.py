@@ -4,7 +4,7 @@ Called by scripts/check-design.sh, design-workbook.sh, import-review.sh, design-
 Formats: docs/FORMATS.md (test case sheet, design requests, design workbook, design baselines)."""
 import sys, os, re, csv, json, time
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from analysis import read_csv, write_csv, refs, die, stage_status, add_sheet, dropdown, REQ_COLS, GAP_COLS, DIR as ADIR
+from analysis import read_csv, write_csv, refs, die, stage_status, add_sheet, dropdown, add_pack, reviewer_changes, REQ_COLS, GAP_COLS, DIR as ADIR
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 TC_DIR = os.environ.get("TH_CASES", "test-cases")
@@ -199,7 +199,8 @@ def cmd_workbook(a):
                 ("", "You may also edit a case's text directly (Steps, Expected Result, ...): TestHive marks it Updated."),
                 ("", "To add a case yourself: add a row at the bottom with an empty ID; fill at least Title, Steps and Expected Result."),
                 ("", "To ask TestHive for more cases: sheet 'Requests', a row with an empty ID; fill Request and Requested By."),
-                ("", "Save the file, then run: import-review " + module + ". Do not change IDs or sheet names."),
+                ("", "Save the file and send it back to the person who sent it. They upload it in TestHive Studio (Design tab, 'upload a filled one')."),
+                ("", "Only the rows you change are taken; reviews others made meanwhile stay. Do not change IDs or sheet names."),
                 ("", "'Coverage' shows which cases test each requirement; 'Assumptions' shows open questions the cases rely on.")]:
         ws.append(row)
     ws["A1"].font = Font(bold=True, size=14); ws.column_dimensions["A"].width = 30; ws.column_dimensions["B"].width = 110
@@ -229,6 +230,8 @@ def cmd_workbook(a):
               [14, 18, 60, 18, 9, 50], editable=("Requirement", "Request", "Requested By"))
     add_sheet(wb.create_sheet("Requirements"), ["ID", "Priority", "Type", "Status", "Text"],
               [[r["ID"], r["Priority"], r["Type"], r["Status"], r["Text"]] for r in reqs], [16, 8, 13, 11, 90])
+    pcols = [x for x in ccols if x in EDITABLE or x in ("Review", "Review Comment")]
+    add_pack(wb, ["ID"] + pcols, [[c["ID"]] + [c[x] for x in pcols] for c in cases])
     os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
     wb.save(out)
     print(f"WORKBOOK {out.replace(os.sep, '/')}: {len(act)} active cases, {covered} of {len(cov)} requirements covered, {len(asks)} requests")
@@ -311,8 +314,13 @@ def cmd_import(a):
         return [(f"{label} {n}", {h: ("" if row[i] is None else str(row[i]).strip()) for i, h in enumerate(head) if h})
                 for n, row in enumerate(rows[1:], 2) if any(row)]
 
+    cols = EDITABLE + ["Review", "Review Comment"]
+    cases, conflicts = reviewer_changes(wb, table("Cases", ["ID", "Title", "Steps", "Expected Result", "Review", "Review Comment"], "row"),
+                                        {c["ID"]: c for c in read_csv(CASE_FILE, CASE_COLS)}, cols)
+    if conflicts: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in conflicts) +
+                      "\nCompare those cases with Studio, then delete those rows from the workbook (or make them match Studio) and upload again.")
     decided, edited, new_cases, new_asks, errors = apply_review(
-        module, table("Cases", ["ID", "Title", "Steps", "Expected Result", "Review", "Review Comment"], "row"),
+        module, cases,
         table("Requests", ["ID", "Request", "Requested By"], "Requests row"))
     if errors: die("IMPORT REFUSED, nothing changed:\n" + "\n".join("- " + e for e in errors))
     print(f"IMPORTED {path.replace(os.sep, '/')}: {decided['Accepted']} accepted, {decided['Change']} to change, {decided['Remove']} to remove, "
