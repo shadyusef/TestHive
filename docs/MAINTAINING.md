@@ -24,9 +24,9 @@ You do not need the original author or any chat history; everything is in this r
 | `hive.cmd`, `scripts/hive.sh` | Launcher: `.\hive <name>` runs `scripts/<name>.sh` | Rarely |
 | `scripts/*.sh` | One script per job. Line 2 is its one-line description (shown by `.\hive`); then `# Usage:` lines | Behaviour changes |
 | `scripts/_py.sh` | Finds a Python 3 that really runs (Windows `python3` is often a Store stub) | Never, unless Python lookup breaks |
-| `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline), `modules.py` (archive and restore a module, called by `stage.sh`) | Behaviour changes |
+| `scripts/lib/*.py` | Python code too big for a heredoc: `mask.py` (masking), `ingest.py` (documents to text), `analysis.py` (register check, workbook, import, score, baseline), `uiscreen.py` (Android UI dumps), `design.py` (case check, risk priority, design workbook, import, impact, score, design baseline), `modules.py` (archive and restore a module, called by `stage.sh`), `stage.py` (the stage rules behind `stage.sh`; one command at a time through the lock `workflow/state.json.lock`), `projects.py` (which project folder Studio works on, the recent list), `pyrun.py` (how libraries start each other) | Behaviour changes |
 | `web/explore.mjs` | Web exploration with Playwright (Edge on Windows) | Exploration behaviour changes |
-| `scripts/lib/studio.py`, `studio/` | TestHive Studio lite: a local server (Python standard library, 127.0.0.1 only, token per start) and one page with no libraries or build step (markup in `index.html`, styles and design tokens in `style.css`, fonts in `fonts/` (IBM Plex, SIL OFL), logic in `app.js` and one file per screen in `js/` (`core`, `home`, `module`, `sources`, `analysis`, `design`, `approvals`); no inline scripts are allowed, and only those page files are served). Each API route is a function registered with `@api(method, path, module=, lock=, busy_check=, raw=)`: the dispatcher checks the token, the module and the write lock. Writes only through `analysis.apply_answers`, `design.apply_review`, `intake` and `stage.sh` | A screen or an action changes; keep every rule in the shared functions, never in the page |
+| `scripts/lib/studio.py`, `studio/` | TestHive Studio lite: a local server (Python standard library, 127.0.0.1 only, token per start) and one page with no libraries or build step (markup in `index.html`, styles and design tokens in `style.css`, fonts in `fonts/` (IBM Plex, SIL OFL), logic in `app.js` and one file per screen in `js/` (`core`, `shell`, `home`, `projects`, `module`, `sources`, `analysis`, `design`, `approvals`); no inline scripts are allowed, and only those page files are served). Each API route is a function registered with `@api(method, path, module=, lock=, busy_check=, raw=)`: the dispatcher checks the token, the module and the write lock. Writes only through `analysis.apply_answers`, `design.apply_review`, `intake` and `stage.py` (the logic behind `stage.sh`). `/api/projects` and `/api/open-project` are the project picker; `studio.Server` owns its port (exclusively on Windows). Review mode: `agents_mode()` is `review` when Claude Code or Git Bash is missing; Run is refused and the command is shown | A screen or an action changes; keep every rule in the shared functions, never in the page |
 | `scripts/lib/jobs.py` | Background jobs for Studio: starts `claude --agent ... -p <task> --output-format stream-json` (or a script), turns the event stream into progress lines, Stop kills the whole process tree, one job per module, saved in `runs/agents/<id>/` | How agents are started or shown changes |
 | `scripts/lib/studio_app.py`, `scripts/lib/pyrun.py`, `scripts/build-studio.py`, `.github/workflows/studio-program.yml`, `tests/studio_program_check.py` | The single Studio program: `studio_app.py` is its entry (`--lib <name>.py` runs a library, `--script` a script); libraries start each other only through `pyrun.lib_cmd`, never `[sys.executable, path]`, so the same code runs from source and inside the program; the page comes from `pyrun.bundle_dir`. CI builds it with PyInstaller per OS (manual run, or a `v*` tag attaches it to the release) and checks it on a fresh project copy | A library is added (the build picks up every `scripts/lib/*.py`), or a library starts another one |
 | `ACTIONS` in `scripts/lib/studio.py` | Each Run button: agent, model, task text, usual duration; `next_step` picks the button | A step of the flow changes; keep the task texts in step with the agents' rules and with `demo/phase2d/fake-claude.py` |
@@ -48,6 +48,7 @@ You do not need the original author or any chat history; everything is in this r
 | `requirements.txt` | Python packages | A script needs a new package; add an import check in `setup.sh`/`setup.ps1` |
 | `web/package.json` | Playwright for web tests | Playwright version changes |
 | `.github/workflows/selftest.yml` | CI: selftest on Linux, Windows, macOS; PowerShell parse; Windows launcher | New platform checks |
+| `.github/workflows/studio-program.yml` | Builds testhive-studio per system with PyInstaller (manual run, or a `v*` tag attaches `testhive-studio-windows.exe`, `-macos`, `-linux` to the release) and checks each with `tests/studio_program_check.py` on a fresh project copy | A library is added or the build changes |
 | `VERSION`, `CHANGELOG.md` | Release number and notes | Every release |
 
 ## Conventions for scripts
@@ -75,7 +76,9 @@ You do not need the original author or any chat history; everything is in this r
 | `TH_CASES` | design scripts, `stage` | Test case folder (default `test-cases`) |
 | `TH_SCORE_TARGET` | `score-analysis`, `score-design` | Pass mark in percent (default 80) |
 | `TH_BROWSER_CHANNEL` | `explore-web`, web tests | `msedge` (Windows default), `chrome` or `chromium` |
-| `TH_BASH` | `studio` (set by `studio.sh`) | The bash that runs `stage.sh` for approvals from Studio |
+| `TH_BASH` | `studio` (set by `studio.sh`), the hooks | The bash that runs scripts started from Studio (Explore, the agents' scripts) and the edit-check hook; approvals need no bash |
+| `TH_STUDIO_CONFIG` | `studio` | Per-user settings file with the recent projects (default `%APPDATA%\TestHive\studio.json`, `~/.config/testhive/studio.json` elsewhere); tests and demos set it so they leave your list alone |
+| `TH_LOGIN_USER`, `TH_LOGIN_PASSWORD` | `explore-web` (set by the script from `.env` `TEST_USER`, `TEST_USER_PASSWORD`) | The test login Explore uses; never written to any file |
 | `TH_CLAUDE_FAKE` | `studio` | A stand-in for Claude Code (`demo/phase2d/fake-claude.py`): Run buttons replay recordings |
 | `TH_FAKE_DELAY` | `fake-claude.py` | Seconds between recorded events (default 0.3) |
 | `TH_JOB_MAX_MINUTES` | `studio` | A job is stopped after this many minutes (default 90) |
@@ -110,7 +113,7 @@ You do not need the original author or any chat history; everything is in this r
 ## Testing
 - `.\hive selftest` (or `bash scripts/selftest.sh`): must end with `SELFTEST PASS`. It includes the unit tests in `tests/` (`python -m unittest discover -s tests` runs them alone). Image masking is tested only where Tesseract is installed; otherwise the test says it was skipped. Every temporary folder is removed at the end.
 - `.\hive demo/phase0/run.sh`, `demo/phase1/run.sh`, `demo/phase2/run.sh`: the demos; read the output top to bottom. CI runs the phase 1 and phase 2 demos and `demo/phase2b/run.sh --check` and `demo/phase2c/run.sh --check` and `demo/phase2d/run.sh --check` (Studio API; the browser click-throughs run where the web tools are installed, and in CI on Linux).
-- CI runs the selftest on Linux, Windows and macOS for every push and pull request (GitHub, Actions tab).
+- CI runs the selftest on Linux, Windows and macOS for every push and pull request (GitHub, Actions tab). `python tests/studio_program_check.py <program>` checks a built Studio program (or `scripts/lib/studio_app.py` from source).
 - Not covered by automated tests: real installs (`setup --install`), real Maestro/Newman/Playwright runs against an app, the agents' own work. Check those by hand when they change.
 
 ## Releasing
@@ -119,7 +122,7 @@ Use `/release-phase <version> <branch> "<summary>"`: it runs the steps below in 
 1. All tests pass locally; the demos run; `bash scripts/check-private.sh` passes.
 2. Update `VERSION` and add a `CHANGELOG.md` entry.
 3. Commit, push, and check the Actions tab is green on all three systems.
-4. Tag: `git tag v<version> && git push --tags`.
+4. Tag: `git tag v<version> && git push --tags`. The tag also starts the `studio-program` workflow: check it is green and the three programs are attached to the release.
 5. The repository is a GitHub **template**: users click "Use this template". Existing projects update by copying changed files from the new version (scripts, agents, templates); their own data folders are not touched.
 
 ## Known limitations

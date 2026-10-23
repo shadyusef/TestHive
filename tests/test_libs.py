@@ -320,19 +320,24 @@ class JobsOfAnotherStudio(Project):
 
     def job(self, pid):
         studio.jobs.JOBS.clear()
-        studio.jobs.save({"id": "J1", "module": "LOGIN", "kind": "agent", "status": "running", "started": "x", "pid": pid})
-        studio.jobs.load_history(); return studio.jobs.JOBS["J1"]["status"]
+        studio.jobs.save({"id": "20260101-000000-LOGIN-business-analyst", "module": "LOGIN", "kind": "agent", "status": "running", "started": "x", "pid": pid})
+        studio.jobs.load_history(); return studio.jobs.JOBS["20260101-000000-LOGIN-business-analyst"]["status"]
 
     def test_live_job_stays_running(self):
         p = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)"])
         try:
             self.assertEqual(self.job(p.pid), "running"); self.assertTrue(studio.jobs.running("LOGIN"))
-            self.assertTrue(studio.jobs.stop("J1")); p.wait(10)  # Stop reaches a job this Studio did not start
+            self.assertFalse(studio.jobs.stop("20260101-000000-LOGIN-business-analyst")); self.assertIsNone(p.poll(), "a process number read from a file is never killed")
         finally: p.kill(); studio.jobs.JOBS.clear()
 
     def test_dead_job_is_interrupted(self):
         p = subprocess.Popen([sys.executable, "-c", "pass"]); p.wait()
         self.assertEqual(self.job(p.pid), "interrupted"); studio.jobs.JOBS.clear()
+
+    def test_a_meta_file_that_names_another_folder_is_ignored(self):
+        self.write(os.path.join(studio.jobs.DIR, "20260101-000000-LOGIN-script", "meta.json"),
+                   json.dumps({"id": "../../x", "module": "LOGIN", "status": "running", "pid": "not a number", "started": "x"}))
+        studio.jobs.JOBS.clear(); studio.jobs.load_history(); self.assertEqual(studio.jobs.JOBS, {})
 
 
 class StageLock(Project):
@@ -386,6 +391,7 @@ class ExploreLogin(unittest.TestCase):
         md = self.explore("Secret-123")
         self.assertIn("Login: logged in with TEST_USER", md); self.assertIn("Welcome to the dashboard", md); self.assertIn("Settings page", md)
         self.assertNotIn("You are logged out", md, "the logout link is not followed"); self.assertNotIn("Secret-123", md)
+        self.assertIn("not submitted while logged in", md); self.assertNotIn("Password changed", md, "the account's password form is left alone")
 
     def test_a_wrong_password_is_reported(self):
         md = self.explore("wrong-one")

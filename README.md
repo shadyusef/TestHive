@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.9.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
+> **Status (v0.10.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines) phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single program for colleagues (Windows, macOS, Linux) with review mode, Excel review packs and a team guide. Still being built phase by phase: tool advice, automation scaffolds, HTML reports and a UI: see [docs/ROADMAP.md](docs/ROADMAP.md). Tested on Windows 11. The selftest also runs on Linux and macOS in GitHub Actions; there is no hands-on macOS/Linux test yet.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -90,6 +90,10 @@ See it with the fictional app: `.\hive demo/phase2/run.sh` (recorded agents, fre
 ## TestHive Studio (no terminal needed)
 Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md).
 
+- **As a program (no Python, no terminal):** `testhive-studio-windows.exe`, `-macos` or `-linux` from the Releases page (or build it: `python scripts/build-studio.py`). It opens the last project, or asks for the project folder (**Open a project**, recent projects; **Switch project** in the sidebar); `--project <folder>` opens one directly.
+- **Review mode:** on a PC without Claude Code or Git Bash the Run buttons are off and the command to hand over is shown; documents, answers, reviews, approvals and Excel work.
+- **Explore the built product** (Sources): records each screen of the address in a hidden browser (free, no AI), logs in first with `TEST_USER` / `TEST_USER_PASSWORD` from `.env` when set, and shows what it found (**Open the report**). A module with only an address runs **Analyse the built product**. Module details save as you type.
+
 `.\hive studio` opens a page in your browser, on this PC only. On it you can:
 - **first opening:** describe the project (name, app, platforms, test environment addresses). Studio writes `PROJECT_BRIEF.md`, `CONTEXT.md` and the non-secret `.env` values; passwords and tokens are never typed into Studio;
 - **New module:** give its code and title, and optionally the address of the built product (say whether it is a test environment);
@@ -115,7 +119,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `init-project` | Creates the project files from `templates/` |
 | `stage` | Stage gates and approvals; `archive` / `restore` move a module out of the project and back (nothing is deleted) |
 | `ingest` | Turns a module's documents (text, PDF, Word, Excel, OpenAPI, images) into text for the analyst; `--mask` hides personal data first |
-| `explore-web` / `explore-android` | Record what a built web app (URL) or Android app (APK) actually does, as observed behaviour |
+| `explore-web` / `explore-android` | Record what a built web app (URL) or Android app (APK) actually does, as observed behaviour; the web one logs in with `TEST_USER` / `TEST_USER_PASSWORD` from `.env` when set |
 | `check-analysis` | Checks the requirement and gap registers; `--for-approval` checks they are ready to approve |
 | `analysis-workbook` / `import-answers` | Excel workbook of questions for the business, and reading the answers back |
 | `score-analysis` | Benchmark: how many planted gaps the analyst found |
@@ -123,7 +127,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `design-workbook` / `import-review` | Excel workbook for reviewing the cases, and reading your decisions, edits, new cases and requests back |
 | `design-impact` | Lists (and with `--apply` flags) the cases affected when approved requirements change |
 | `score-design` | Benchmark: how many expert test conditions the cases cover |
-| `studio` | Opens TestHive Studio in the browser (local only) |
+| `studio` | Opens TestHive Studio in the browser (local only); `--project <folder>`, `--port N`, `--no-browser` |
 | `check-private` | Fails if a private name from your git-ignored `.private-names` list is in a file that would be published |
 | `run-mobile` / `run-api` / `run-web` | Run a module's tests; each run is stored in `runs/` |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |

@@ -12,7 +12,10 @@ cd "$(dirname "$0")/.." || exit 1
 case "$URL" in http*|file:*) ;; *) [ -f "$URL" ] && URL="file:///$(cd "$(dirname "$URL")" && pwd -W 2>/dev/null || pwd)/$(basename "$URL")" ;; esac
 OUT="analysis/exploration/$(echo "$MOD" | tr '[:lower:]' '[:upper:]')/web"
 # A test login from .env, when the product needs one: only these two values reach the explorer, and it never writes them down.
-envval() { [ -f .env ] && tr -d '\r' < .env | sed -n "s/^$1=//p" | tail -1; }
+envval() {  # KEY=value or export KEY=value; quotes around the value are dropped
+  [ -f .env ] || return; local v; v=$(tr -d '\r' < .env | sed -n "s/^\(export \)\{0,1\}$1=//p" | tail -1)
+  v="${v#\"}"; v="${v%\"}"; v="${v#\'}"; v="${v%\'}"; printf '%s' "$v"
+}
 TH_LOGIN_USER="$(envval TEST_USER)"; TH_LOGIN_PASSWORD="$(envval TEST_USER_PASSWORD)"
 [ "$TH_LOGIN_PASSWORD" = change-me ] && TH_LOGIN_PASSWORD=""  # the template's placeholder
 export TH_LOGIN_USER TH_LOGIN_PASSWORD

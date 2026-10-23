@@ -40,13 +40,17 @@ async function logIn(url) {  // returns the page it lands on, or null
   const pass = page.locator('input[type=password]:visible').first();
   const user = page.locator('input[type=email]:visible, input[type=text]:visible, input:not([type]):visible').first();
   if (!await pass.count() || !await user.count()) return null;
+  const here = new URL(page.url()), local = ['localhost', '127.0.0.1', '[::1]'].includes(here.hostname);
+  if (origin(page.url()) !== home || !(here.protocol === 'https:' || here.protocol === 'file:' || local)) {  // the password goes nowhere else
+    login = `skipped: the login form is on ${here.protocol}//${here.host}, not the start address's site over https`; return null;
+  }
   await user.fill(LOGIN.user); await pass.fill(LOGIN.password); await pass.press('Enter');
   await page.waitForLoadState('load').catch(() => {}); await page.waitForTimeout(1500);
   if (await page.locator('input[type=password]:visible').count()) {
     const msg = (await visibleMessages()).join('; ');
     login = `failed: the login form was still shown${msg ? ` ("${msg}")` : ''}`; return null;
   }
-  login = `logged in with TEST_USER from .env, landed on ${page.url()}`; return page.url();
+  login = `logged in with TEST_USER from .env, landed on ${page.url().split(/[?#]/)[0]}`; return page.url();  // no query: it may hold a token
 }
 
 async function snapshotForms() {
@@ -121,6 +125,9 @@ while (queue.length && seen.size < maxPages) {
   const forms = await snapshotForms();
   for (const f of forms) {
     f.tries = [];
+    if (login.startsWith('logged in') && (f.fields.some(x => x.type === 'password') || LOGOUT.test(f.action) || f.buttons.some(b => LOGOUT.test(b)))) {
+      f.skipped = 'not submitted while logged in (a password or logout form: it could change or end the test account)'; continue;
+    }
     for (const mode of ['empty', 'invalid'].concat(submitValid ? ['valid'] : [])) {
       const r = await tryForm(url, f.index, mode);
       await page.screenshot({ path: path.join(out, `${n}-form${f.index}-${mode}.png`), fullPage: true });
@@ -152,6 +159,7 @@ for (const p of report) {
       const rules = ['minlength', 'maxlength', 'pattern', 'min', 'max'].filter(k => x[k]).map(k => `${k}=${x[k]}`).concat(x.options ? [`options: ${x.options.join(', ')}`] : []);
       md.push(`| ${x.name} | ${x.label} | ${x.type}${x.inputmode ? ' (' + x.inputmode + ')' : ''} | ${x.required ? 'yes' : 'no'} | ${rules.join('; ')} |`);
     }
+    if (f.skipped) md.push(`- ${f.skipped}`);
     for (const t of f.tries) md.push(`- Submitted **${t.mode}**: ${t.messages.length ? t.messages.map(m => `"${m}"`).join('; ') : 'no message shown'}${t.navigated_to ? ` -> went to ${t.navigated_to}` : ''} (screenshot ${p.n}-form${f.index}-${t.mode}.png)`);
   }
   md.push('', '<details><summary>Visible text</summary>', '', '```', p.text, '```', '</details>', '');

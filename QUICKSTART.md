@@ -32,7 +32,7 @@ This creates `PROJECT_BRIEF.md`, `CONTEXT.md`, `.env`, `workflow/BOARD.md`, `tes
 
 ## 5. Describe your app
 - `CONTEXT.md` (max 30 lines; agents read it instead of long documents): app name, package/bundle id, platforms, environment, how test users are made, known quirks.
-- `.env` (stays on your PC, never committed, agents cannot read it): `APP_ID`, `TEST_ENV`, URLs, device ids.
+- `.env` (stays on your PC, never committed, agents cannot read it): `APP_ID`, `TEST_ENV`, URLs, device ids, and `TEST_USER` / `TEST_USER_PASSWORD` (a test account for Explore and Maestro).
 - Put requirement documents in `requirements/sources/`. If they contain personal data, mask them first (section 8).
 
 ## 6. Connect a device
@@ -57,7 +57,7 @@ Put the module's documents in `requirements/sources/<MODULE>/`, or have a URL / 
 After you approve the analysis, follow **Design the tests** in the README: the manual-tester writes cases linked to the approved requirements, the reviewer checks them, you review them in `test-cases/<MODULE>-design.xlsx` (accept, change, remove, add your own, request more), it re-checks, and you approve. To see it first: `.\hive demo/phase2/run.sh`.
 
 ## 8c. Prefer a browser to a terminal?
-After steps 1 to 3, `.\hive studio` opens TestHive Studio instead of steps 5 to 8: the first page asks for the project details, then **New module**, drop the documents in **Sources**, **Read the documents**, and press **Run** (the button next to what to do next at the top of the module; or copy the command shown there into Claude Code). Answer the questions, review the cases and approve the stages in Studio too. Once a stage is approved its answers or cases are read-only until you reopen it in **Approvals**. See it first with `.\hive demo/phase2d/run.sh` (Run buttons, recorded agents, free) or `.\hive demo/phase2c/run.sh` (an empty project). Claude Code must be installed and signed in once (`claude` in a terminal) for real runs. Documents can be opened, removed and brought back from **Sources** (nothing is deleted); a module added by mistake can be archived and restored. See README, "TestHive Studio".
+After steps 1 to 3, `.\hive studio` opens TestHive Studio instead of steps 5 to 8: the first page asks for the project details, then **New module**, drop the documents in **Sources**, **Read the documents**, and press **Run** (the button next to what to do next at the top of the module; or copy the command shown there into Claude Code). Answer the questions, review the cases and approve the stages in Studio too. Once a stage is approved its answers or cases are read-only until you reopen it in **Approvals**. Studio also runs as one program that needs no Python (see docs/TEAM-GUIDE.md); on a PC without Claude Code it opens in review mode (Run buttons off, everything else works). **Explore the built product** logs in with `TEST_USER` / `TEST_USER_PASSWORD` from `.env` if you set them. See it first with `.\hive demo/phase2d/run.sh` (Run buttons, recorded agents, free) or `.\hive demo/phase2c/run.sh` (an empty project). Claude Code must be installed and signed in once (`claude` in a terminal) for real runs. Documents can be opened, removed and brought back from **Sources** (nothing is deleted); a module added by mistake can be archived and restored. See README, "TestHive Studio".
 
 ## 8d. Working with colleagues
 See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md): who needs what, the single Studio program, sharing the project through git, and reviewers with Excel only.

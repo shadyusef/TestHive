@@ -348,6 +348,8 @@ def get_projects(h, q, body, module):
 @api("POST", "/api/open-project", lock=True)
 def post_open_project(h, q, body, module):
     p = os.path.expanduser(str(body.get("path", "")).strip().strip('"'))
+    if p.startswith(("\\\\", "//")):  # a network share: Windows would send your sign-in to that server just to look
+        return h.send(400, {"ok": False, "message": "Open a project folder on this PC (copy it here with git), not on a network share."})
     if not projects.is_project(p):
         return h.send(400, {"ok": False, "message": "That folder is not a TestHive project: it needs the scripts and templates folders of TestHive "
                                                      "(clone your team's project repository, then open its folder)."})
@@ -536,6 +538,9 @@ def post_run(h, q, body, module):  # under the lock: no save can slip in between
 
 @api("POST", "/api/stop", module="body")
 def post_stop(h, q, body, module):
+    j = jobs.JOBS.get(str(body.get("id", "")))
+    if j and j["status"] == "running" and not j.get("_proc"):
+        return h.send(409, {"ok": False, "message": "Another Studio window started this job: stop it there (or wait for it to finish)."})
     ok = jobs.stop(str(body.get("id", "")))
     return h.send(200 if ok else 400, {"ok": ok, "message": "Stopped. Files the agent already wrote stay as they are." if ok else "That job is not running."})
 
@@ -675,7 +680,7 @@ def main():
     if "--no-browser" not in a: webbrowser.open(url)
     try: srv.serve_forever()
     except KeyboardInterrupt: pass
-    for j in [j for j in jobs.JOBS.values() if j["status"] == "running"]:  # no agent keeps writing unseen
+    for j in [j for j in jobs.JOBS.values() if j["status"] == "running" and j.get("_proc")]:  # this window's agents only
         jobs.stop(j["id"], "stopped because Studio was closed")
     print("Studio stopped.")
 

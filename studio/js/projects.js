@@ -21,7 +21,8 @@ export async function renderProjects() {
       ${r.recent.map(p => `<div class="module-card proj" data-path="${esc(p)}"><div class="mc-name"><button class="link strong">${esc(base(p))}</button><span class="muted">${esc(p)}</span></div>
         <div class="mc-act">${p === r.current ? '<span class="small muted">open now</span>' : '<button class="small">Open</button>'}</div></div>`).join('')}</div></section>` : ''}
     <section class="block"><div class="blockhead"><div class="grow"><h2>Open a folder</h2>
-      <p class="small muted">Paste the folder's full path, for example C:\\Projects\\my-project. In File Explorer: hold Shift, right-click the folder, Copy as path.</p></div></div>
+      <p class="small muted">Paste the folder's full path, for example C:\\Projects\\my-project. In File Explorer: hold Shift, right-click the folder, Copy as path.</p>
+      <p class="small muted">Open only a copy of your team's own project repository: the Run buttons start that folder's scripts and agents on this PC.</p></div></div>
       <div class="decide"><input id="pp" class="grow" placeholder="Folder path" aria-label="Project folder path" spellcheck="false" autocomplete="off"><button class="primary" id="ppgo">Open</button></div></section>
     <details class="fold"><summary><b>No project folder yet?</b> <span class="small muted">get your team's copy, or start a new one</span></summary>
       <p>Your team keeps each project in a git repository. Copy it to this PC once, then open its folder here:</p>

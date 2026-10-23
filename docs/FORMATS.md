@@ -5,6 +5,7 @@ Every chain is linked by IDs: `REQ` -> `GAP` -> `TC` -> run `R-...` -> `BUG`.
 
 ## Stage state: `workflow/state.json` (written by `scripts/stage.sh`)
 One entry per module. Stages in order: `analysis`, `design`, `tools`, `automation`, `execution`, `reporting`.
+`workflow/state.json.lock` exists only while a stage command runs (one at a time; a lock older than 2 minutes is removed; not committed).
 Each stage: `status` (`pending`, `in_progress`, `awaiting_approval`, `approved`) and a `history` of
 `{at, status, by, comment}`. A stage cannot start until the previous one is `approved`.
 Approve and reject need a named person (`--by`); a reject needs a comment.
@@ -41,7 +42,13 @@ Both are logged in `workflow/APPROVALS.md` (stage `-`). APKs and agent logs stay
 ## Exploration: `analysis/exploration/<MODULE>/web|android/`
 `exploration.md` (for the analyst), screenshots, and for web `exploration.json` (pages, form fields with their HTML
 rules, messages after empty / invalid / valid submissions); for Android one `NN-name.png` + `NN-name.xml` (UI dump)
-per recorded screen. Everything there is observed behaviour, not confirmed requirements.
+per recorded screen. Everything there is observed behaviour, not confirmed requirements. The web `exploration.md` has a
+`Login:` line (not set, not tried, failed, or logged in with `TEST_USER` from `.env`); the password is never written. If the start
+page cannot be opened, the explorer prints `NOT EXPLORED:` and exits with an error.
+
+## Studio settings: `studio.json` (per user, outside any project)
+`%APPDATA%\TestHive\studio.json` on Windows, `~/.config/testhive/studio.json` elsewhere (`TH_STUDIO_CONFIG` overrides):
+`{"recent": [project folders, newest first]}`. Remembering is a convenience: Studio works without it.
 
 ## Requirements register: `analysis/requirements.csv`
 | Column | Values |
@@ -77,7 +84,9 @@ To confirm gap. With `--for-approval`: every High gap Closed, no Answered gap le
 ## Analysis workbook: `analysis/<MODULE>-analysis.xlsx` (written by `scripts/analysis-workbook.sh`)
 Sheets: Cover (counts and how to answer), Gaps (yellow columns Answer, Answered By, Status are for the human; a row
 with an empty ID is a new question), Requirements, Sources. `scripts/import-answers.sh` reads the Gaps sheet back;
-if any row is invalid nothing is changed. Arabic cells are right-aligned.
+if any row is invalid nothing is changed. Arabic cells are right-aligned. A hidden sheet `_pack` keeps the editable values as they
+were when the workbook was made: the import takes only the rows the reviewer changed, and refuses (listing them) rows also changed
+in TestHive since. A workbook without `_pack` (older) imports every row.
 
 ## Baselines: `analysis/baseline/<MODULE>/v<n>/`
 Written when a human approves the analysis stage: `requirements.csv` and `gaps.csv` (the module's rows at that
@@ -129,7 +138,8 @@ Requirement, Request, Requested By, Status (Open, Done), Response (the case IDs 
 Sheets: Cover (counts, coverage, how to review), Cases (yellow Review and Review Comment; edit any case text directly; a row
 with an empty ID and a Title is a new case), Coverage (per requirement: its cases, whether a needed negative or boundary
 case exists, its open gaps), Assumptions (open gaps and the cases relying on them), Requests (a row with an empty ID is a new
-request), Requirements (the baseline). `scripts/import-review.sh` reads Cases and Requests back; if any row is invalid nothing is changed.
+request), Requirements (the baseline). `scripts/import-review.sh` reads Cases and Requests back; if any row is invalid nothing is changed. The hidden `_pack`
+sheet works as in the analysis workbook: only the rows the reviewer changed are taken, rows changed in both places are refused.
 
 ## Design baselines: `test-cases/baseline/<MODULE>/v<n>/`
 Written when a human approves the design stage: `TestCases.csv` and `requests.csv` (the module's rows) and `meta.json`

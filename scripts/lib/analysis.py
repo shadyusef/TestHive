@@ -148,6 +148,7 @@ def reviewer_changes(wb, table, current, cols):
     workbooks) every row counts, as before. current: {ID: row now in the CSV}."""
     if PACK not in wb.sheetnames: return table, []
     rows = list(wb[PACK].iter_rows(values_only=True))
+    if not rows: return table, []  # a damaged snapshot: treat it as an older workbook
     head = [str(h or "") for h in rows[0]]
     snap = {str(r[0]): {h: "" if v is None else str(v).strip() for h, v in zip(head, r)} for r in rows[1:] if r and r[0]}
     out, conflicts = [], []
