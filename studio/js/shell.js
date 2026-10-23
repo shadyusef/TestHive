@@ -1,6 +1,7 @@
 // The frame around every screen: the sidebar (project, modules and what each waits for) and the top bar (where you are).
 import { S, $, esc, api, STAGE_LABEL, confirmLeave } from './core.js';
 import { home, renderNewModule } from './home.js';
+import { renderProjects } from './projects.js';
 import { openModule } from './module.js';
 
 /* One line per module: what it waits for now. */
@@ -16,6 +17,7 @@ export function waits(m) {
 export async function renderSide(ov, arch) {
   [ov, arch] = await Promise.all([ov || api('/api/overview'), arch || api('/api/archive')]);
   if (ov.status !== 200) return;
+  $('#newmod-side').hidden = $('#projbtn').hidden = false;
   S.agents = ov.agents;
   $('#project').textContent = ov.setup.setup_needed ? 'Studio' : ov.project;
   $('#mods').innerHTML = ov.modules.map(m => `<a class="nav ${S.view === 'module' && S.module === m.module ? 'on' : ''}" href="#/${esc(m.module)}" data-side="${esc(m.module)}"
@@ -44,4 +46,5 @@ export function bindShell() {
   $('#brand').onclick = e => { e.preventDefault(); closeMenu(); confirmLeave(home); };
   $('#newmod-side').onclick = () => { closeMenu(); confirmLeave(renderNewModule); };
   $('#archbtn').onclick = () => { closeMenu(); confirmLeave(() => home({ archived: true })); };
+  $('#switchbtn').onclick = () => { closeMenu(); confirmLeave(renderProjects); };
 }

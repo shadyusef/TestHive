@@ -21,6 +21,7 @@ export function route() {
 
 export async function openModule(mod, keepTab) {
   const d = await api('/api/module?m=' + encodeURIComponent(mod));
+  if (d.no_project) return home();
   if (d.status !== 200) { toast(d.error === 'unknown module' ? `There is no module ${mod} (it may be archived).` : d.error || 'Could not load the module', 'bad'); return home(); }
   const push = !(S.view === 'module' && S.module === mod);
   S.view = 'module'; S.module = mod; S.data = d; S.dirty = {}; S.agents = d.agents;

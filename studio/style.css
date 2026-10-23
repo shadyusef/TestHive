@@ -109,6 +109,9 @@ button.link:hover { color: var(--text); text-decoration: underline; }
 .mc-state { display: flex; align-items: center; gap: 10px; }
 .mc-counts { display: flex; gap: 14px; white-space: nowrap; } .mc-counts b { color: var(--text); font-weight: 500; }
 .mc-act { justify-self: end; } .mc-act .pulse { display: inline-block; }
+.picker .block { margin: 28px 0 0; } .picker details.fold { margin-top: 28px; }
+.module-card.proj { grid-template-columns: minmax(0, 1fr) auto; }
+.formpage code, .module-card.proj .muted { overflow-wrap: anywhere; }
 .minitrack { display: inline-flex; gap: 3px; } .minitrack i { width: 18px; height: 4px; border-radius: 2px; background: var(--control); }
 .minitrack i.done { background: var(--text); } .minitrack i.now { background: var(--accent); }
 .formpage { max-width: 760px; } .formpage .form { margin-top: var(--gap); }

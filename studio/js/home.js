@@ -2,6 +2,7 @@
 import { store, S, $, esc, api, toast, me, showMe, askName, ask, STAGE_LABEL } from './core.js';
 import { renderSide, setCrumbs, waits } from './shell.js';
 import { setHash, openModule, updateSavebar } from './module.js';
+import { renderProjects } from './projects.js';
 
 /* The two stages TestHive has today, as a small track: done, now, or still to come. */
 const miniTrack = stages => `<span class="minitrack" aria-hidden="true">${stages.slice(0, 2).map(s =>
@@ -10,6 +11,7 @@ const miniTrack = stages => `<span class="minitrack" aria-hidden="true">${stages
 export async function home(opts = {}) {
   S.view = 'home'; S.module = null; S.dirty = {}; updateSavebar(); setHash(true);
   const [d, arch] = await Promise.all([api('/api/overview'), api('/api/archive')]);
+  if (d.no_project) return renderProjects();
   if (d.status !== 200) return $('#main').innerHTML = `<div class="msg bad">${esc(d.error || 'Studio could not load. Open the address printed in the Studio window.')}</div>`;
   renderSide(d, arch); setCrumbs([['Modules']]);
   if (d.setup.setup_needed) return renderSetup(d.setup, true);

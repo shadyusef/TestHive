@@ -31,6 +31,14 @@ echo "Studio started at ${URL%%\?*} (address with access key hidden)"
 if [ -d web/node_modules/@playwright/test ]; then
   echo "--- the screens, clicked through in a real browser (screenshots go to demo/phase2b/output/)"
   node web/studio-smoke.mjs "$URL" "$SRC/demo/phase2b/output" || { echo "UI smoke test failed"; exit 1; }
+  echo "--- Studio started outside any project: choose the project folder in the page"
+  E=$(mktemp -d); LOG2="$E/studio.log"
+  (cd "$E" && TH_STUDIO_CONFIG="$E/studio.json" exec $PY "$W/scripts/lib/studio.py" --no-browser --port 0 > "$LOG2" 2>&1) & S2=$!
+  for i in $(seq 1 150); do grep -q "^STUDIO " "$LOG2" 2>/dev/null && break; sleep 0.2; done
+  URL2=$(sed -n 's/^STUDIO //p' "$LOG2"); [ -n "$URL2" ] || { cat "$LOG2"; echo "Studio without a project did not start"; exit 1; }
+  grep -q "No project yet" "$LOG2" || { cat "$LOG2"; echo "Studio opened a project it should not have"; exit 1; }
+  node web/studio-projects-smoke.mjs "$URL2" "$(cygpath -w "$W" 2>/dev/null || echo "$W")" "$SRC/demo/phase2b/output" || { echo "Project picker check failed"; exit 1; }
+  kill $S2 2>/dev/null; wait $S2 2>/dev/null; rm -rf "$E" 2>/dev/null || true
 else
   echo "(web tools not installed: skipping the browser click-through; install with setup --install --web)"
 fi

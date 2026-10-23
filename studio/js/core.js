@@ -18,6 +18,7 @@ export async function api(path, opts = {}) {
   return { status: r.status, ...body };
 }
 export function toast(text, kind = 'ok') {
+  document.querySelectorAll('.toast').forEach(t => t.remove());  // the newest message replaces the last
   const d = document.createElement('div'); d.className = `msg ${kind} toast`; d.textContent = text; document.body.appendChild(d);
   setTimeout(() => d.remove(), kind === 'ok' ? 3500 : 9000);
 }
