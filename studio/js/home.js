@@ -57,14 +57,14 @@ export function renderSetup(p, first) {
     <h1>${first ? 'Welcome to TestHive' : 'Project details'}</h1>
     <p class="finding">${first ? 'Tell TestHive about the product you are testing. You can change this later (Project, in the sidebar).' : 'These facts are shared with the agents (CONTEXT.md).'}</p>
     <div class="form">
-      <label for="p-project">Project name</label><input id="p-project" dir="auto" value="${esc(p.project)}" placeholder="Nakhla Rewards">
-      <label for="p-app">App name</label><input id="p-app" dir="auto" value="${esc(p.app)}" placeholder="Nakhla">
+      <label for="p-project">Project name</label><input id="p-project" dir="auto" value="${esc(p.project)}" placeholder="Name of the project">
+      <label for="p-app">App name</label><input id="p-app" dir="auto" value="${esc(p.app)}" placeholder="Name of the product under test">
       <label>Platforms</label><span class="bar">${plat.map(x => `<label class="check"><input type="checkbox" class="p-plat" value="${x}" ${p.platforms.includes(x) ? 'checked' : ''}> ${x}</label>`).join('')}</span>
       <label for="p-env">Environment name</label><input id="p-env" value="${esc(p.test_env)}" placeholder="staging">
       <label for="p-web">Web address</label><input id="p-web" value="${esc(p.base_url)}" placeholder="https://staging.example.com">
       <label for="p-api">API address</label><input id="p-api" value="${esc(p.api_url)}" placeholder="https://api.staging.example.com">
       <label for="p-appid">Android package</label><input id="p-appid" value="${esc(p.app_id)}" placeholder="com.company.app (optional)">
-      <label for="p-me">Your name</label><input id="p-me" value="${esc(me())}" placeholder="Sara (QA lead)">
+      <label for="p-me">Your name</label><input id="p-me" value="${esc(me())}" placeholder="Your name and role">
       <span></span><span class="small muted">Passwords and tokens are never typed here: add them to the .env file yourself when a test needs them.</span>
       <span></span><span class="bar"><button class="primary" id="p-save">${first ? 'Create project' : 'Save'}</button>${first ? '' : '<button id="p-cancel">Cancel</button>'}</span>
     </div></div>`;
@@ -86,9 +86,9 @@ export function renderNewModule() {
   $('#main').innerHTML = `<div class="formpage">
     <h1>New module</h1><p class="finding">One part of the product, tested on its own. Next you add its documents (and an APK if you have one).</p>
     <div class="form">
-      <label for="m-code">Module code</label><input id="m-code" class="upper" placeholder="SIGNUP">
-      <label for="m-title">Title</label><input id="m-title" dir="auto" placeholder="Sign-up and mobile verification">
-      <label for="m-url">Built product (optional)</label><input id="m-url" placeholder="https://staging.example.com/signup">
+      <label for="m-code">Module code</label><input id="m-code" class="upper" placeholder="2 to 20 letters and digits">
+      <label for="m-title">Title</label><input id="m-title" dir="auto" placeholder="What this part of the product does">
+      <label for="m-url">Built product (optional)</label><input id="m-url" placeholder="https://test.example.com/page">
       <span></span><label class="check"><input type="checkbox" id="m-test"> This address is a test environment (the analyst may submit forms with test data)</label>
       <span></span><label class="check"><input type="checkbox" id="m-mask"> The documents contain personal data: mask it before the AI reads them</label>
       <span></span><span class="bar"><button class="primary" id="m-save">Add module</button><button id="m-cancel">Cancel</button></span>

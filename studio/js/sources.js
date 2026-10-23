@@ -28,7 +28,7 @@ export function renderSources() {
     <section class="block"><div class="blockhead"><div class="grow"><h2>Built product <span class="muted">optional</span></h2>
       <p class="small muted">If the product is already built, the analyst also explores it during its first pass.</p></div></div>
       <div class="form">
-      <label for="u-url">Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://staging.example.com/signup">
+      <label for="u-url">Web address</label><input id="u-url" value="${esc(mt.url)}" placeholder="https://test.example.com/page">
       <span></span><label class="check"><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
       <label>Android app</label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="link accent">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
       <label for="u-title">Module title</label><input id="u-title" dir="auto" value="${esc(mt.title)}">

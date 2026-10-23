@@ -107,7 +107,7 @@ function renderRequests() {
     </tbody></table></div>`;
   if (designApproved()) return $('#dtab').innerHTML = `<p class="small muted">The design is approved: new cases and requests wait until it is reopened.</p>${list}`;
   $('#dtab').innerHTML = `<section class="block"><div class="blockhead"><div class="grow"><h2>Ask TestHive for more cases</h2><p class="small muted">The manual tester answers at its next re-check.</p></div></div><div class="form">
-      <label for="rq">What is missing?</label><textarea id="rq" dir="auto" rows="2" placeholder="e.g. Add cases for pasting the code into the first box"></textarea>
+      <label for="rq">What is missing?</label><textarea id="rq" dir="auto" rows="2" placeholder="The scenario or rule that has no case yet"></textarea>
       <label for="rqr">Requirement (optional)</label><input id="rqr" list="dreq"><span></span><span><button id="rqadd">Send request</button></span></div></section>
     <section class="block"><div class="blockhead"><div class="grow"><h2>Requests</h2></div></div>${list}</section>
     <details class="fold"><summary><b>Add a case yourself</b> <span class="small muted">the manual tester completes the type, technique and risk at its re-check</span></summary><div class="form">

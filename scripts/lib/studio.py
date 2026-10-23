@@ -486,7 +486,7 @@ def post_project(h, q, body, module):
 def post_module_new(h, q, body, module):
     code = str(body.get("module", "")).strip().upper()
     if not re.fullmatch(r"[A-Z][A-Z0-9]{1,19}", code):
-        return h.send(400, {"ok": False, "message": "Module code: 2 to 20 letters and digits, starting with a letter (for example SIGNUP)."})
+        return h.send(400, {"ok": False, "message": "Module code: 2 to 20 letters and digits, starting with a letter."})
     if code in load_state()["modules"]: return h.send(400, {"ok": False, "message": f"{code} already exists."})
     m, err = intake.clean_meta(code, body)
     if err: return h.send(400, {"ok": False, "message": err})

@@ -75,7 +75,7 @@ def show(name, m):
 if cmd == "init":
     if len(pos) != 1: die("Usage: stage.sh init <MODULE>")
     name = pos[0].upper()
-    if not re.fullmatch(r"[A-Z0-9]+", name): die("Module code: letters and digits only, e.g. SIGNUP")
+    if not re.fullmatch(r"[A-Z0-9]+", name): die("Module code: letters and digits only")
     if name in s["modules"]: die(f"{name} already exists", 0)
     s["modules"][name] = {"created": now(), "stages": {st: {"status": "pending", "history": []} for st in STAGES}}
     save(s); print(f"Module {name} added. Next: {RUN} start {name} analysis")
@@ -144,7 +144,7 @@ elif cmd in ("archive", "restore"):
         log(name, "-", "Archived", opt["by"], f"{opt['comment']} (kept in {dest.replace(os.sep, '/')}/, fingerprint {fp})")
         print(f"{name}: archived by {opt['by']}. Restore with: {RUN} restore {os.path.basename(dest)} --by <name>")
     else:
-        if not re.fullmatch(r"[A-Z][A-Z0-9]*-\d{8}-\d{6}", pos[0]): die(f"Unknown archive {pos[0]}: give the folder name, e.g. SIGNUP-20261022-153000")
+        if not re.fullmatch(r"[A-Z][A-Z0-9]*-\d{8}-\d{6}", pos[0]): die(f"Unknown archive {pos[0]}: give the folder name (module code, date and time, as listed by the archive)")
         dest = os.path.join(arch, pos[0])
         if not os.path.exists(os.path.join(dest, "state.json")): die(f"No archived module in {dest}/")
         with open(os.path.join(dest, "state.json"), encoding="utf-8") as f: m = json.load(f)

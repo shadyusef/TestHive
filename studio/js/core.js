@@ -28,7 +28,7 @@ export function askName(then) {
   const m = document.createElement('div'); m.className = 'modal';
   m.innerHTML = `<div class="dialog"><h2>Who are you?</h2>
     <p class="muted small">Your name signs your answers, reviews and approvals (as in the approvals log). It stays in this browser.</p>
-    <input id="nm" class="full" placeholder="e.g. Sara (QA lead)" aria-label="Your name" value="${esc(me())}">
+    <input id="nm" class="full" placeholder="Your name and role" aria-label="Your name" value="${esc(me())}">
     <p class="buttons"><button class="primary" id="nmok">Continue</button></p></div>`;
   document.body.appendChild(m); const inp = m.querySelector('#nm'); inp.focus();
   const done = () => { const v = inp.value.trim(); if (!v) return inp.focus(); store.set('th-name', v); m.remove(); showMe(); then && then(); };
