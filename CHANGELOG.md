@@ -2,6 +2,12 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.17.0 (2026-10-24)
+- Phase 7a, the agents' questions in Studio: an agent started from Studio no longer just fails when it wants something its rules do not allow. Claude Code asks TestHive (`--permission-prompt-tool`, served by `scripts/lib/ask.py`, a small MCP server; nothing installed), and the job panel shows the question with the full command or file: **Allow once** or **Deny**, with a note to the agent, signed. No answer in 10 minutes (`TH_ASK_MINUTES`) is a No. Deny rules, the hooks and the blocked commands still apply before any question; agents cannot write the answers (the hook protects `runs/agents/`). Questions and answers are kept in the job's folder and its log.
+- Phase 7b, Android exploration from Studio: **Explore the app** in Sources (after uploading the APK) starts the analyst on the Android device you pick from those adb sees; it installs the app (`explore-android.sh ... packages` finds it) and walks its screens. Sources shows the recorded screens and the report.
+- New demo `demo/phase7/run.sh` (recorded agents: one asks twice, the person allows and denies; one explores two screens on a stand-in device), in the selftest and CI.
+- Roadmap: 3b, 5c, 6b and 8 are not planned (owner decision); the roadmap is complete.
+
 ## 0.16.0 (2026-10-24)
 - Phase 6a, reporting: one bug register for the project, `reports/bugs.csv` (`bug add | status | list`, or Studio's new **Reports** tab; **Report a bug** on a failed case in the Execution tab fills it in). A person's report links the bug to the failed tests of the open cycle; marking it Fixed asks for their retest. The defect-triage agent writes its bugs there instead of `reports/BUG_REPORT.md`.
 - `report <MODULE>`: one self-contained HTML test report of the approved test cycle (opens offline, prints to PDF): TestHive's Go / No-go suggestion with its reasons and the risks to accept, the results, the bugs, the requirements that passed or fail, the pass rate per cycle and per run, small failure screenshots, and the agents' cost per stage. Studio opens it sandboxed.

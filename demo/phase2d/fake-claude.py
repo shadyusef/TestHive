@@ -26,9 +26,34 @@ def copy(src, dst):
 
 emit({"type": "system", "subtype": "init", "model": "recorded", "tools": ["Bash", "Read", "Write", "Edit"]})
 say(f"(recorded {agent} run for {module})")
+if os.environ.get("TH_FAKE_ASK") and "--permission-prompt-tool" in a:  # phase 7: ask the person through Studio, as Claude Code does
+    srv = json.loads(a[a.index("--mcp-config") + 1])["mcpServers"]["testhive"]
+    p = subprocess.Popen([srv["command"]] + srv["args"], stdin=subprocess.PIPE, stdout=subprocess.PIPE, text=True, env=dict(os.environ, **srv.get("env", {})))
+    def rpc(i, method, params=None):
+        p.stdin.write(json.dumps({"jsonrpc": "2.0", "id": i, "method": method, "params": params or {}}) + "\n"); p.stdin.flush()
+        return json.loads(p.stdout.readline())
+    rpc(1, "initialize", {"protocolVersion": "2024-11-05", "capabilities": {}, "clientInfo": {"name": "recorded"}})
+    outcome = []
+    for n, (name, inp) in enumerate((("Bash", {"command": "npx playwright test --headed"}), ("Write", {"file_path": "web/playwright.config.ts", "content": "// changed"})), 2):
+        say(f"I need {name}: {json.dumps(inp)}")
+        r = json.loads(rpc(n, "tools/call", {"name": "approve", "arguments": {"tool_name": name, "input": inp}})["result"]["content"][0]["text"])
+        outcome.append(r["behavior"]); say(f"{name}: {r['behavior']}" + (f" ({r['message']})" if r.get("message") else ""))
+    p.stdin.close(); p.wait(timeout=10)
+    emit({"type": "result", "is_error": False, "result": "Asked twice: " + ", ".join(outcome), "total_cost_usd": 0.01}); sys.exit(0)
 if module != "SIGNUP":
     say("The recorded runs only exist for module SIGNUP."); emit({"type": "result", "is_error": True, "result": "No recording for this module.", "total_cost_usd": 0}); sys.exit(1)
-if agent == "business-analyst" and "answered questions" not in t:
+if agent == "business-analyst" and "explore the android app only" in t:  # phase 7: two recorded screens (no phone here)
+    out = f"analysis/exploration/{module}/android"; os.makedirs(out, exist_ok=True)
+    png = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000" "1f15c4890000000d4944415478da63f8cfc0f01f0005000201" "a7c9a6b80000000049454e44ae426082")
+    sh(["scripts/explore-android.sh", module, "packages"])
+    md = ["# Android exploration", "Everything below is OBSERVED behaviour, not confirmed requirements.", ""]
+    for n, name in enumerate(("sign-up", "otp"), 1):
+        tool("Bash", command=f"bash scripts/explore-android.sh {module} snap {name}")
+        with open(f"{out}/{n:02d}-{name}.png", "wb") as f: f.write(png)
+        md += [f"## {n:02d} {name}", f"- Screenshot: {n:02d}-{name}.png", ""]
+    with open(f"{out}/exploration.md", "w", encoding="utf-8") as f: f.write(chr(10).join(md))
+    summary = "Explored the app: 2 screens (sign-up, OTP). Not submitted."
+elif agent == "business-analyst" and "answered questions" not in t:
     sh(["scripts/stage.sh", "start", module, "analysis"])
     tool("Read", file_path=f"analysis/sources-text/{module}/prd.pdf.md")
     copy(os.path.join(P1, "first-pass", "requirements.csv"), "analysis/requirements.csv")

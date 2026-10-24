@@ -226,7 +226,9 @@ reports how many conditions at least one active case covers (target `TH_SCORE_TA
 ## Agent runs from Studio: `runs/agents/<yyyymmdd-hhmmss>-<MODULE>-<agent>/` (git-ignored)
 `meta.json` (`id`, `module`, `kind` agent or script, `agent`, `title`, `task`, `status` running / done / failed / stopped /
 interrupted, `started`, `ended`, `summary`, `cost_usd` as reported by Claude Code, `exit_code`), `progress.txt` (one line per
-step: `$` commands, `writes` files, `>` messages, `!` errors) and, for agents, `transcript.jsonl` (the raw Claude Code event stream).
+step: `$` commands, `writes` files, `>` messages, `!` errors, `?` a person's answer to a question) and, for agents, `transcript.jsonl` (the raw Claude Code event stream)
+and `asks/`: one `<nnn>.json` per question the agent asked (`id`, `tool`, `input`, `asked_at`) and its `<nnn>.answer.json` (`decision` allow or
+deny, `by`, `note`, `at`; `by` is `TestHive` when nobody answered in time). Written by Studio and `scripts/lib/ask.py` only (the hook refuses agents).
 
 ## Runs: `runs/<RUN-ID>/` (written by `scripts/collect-run.sh`)
 `RUN-ID` is `R-<yyyymmdd>-<nn>` (UTC date, then a sequence number).

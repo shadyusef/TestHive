@@ -8,7 +8,7 @@ The person who sets it up reads all of it; everyone else reads their own row and
 | Role | Does | Needs on their PC |
 |---|---|---|
 | **QA lead** (sets it up once) | Creates the project repository, describes the app, adds modules, approves stages | Everything a QA engineer needs, plus a GitHub account that can create private repositories |
-| **QA engineer** | Runs the agents (Run buttons), answers, reviews, approves | Git, the Studio program, and the full TestHive setup (`.\hive setup --install`: Python, Claude Code signed in, Git Bash on Windows) |
+| **QA engineer** | Runs the agents (Run buttons), answers their questions (Allow once / Deny), answers, reviews, approves | Git, the Studio program, and the full TestHive setup (`.\hive setup --install`: Python, Claude Code signed in, Git Bash on Windows) |
 | **Reviewer** (QA or business, with a PC) | Answers questions, reviews and approves cases in Studio | Git and the Studio program. Without Claude Code, Studio opens in **review mode**: everything works except the Run buttons, which show the command to hand to a QA engineer |
 | **Business reviewer** (Excel only) | Answers questions or reviews cases in a workbook | Excel. Nothing to install |
 

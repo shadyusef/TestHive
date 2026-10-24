@@ -88,10 +88,43 @@ def claude_command(agent, task, model=None):
         exe = shutil.which("claude")
         if not exe: return None
         base = [exe]
-    # the project settings also allow maestro, adb, newman and playwright for the QA team; a background agent gets scripts only
+    # the project settings also allow maestro, adb, newman and playwright for the QA team; a background agent gets scripts only.
+    # Anything else it wants is asked of the person in Studio (ask.py, an MCP server; ASK_DIR becomes the job's folder in start()).
+    ask = pyrun.lib_cmd("ask.py")
+    mcp = json.dumps({"mcpServers": {"testhive": {"command": ask[0], "args": ask[1:], "env": {"TH_ASK_DIR": ASK_DIR}}}})
     return base + ["--agent", agent, "--permission-mode", "acceptEdits", "--allowedTools", "Bash(bash scripts/*)",
                    "--disallowedTools", "Bash(maestro *)", "Bash(adb *)", "Bash(newman *)", "Bash(npx *)",
+                   "--mcp-config", mcp, "--permission-prompt-tool", "mcp__testhive__approve",
                    "--output-format", "stream-json", "--verbose"] + (["--model", model] if model else []) + ["-p", task]
+
+
+ASK_DIR = "<TESTHIVE_JOB_DIR>"  # replaced by the job's folder when the job starts
+
+
+def asks(job):
+    """The questions the job's agent waits on (no answer yet), oldest first: [{id, tool, input, asked_at}]."""
+    d = os.path.join(job.get("_dir") or os.path.join(DIR, job["id"]), "asks")
+    out = []
+    for f in sorted(os.listdir(d)) if os.path.isdir(d) else []:
+        late = time.time() - os.path.getmtime(os.path.join(d, f)) > 60 * (float(os.environ.get("TH_ASK_MINUTES", "10")) + 1)  # its helper is gone
+        if re.fullmatch(r"\d{3}\.json", f) and not late and not os.path.exists(os.path.join(d, f[:3] + ".answer.json")):
+            try:
+                with open(os.path.join(d, f), encoding="utf-8") as fh: out.append(json.load(fh))
+            except (OSError, ValueError): pass
+    return out
+
+
+def answer(job, ask_id, decision, by, note=""):
+    """Writes a person's answer to one waiting question. Returns an error, or None."""
+    d = os.path.join(job.get("_dir") or os.path.join(DIR, job["id"]), "asks")
+    if not re.fullmatch(r"\d{3}", ask_id) or decision not in ("allow", "deny"): return "bad request"
+    if not os.path.exists(os.path.join(d, ask_id + ".json")) or os.path.exists(os.path.join(d, ask_id + ".answer.json")): return "That question is not waiting any more."
+    p = os.path.join(d, ask_id + ".answer.json")
+    with open(p + ".tmp", "w", encoding="utf-8", newline="\n") as f: json.dump({"decision": decision, "by": by, "note": note, "at": now()}, f, ensure_ascii=False)
+    os.replace(p + ".tmp", p)
+    with open(os.path.join(os.path.dirname(d), "progress.txt"), "a", encoding="utf-8", newline="\n") as f:
+        f.write(f"? {by} {'allowed' if decision == 'allow' else 'denied'} question {ask_id}" + (f": {note}" if note else "") + "\n")
+    return None
 
 
 def describe(event):
@@ -157,9 +190,10 @@ def start(module, kind, title, cmd, task="", agent="", env=None):
         job = {"id": time.strftime("%Y%m%d-%H%M%S") + f"-{module}-{(agent or kind)}", "module": module, "kind": kind, "agent": agent,
                "title": title, "task": task, "status": "running", "started": now(), "ended": "", "summary": "", "cost_usd": None}
         job["_dir"] = os.path.abspath(os.path.join(DIR, job["id"]))  # stays in this project even if Studio switches project later
+        cmd = [x.replace(ASK_DIR, job["_dir"].replace("\\", "/").replace('"', "")) if ASK_DIR in x else x for x in cmd]
         save(job)
         kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-        env = dict(os.environ, **(env or {}), PYTHONIOENCODING="utf-8", TH_JOB=job["id"])  # stage.sh and the hooks treat it as an agent, not a person
+        env = dict(os.environ, **(env or {}), PYTHONIOENCODING="utf-8", TH_JOB=job["id"], MCP_TOOL_TIMEOUT=str(15 * 60 * 1000))  # a question waits up to 10 minutes  # stage.sh and the hooks treat it as an agent, not a person
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True,
                                     encoding="utf-8", errors="replace", env=env, **kw)

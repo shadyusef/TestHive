@@ -1,5 +1,5 @@
 // A module's page: the header, the tabs, agent jobs, and saving (afterSave) for every tab.
-import { S, $, esc, api, toast, ask, panel, STAGE_LABEL, confirmLeave } from './core.js';
+import { S, $, esc, api, toast, ask, panel, STAGE_LABEL, confirmLeave, me, askName } from './core.js';
 import { home } from './home.js';
 import { renderSide, setCrumbs } from './shell.js';
 import { renderSources } from './sources.js';
@@ -39,8 +39,23 @@ export function jobCard(j) {
   const secs = Math.max(0, Math.round((Date.now() - Date.parse(j.started)) / 1000));
   return `<div class="jobcard" id="jobcard"><div class="bar"><span class="pulse" aria-hidden="true"></span><b class="grow">${esc(j.title)} is working… <span class="muted small">${Math.floor(secs / 60)} min ${secs % 60} s</span></b>
     <button class="danger" id="jobstop" data-id="${esc(j.id)}">Stop</button></div>
-    <pre class="log">${esc((j.lines || []).join('\n')) || 'Starting…'}</pre>
+    <div id="jobasks" data-ids="${esc((j.asks || []).map(a => a.id).join(','))}">${asksHtml(j.asks)}</div>
+    <pre class="log" id="joblog">${esc((j.lines || []).join('\n')) || 'Starting…'}</pre>
     <p class="small muted">Saving on this module is paused until it finishes. The full log is kept in runs/agents/.</p></div>`;
+}
+// The agent's questions (phase 7a): something its rules do not allow; a person allows it once or says no. Signed with your name.
+function asksHtml(list) {
+  return (list || []).map(a => `<div class="msg warn ask"><b>The agent asks to use ${esc(a.tool)}</b> <span class="small muted">asked ${esc(a.asked_at.slice(11, 16))} UTC; no answer in 10 minutes is a No</span>
+    <pre class="log">${esc(a.input)}</pre>
+    <div class="decide"><input class="grow" id="an-${esc(a.id)}" placeholder="Note to the agent (optional)" aria-label="Note to the agent" maxlength="300">
+      <button class="primary" data-ask="${esc(a.id)}" data-d="allow">Allow once</button><button class="danger" data-ask="${esc(a.id)}" data-d="deny">Deny</button></div></div>`).join('');
+}
+function bindAsks() {
+  document.querySelectorAll('[data-ask]').forEach(b => b.onclick = async () => {
+    if (!me()) return askName();
+    const r = await api('/api/ask', { method: 'POST', body: JSON.stringify({ module: S.module, id: b.dataset.ask, decision: b.dataset.d, note: ($('#an-' + b.dataset.ask) || {}).value || '', by: me() }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad');
+  });
 }
 export function watchJob() {
   clearInterval(POLL);
@@ -48,7 +63,11 @@ export function watchJob() {
   POLL = setInterval(async () => {
     if (S.view !== 'module') return clearInterval(POLL);
     const r = await api('/api/jobs?m=' + encodeURIComponent(S.module));
-    if (r.job) { const c = $('#jobcard'); if (c) c.outerHTML = jobCard(r.job); bindStop(); return; }
+    if (r.job) {  // the questions are redrawn only when they change, so a note being typed stays
+      const c = $('#jobcard'), q = $('#jobasks'), ids = (r.job.asks || []).map(a => a.id).join(',');
+      if (c && q && q.dataset.ids === ids) { $('#joblog').textContent = (r.job.lines || []).join('\n') || 'Starting…'; return; }
+      if (c) c.outerHTML = jobCard(r.job); bindStop(); bindAsks(); return;
+    }
     clearInterval(POLL);
     if (r.last) toast(`${r.last.title}: ${r.last.status}. ${r.last.summary || ''}`.slice(0, 400), r.last.status === 'done' ? 'ok' : 'bad');
     openModule(S.module, true);
@@ -135,7 +154,7 @@ export function render() {
   document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => go(b.dataset.goto));
   $('#readybtn').onclick = () => showReadiness(d.readiness);
   ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, tools: renderTools, automation: renderAutomation, execution: renderExecution, reports: renderReports, approvals: renderApprovals, activity: renderActivity })[S.tab]();
-  updateSavebar(); bindStop(); watchJob();
+  updateSavebar(); bindStop(); bindAsks(); watchJob();
 }
 
 /* ---------- saving ---------- */

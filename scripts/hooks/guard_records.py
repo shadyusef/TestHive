@@ -20,14 +20,16 @@ path = inp.get("file_path") or inp.get("notebook_path") or ""
 if not path: sys.exit(0)
 root = os.environ.get("CLAUDE_PROJECT_DIR") or data.get("cwd") or os.getcwd()
 full = path if os.path.isabs(path) else os.path.join(root, path)
-rel = os.path.relpath(os.path.realpath(full), os.path.realpath(root)).replace(os.sep, "/")  # realpath: links, junctions, short names
+try: rel = os.path.relpath(os.path.realpath(full), os.path.realpath(root)).replace(os.sep, "/")  # realpath: links, junctions, short names
+except ValueError: sys.exit(0)  # another drive (Windows): outside the project, no record of it to protect
 if os.environ.get("TH_JOB"):  # an agent started by TestHive Studio: the tool itself and the secrets are off limits too
     PROTECTED.update({".env": "secrets are added by a person", ".mask-terms": "masking lists are kept by a person",
                       ".mask-allow": "masking lists are kept by a person", ".mask-map.json": "the masking map is written by mask.sh"})
     PROTECTED_DIRS.update({"scripts/": "agents started from Studio may run the scripts, not change them",
                            ".claude/": "agents started from Studio may not change their own rules or settings",
                            "templates/": "agents started from Studio may not change the templates",
-                           "archive/": "archived modules are moved there by stage.sh archive, never written by hand"})
+                           "archive/": "archived modules are moved there by stage.sh archive, never written by hand",
+                           "runs/agents/": "the agent runs' logs and the person's answers to the agents' questions are written by Studio"})
 if os.environ.get("TH_JOB") and os.path.basename(rel).lower().startswith(".env."): PROTECTED[rel] = "secrets are added by a person"  # .env.<name>
 if re.fullmatch(r"reports/[^/]+-report\.html", rel): PROTECTED[rel] = "the test report is built by report.sh"
 fold = (lambda x: x.lower()) if os.name == "nt" else (lambda x: x)  # Windows paths ignore case

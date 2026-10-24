@@ -38,6 +38,9 @@ jobs:
       - name: Phase 5 and 6 demo (a test cycle with a planted bug, a fix and a flaky test; then the report and the sign-off)
         run: bash demo/phase6/run.sh --check
         shell: bash
+      - name: Phase 7 demo (Studio answers the agents' questions; Android exploration with a stand-in device)
+        run: bash demo/phase7/run.sh
+        shell: bash
       - name: Phase 5b demo (run targets; BrowserStack played by local stand-ins, made-up keys)
         run: bash demo/phase5b/run.sh --check
         shell: bash

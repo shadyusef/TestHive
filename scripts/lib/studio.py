@@ -213,6 +213,12 @@ ACTIONS = {
     "design-impact": {"agent": "manual-tester", "title": "Update the cases for the new requirements", "minutes": "5-20", "command": "/th-manual update the cases of {m}",
                       "task": "Module {m} (started from TestHive Studio). Requirements changed: run bash scripts/design-impact.sh {m} --apply, update the cases marked Needs update as your rules say, add cases for new requirements, run the checks, and submit if ready."},
     "explore-web": {"title": "Explore the built product", "minutes": "1-5", "command": ""},
+    "explore-android": {"agent": "business-analyst", "title": "Explore the Android app", "minutes": "10-30", "command": "/th-analyst explore the Android app of {m}",
+                        "task": "Module {m} (started from TestHive Studio). Explore the Android app only; do not write the registers. Install \"{apk}\" with "
+                                "bash scripts/explore-android.sh {m} install \"{apk}\", find its package with bash scripts/explore-android.sh {m} packages, launch it, "
+                                "then walk its main screens with snap, tap, type and back as your rules say (snap every new screen with a short name). "
+                                "Never type real personal data; use made-up test values. When done, add a short summary of the screens and paths "
+                                "at the end of analysis/exploration/{m}/android/exploration.md."},
     "scaffold": {"title": "Set up the test project", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/scaffold.sh", m]},
     "run-tests": {"title": "Run the tests", "minutes": "1-15", "command": "",
                   "script": lambda m, o: run_cmd(o["kind"], m, o)},
@@ -260,7 +266,7 @@ def start_action(module, action, info, opts=None):
     kind = o["kind"] if action == "run-tests" else action.split("-", 1)[1] if action.startswith(("cycle-", "retest-")) else ""
     t = targets.load().get(o["target"]) if o["target"] else None
     if o["target"] and (not t or t["kind"] != kind): return None, "unknown action"
-    if o["device"] and (kind != "mobile" or (t and t["where"] != "local") or o["device"] not in targets.adb_devices()): return None, "unknown action"
+    if o["device"] and (kind != "mobile" and action != "explore-android" or (t and t["where"] != "local") or o["device"] not in targets.adb_devices()): return None, "unknown action"
     if t and t["where"] == "browserstack" and not targets.keys_set(o["env"] or ((execute.current(module) or {}).get("env", "") if ACTIONS[action].get("cycle") else "")): return None, "Add BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY to .env first (you, in the file; Studio never shows them)."
     if ACTIONS[action].get("cycle"):
         c = execute.current(module)
@@ -282,6 +288,15 @@ def start_action(module, action, info, opts=None):
         where = (f" on {o['env']}" if o["env"] else "") + (f" ({o['target']}{' ' + o['device'] if o['device'] else ''})" if o["target"] or o["device"] else "")
         return jobs.start(module, "script", a["title"] + (f" ({o['kind']}{', ' + o['tag'] if o['tag'] else ''})" if action == "run-tests" else "") + where,
                           cmd, task=(f"TEST_ENV={o['env']} " if o["env"] else "") + " ".join(cmd[1:]), env={"TEST_ENV": o["env"]} if o["env"] else None)
+    if action == "explore-android":  # the analyst drives the phone through explore-android.sh; the device is picked (or the only one)
+        if not mt.get("apk"): return None, "Upload the module's APK first (Sources, Android app)."
+        devs = targets.adb_devices()
+        dev = o["device"] or (devs[0] if len(devs) == 1 else "")
+        if not dev: return None, "No Android device found (adb): connect a phone with USB debugging or start an emulator." if not devs else "Pick the device to explore on."
+        task = a["task"].format(m=module, apk=mt["apk"])
+        cmd = jobs.claude_command(a["agent"], task, a.get("model"))
+        if not cmd: return None, "Claude Code is not installed here. Run setup --install, then type claude once in a terminal to sign in."
+        return jobs.start(module, "agent", f"{a['title']} ({dev})", cmd, task=task, agent=a["agent"], env={"ANDROID_DEVICE_ID": dev})
     review = (sorted(glob.glob(os.path.join("reviews", f"DESIGN-{module}-*.md")), key=os.path.getmtime) or [""])[-1].replace(os.sep, "/")
     if action == "design-fix" and not review: return None, "There is no pre-review to fix yet."
     task = a["task"].format(m=module, review=review, explore=(" Explore the built product too:" + explore_note(mt) + ".") if mt.get("url") or mt.get("apk") else "")
@@ -309,6 +324,17 @@ def exploration(module):
     except ValueError: return None
     return {"at": time.strftime("%Y-%m-%d %H:%M", time.localtime(os.path.getmtime(p))), "pages": sum(1 for x in pages if not x.get("error")),
             "failed": sum(1 for x in pages if x.get("error")), "url": (pages[0].get("url") if pages else "")}
+
+
+SHOT = re.compile(r"\d{2}-[A-Za-z0-9_-]{1,80}\.png")
+
+
+def android_exploration(module):
+    """The screens the Android exploration recorded: [names], and when; or None."""
+    d = os.path.join(analysis.DIR, "exploration", module, "android")
+    shots = sorted(f for f in os.listdir(d) if SHOT.fullmatch(f)) if os.path.isdir(d) else []
+    if not shots: return None
+    return {"screens": shots, "at": time.strftime("%Y-%m-%d %H:%M", time.localtime(max(os.path.getmtime(os.path.join(d, f)) for f in shots)))}
 
 
 def module_info(module):
@@ -366,11 +392,12 @@ def module_info(module):
     if info["next"]["run"]: info["next"].update(title=ACTIONS[info["next"]["run"]]["title"], minutes=ACTIONS[info["next"]["run"]]["minutes"])
     if info["next"]["run"] == "analyse" and not info["sources"]["files"]: info["next"]["title"] = "Analyse the built product"
     info["exploration"], info["web_tools"], info["project_url"] = exploration(module), web_tools(), intake.project()["base_url"]
+    info["android_exploration"] = android_exploration(module)
     info["test_login"] = intake.test_login_set()
     info["targets"], info["browserstack_keys"] = targets.load(), targets.keys_set()
     info["jobs"], info["agents"], info["agents_missing"] = jobs.listing(module)[:15], agents_mode(), agents_missing()
     job = jobs.running(module)
-    info["job"] = dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None
+    info["job"] = job_view(job)
     return info
 
 
@@ -525,11 +552,28 @@ def get_job(h, q, body, module):
     return h.send(200, dict(j, lines=jobs.progress(j["id"]))) if j else h.send(404, {"error": "unknown job"})
 
 
+def job_view(job):
+    """A running job for the page: its fields, the last progress lines, and the questions its agent waits on."""
+    if not job: return None
+    return dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30),
+                asks=[{"id": a["id"], "tool": a["tool"], "input": json.dumps(a.get("input"), ensure_ascii=False, indent=1)[:4000], "asked_at": a.get("asked_at", "")}
+                      for a in jobs.asks(job)] if job.get("kind") == "agent" else [])
+
+
 @api("GET", "/api/jobs", module="query")
 def get_jobs(h, q, body, module):
-    job = jobs.running(module)
-    return h.send(200, {"job": dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None,
-                        "last": (jobs.listing(module) or [None])[0]})
+    return h.send(200, {"job": job_view(jobs.running(module)), "last": (jobs.listing(module) or [None])[0]})
+
+
+@api("POST", "/api/ask", module="body")
+def post_ask(h, q, body, module):
+    """A person answers a question the module's running agent waits on (Allow once / Deny), signed."""
+    job, by, note = jobs.running(module), str(body.get("by", "")).strip(), str(body.get("note", "")).strip()[:300]
+    if not job or job.get("kind") != "agent": return h.send(409, {"ok": False, "message": "No agent is working on this module now."})
+    if not by or re.search(r"[\r\n|]", by + note): return h.send(400, {"ok": False, "message": "your name is needed (no line breaks or |): answers are signed"})
+    err = jobs.answer(job, str(body.get("id", "")), str(body.get("decision", "")), by, note)
+    if err: return h.send(400 if err == "bad request" else 409, {"ok": False, "message": err})
+    return h.send(200, {"ok": True, "message": "Allowed once: the agent goes on." if body.get("decision") == "allow" else "Denied: the agent is told no."})
 
 
 @api("GET", "/api/mask-preview", module="query")
@@ -621,9 +665,18 @@ def get_devices(h, q, body, module):
     return h.send(200, {"devices": targets.adb_devices()})
 
 
+@api("GET", "/api/exploration-shot", module="query")
+def get_exploration_shot(h, q, body, module):
+    """One screen the Android exploration recorded (a PNG of that folder only)."""
+    name, d = arg(q, "name"), os.path.realpath(os.path.join(analysis.DIR, "exploration", module, "android"))
+    p = os.path.realpath(os.path.join(d, name))
+    if not SHOT.fullmatch(name) or not p.startswith(d + os.sep) or not os.path.isfile(p): return h.send(404, {"error": "not found"})
+    return h.send(200, read_bytes(p), "image/png", {"Content-Security-Policy": "sandbox"})
+
+
 @api("GET", "/api/exploration", module="query")
-def get_exploration(h, q, body, module):  # the explorer's report, as text (screenshots stay in the folder)
-    p = os.path.join(analysis.DIR, "exploration", module, "web", "exploration.md")
+def get_exploration(h, q, body, module):  # the explorer's report, as text (screenshots stay in the folder; Android's are shown in Sources)
+    p = os.path.join(analysis.DIR, "exploration", module, "android" if arg(q, "kind") == "android" else "web", "exploration.md")
     if not os.path.exists(p): return h.send(404, {"error": "not explored yet"})
     with open(p, encoding="utf-8", errors="replace") as f: return h.send(200, {"text": f.read(), "folder": os.path.dirname(p).replace(os.sep, "/")})
 

@@ -2,6 +2,7 @@
 # Explores an Android app on a connected phone or emulator, step by step, recording each screen as observed behaviour.
 # Usage: bash scripts/explore-android.sh <MODULE> <command> [args]
 #   install <file.apk>        install (or update) the app
+#   packages                  the apps installed on the device by a person (not the system's), to find the one just installed
 #   launch <package>          start the app from a clean state (clears its data first)
 #   snap <name>               record the current screen: screenshot, UI dump and a summary added to exploration.md
 #   tap <id|text>             tap the element with that resource id, text or description (from the last snap)
@@ -20,7 +21,8 @@ ADB=(adb ${ANDROID_DEVICE_ID:+-s "$ANDROID_DEVICE_ID"})
 last_xml() { ls "$OUT"/*.xml 2>/dev/null | tail -1; }
 case "$CMD" in
   install) "${ADB[@]}" install -r "${1:?apk file}" ;;
-  launch)  P="${1:?package}"; "${ADB[@]}" shell pm clear "$P" >/dev/null; "${ADB[@]}" shell monkey -p "$P" -c android.intent.category.LAUNCHER 1 >/dev/null && echo "Started $P" ;;
+  packages) "${ADB[@]}" shell pm list packages -3 | sed 's/^package://' | tr -d '\r' | sort ;;
+  launch)  P="${1:?package}"; [[ "$P" =~ ^[A-Za-z][A-Za-z0-9_]*(\.[A-Za-z0-9_]+)+$ ]] || { echo "Not a package name: $P (the phone's shell reads it)"; exit 1; }; "${ADB[@]}" shell pm clear "$P" >/dev/null; "${ADB[@]}" shell monkey -p "$P" -c android.intent.category.LAUNCHER 1 >/dev/null && echo "Started $P" ;;
   snap)
     NAME=$(echo "${1:?screen name}" | tr -c 'A-Za-z0-9_-' '_'); N=$(printf '%02d' $(( $(ls "$OUT"/*.xml 2>/dev/null | wc -l) + 1 )))
     sleep 1   # let animations settle before reading the screen
@@ -33,7 +35,7 @@ case "$CMD" in
     X=$(last_xml); [ -n "$X" ] || { echo "Run snap first, so TestHive knows what is on the screen"; exit 1; }
     XY=$($PY "$(dirname "$0")/lib/uiscreen.py" find "$X" "${1:?id or text}") || exit 1
     "${ADB[@]}" shell input tap $XY && echo "Tapped $1 at $XY" ;;
-  type) T="${1:?text}"; "${ADB[@]}" shell input text "${T// /%s}" && echo "Typed" ;;
+  type) T="${1:?text}"; [[ "$T" =~ ^[A-Za-z0-9\ .,@_+-]*$ ]] || { echo "Only letters, digits, spaces and . , @ _ + - can be typed (the phone's shell reads the text)"; exit 1; }; "${ADB[@]}" shell input text "${T// /%s}" && echo "Typed" ;;
   back) "${ADB[@]}" shell input keyevent 4 && echo "Back" ;;
-  *) echo "Unknown command: $CMD (install, launch, snap, tap, type, back)"; exit 1 ;;
+  *) echo "Unknown command: $CMD (install, packages, launch, snap, tap, type, back)"; exit 1 ;;
 esac

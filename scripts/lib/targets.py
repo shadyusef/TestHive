@@ -57,7 +57,7 @@ def endpoint(kind):
 def adb_devices():
     """IDs of the Android devices adb sees now ([] without adb)."""
     if not shutil.which("adb"): return []
-    try: out = subprocess.run(["adb", "devices"], capture_output=True, text=True, timeout=10).stdout
+    try: out = subprocess.run([shutil.which("adb"), "devices"], capture_output=True, text=True, timeout=10).stdout
     except (OSError, subprocess.TimeoutExpired): return []
     return [m[1] for m in (re.match(r"([A-Za-z0-9][A-Za-z0-9._:-]*)\s+device$", ln.strip()) for ln in out.splitlines()[1:]) if m]
 

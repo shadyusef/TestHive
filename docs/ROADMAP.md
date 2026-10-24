@@ -19,16 +19,16 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 2f | Studio design for the two stages: sidebar with every module, module header with the next step and a stage track, requirements and test-case screens with summary rows, review switch, phone layout, dark theme, fonts kept offline; answers read-only after the analysis approval | Done (v0.9.0) |
 | 2g | Studio on its own for colleagues: a single Studio program (Windows) built by CI, review mode without Claude Code, a hand-off guide; projects shared through a git repository, Excel review packs for reviewers who install nothing | Done (v0.10.0) |
 | 3 | Tool advice for functional tests: decision matrix per test type (Web UI, API, Android, iOS) from the approved design, weights and team skills, the human's choice with a reason, approval and baseline; Tools tab in Studio; Windows only from here on | Done (v0.11.0) |
-| 3b | Tool advice for non-functional tests: accessibility, security, performance | Planned |
+| 3b | Tool advice for non-functional tests: accessibility, security, performance | Not planned (owner decision, 2026-10-24) |
 | 4a | Automation: test project for the approved tools (Playwright, Postman + Newman, Maestro), one placeholder per case with its steps and tags, run by tag and environment, unique test data, engineers from Studio, stability proof, gate and baseline; Automation tab | Done (v0.12.0) |
 | 4b | Contract tests from the OpenAPI spec; E2E journeys across web and API with shared steps | Done (v0.13.0) |
 | 5a | Execution: test cycles per environment, results by hand and from the runs, run picker (type, suite, environment), video, screenshots and traces, API request/response logs, retest after a fix, flaky quarantine, gate and baseline; Execution tab | Done (v0.14.0) |
 | 5b | Run targets: local browsers and Android devices, BrowserStack browsers (Playwright) and real devices (Maestro), picked per run and recorded with it | Done (v0.15.0) |
-| 5c | BrowserStack Local (a tunnel to test environments that are not on the internet), several targets in one run | Planned |
+| 5c | BrowserStack Local (a tunnel to test environments that are not on the internet), several targets in one run | Not planned (owner decision, 2026-10-24) |
 | 6a | Reporting: bug register, one HTML test report (management summary with a Go / No-go suggestion, results, requirements covered, trends, cost per stage), the signed decision, gate and baseline; Reports tab | Done (v0.16.0) |
-| 6b | Write-back to Jira / Azure DevOps: bugs become issues, their status comes back | Next |
-| 7 | More Studio: answer agent permission prompts from the browser (Claude Agent SDK), Android exploration from Studio | Planned |
-| 8 | Scale: scheduled CI runs, team roles, notifications, device farms, iOS on a Mac | Planned |
+| 6b | Write-back to Jira / Azure DevOps: bugs become issues, their status comes back | Not planned (owner decision, 2026-10-24) |
+| 7 | More Studio: the agents' questions answered in the browser (Allow once / Deny, signed; through Claude Code's permission prompt tool), Android exploration from Studio with the screens shown | Done (v0.17.0) |
+| 8 | Scale: scheduled CI runs, team roles, notifications, device farms, iOS on a Mac | Not planned (owner decision, 2026-10-24) |
 
 Owner decisions that shape the design: all input types plus a "no tools, one folder" mode; Excel export with human
 edits before approval; one user now, team later; Arabic in scope, masking optional; template stays public (projects

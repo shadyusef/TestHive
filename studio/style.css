@@ -330,3 +330,6 @@ td.rev { min-width: 230px; }
   .track div.stage.later { display: none; }  /* stages of later phases: the desktop shows them */
 }
 @media (prefers-reduced-motion: reduce) { .side { transition: none; } }
+
+.shots { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 10px; margin-top: 8px; }
+.shots figure { margin: 0; } .shots img { width: 100%; border: 1px solid var(--border); border-radius: var(--radius-control); } .shots figcaption { font-size: 12px; color: var(--muted); }

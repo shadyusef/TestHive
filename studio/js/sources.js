@@ -33,6 +33,10 @@ export function renderSources() {
         ${!mt.url && d.project_url ? `<button class="link accent small" id="u-useproj">Use the project's address (${esc(d.project_url)})</button>` : ''}</span>
       <span></span><label class="check"><input type="checkbox" id="u-test" ${mt.test_env ? 'checked' : ''}> Test environment (the analyst may submit forms with test data)</label>
       <label>Android app <span class="muted">optional</span></label><span>${src.apk ? `<code>${esc(src.apk)}</code> · ` : ''}<label class="link accent" role="button" tabindex="0">${src.apk ? 'replace' : 'upload an APK'}<input type="file" id="apk" accept=".apk" hidden></label></span>
+      <span></span><div>${src.apk && S.agents !== 'review' ? '<button id="u-explore-a">Explore the app</button> <select id="u-dev" aria-label="Device" hidden></select>' : ''}
+        ${d.android_exploration ? `<p class="small">Explored on ${esc(d.android_exploration.at)}: ${d.android_exploration.screens.length} screen(s) · <button class="link accent" id="u-areport">Open the report</button></p>
+          <div class="shots">${d.android_exploration.screens.map(n => `<figure><img loading="lazy" alt="Screen ${esc(n)}" src="/api/exploration-shot?m=${encodeURIComponent(d.module)}&name=${encodeURIComponent(n)}&t=${encodeURIComponent(TOKEN)}"><figcaption>${esc(n.replace(/\.png$/, ''))}</figcaption></figure>`).join('')}</div>`
+          : src.apk ? '<p class="small muted">The analyst installs the app on the device you pick (a phone with USB debugging, or an emulator) and records each screen; you see them here.</p>' : ''}</div>
       <span></span><div>${S.agents === 'review' ? '' : d.web_tools ? '<button id="u-explore" data-run="explore-web" data-title="Explore the built product" data-min="1-5">Explore the built product</button>'
           : '<p class="msg warn">Explore needs the web tools on this PC. Someone at a terminal installs them once: setup --install --web (see docs/TEAM-GUIDE.md).</p>'}
         ${d.exploration ? `<p class="small" dir="auto">Explored <span class="mono">${esc(d.exploration.url)}</span> on ${esc(d.exploration.at)}: ${d.exploration.pages} page(s)${d.exploration.failed ? `, ${d.exploration.failed} could not be opened` : ''} · <button class="link accent" id="u-report">Open the report</button></p>`
@@ -86,6 +90,23 @@ export function renderSources() {
     const r = await api('/api/exploration?m=' + encodeURIComponent(d.module));
     if (r.status !== 200) return toast(r.error || 'No report yet.', 'warn');
     panel('What Explore found', `<p class="small muted">Observed behaviour, not confirmed requirements. Screenshots are in ${esc(r.folder)}/.</p><pre class="log">${esc(r.text)}</pre>`);
+  };
+  if ($('#u-areport')) $('#u-areport').onclick = async () => {
+    const r = await api('/api/exploration?m=' + encodeURIComponent(d.module) + '&kind=android');
+    if (r.status !== 200) return toast(r.error || 'No report yet.', 'warn');
+    panel('What the app exploration found', `<p class="small muted">Observed behaviour, not confirmed requirements.</p><pre class="log">${esc(r.text)}</pre>`);
+  };
+  if ($('#u-explore-a')) $('#u-explore-a').onclick = async () => {  // the device: the only one adb sees, or the one picked
+    const sel = $('#u-dev');
+    if (sel.hidden) {
+      const devs = (await api('/api/devices')).devices || [];
+      if (!devs.length) return toast('No Android device found: connect a phone with USB debugging, or start an emulator.', 'warn');
+      sel.innerHTML = devs.map(v => `<option>${esc(v)}</option>`).join('');
+      if (devs.length > 1) { sel.hidden = false; return toast('Pick the device, then press Explore the app again.', 'ok'); }
+    }
+    if (!await ask(`Explore the app on ${sel.value}? The analyst installs it and walks its screens (10-30 min, on your Claude plan).`, { ok: 'Explore' })) return;
+    const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: d.module, action: 'explore-android', options: { device: sel.value } }) });
+    toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(d.module, true);
   };
   if ($('#u-explore')) $('#u-explore').onclick = async e => {  // saves a typed address first, then the usual Run confirmation
     const b = e.currentTarget; if (b.dataset.saved) { delete b.dataset.saved; return; }
