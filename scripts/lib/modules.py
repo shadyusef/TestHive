@@ -32,6 +32,7 @@ def fixed_paths(m):
             os.path.join(analysis.DIR, "exploration", m), os.path.join(analysis.DIR, "baseline", m),
             os.path.join(design.TC_DIR, "baseline", m), os.path.join(tools.DIR, "baseline", m),
             os.path.join(automate.DIR, "baseline", m), os.path.join("web", "tests", m), os.path.join("mobile", "flows", m), automate.collection(m),
+            automate.contract.path(m), automate.contract.bugs_path(m),
             os.path.join("api", "environments", f"{m}.postman_environment.json"), os.path.join(analysis.DIR, f"{m}-analysis.xlsx"),
             os.path.join(design.TC_DIR, f"{m}-design.xlsx")]
 

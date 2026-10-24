@@ -144,6 +144,12 @@ def next_step(module, m, info):
             if status == "pending" or any(c["state"] == "missing" for c in a["cases"]):
                 return step("Set up the test project: TestHive writes one placeholder test per approved case to automate (free, no AI).",
                             f"{RUN} scaffold {module}", "scaffold")
+            ct = a.get("contract")
+            if ct and ct["state"] != "current":
+                return step("The API spec is new or changed: TestHive rebuilds the contract tests from it (free, no AI).", f"{RUN} contract {module}", "scaffold")
+            if ct and not ct["run"]:
+                return step(f"Run the {ct['operations']} contract tests: each endpoint must answer as the API spec says (no test data needed).",
+                            f"{RUN} run-api {module} --contract", "run-contract")
             for kind in ("web", "api", "mobile"):
                 todo = [c for c in a["cases"] if c["kind"] == kind and c["state"] in ("stub", "written-no-check")]
                 if todo: return step(f"{len(todo)} {KIND_LABEL[kind]} tests are still placeholders: the engineer writes them, smoke first.",
@@ -152,6 +158,10 @@ def next_step(module, m, info):
                 todo = [c for c in a["cases"] if c["kind"] == kind and c["state"] == "written"]
                 if todo: return step(f"{len(todo)} {KIND_LABEL[kind]} tests are written but not proven yet: run them 3 times in a row.",
                                      f"{RUN} stable {kind} {module}", f"stable-{kind}")
+            if ct and any(not f["bug"] for f in ct["failed"]):
+                return step("Some endpoints answer differently from the API spec: report each as a bug and list it in "
+                            f"api/collections/{module}.contract-bugs.txt (\"<METHOD> <path> <BUG-ID>\"), or fix the spec, then run the contract tests again.",
+                            f"{RUN} run-api {module} --contract", "run-contract")
             return step("Every test is written and stable: submit the automation in the Approvals tab.")
         return step(f"Stage '{st}' comes in a later TestHive phase.")
     return step("All stages are approved.")
@@ -183,7 +193,9 @@ ACTIONS = {
     "explore-web": {"title": "Explore the built product", "minutes": "1-5", "command": ""},
     "scaffold": {"title": "Set up the test project", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/scaffold.sh", m]},
     "run-tests": {"title": "Run the tests", "minutes": "1-15", "command": "",
-                  "script": lambda m, o: [f"scripts/run-{o['kind']}.sh", m] + (["--tag", o["tag"]] if o["tag"] else [])},
+                  "script": lambda m, o: ["scripts/run-api.sh", m, "--contract"] if o["kind"] == "contract" else
+                                         [f"scripts/run-{o['kind']}.sh", m] + (["--tag", o["tag"]] if o["tag"] else [])},
+    "run-contract": {"title": "Run the contract tests", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/run-api.sh", m, "--contract"]},
 }
 KIND_LABEL = {"web": "web", "api": "API", "mobile": "mobile"}
 ENGINEER = {"web": "web-automation-engineer", "api": "api-backend-test-engineer", "mobile": "mobile-automation-engineer"}
@@ -203,7 +215,7 @@ def start_action(module, action, info, opts=None):
     """Starts the Run button's job. Returns (job, error). opts: kind and tag for run-tests."""
     if action not in ACTIONS: return None, "unknown action"
     o = {"kind": str((opts or {}).get("kind", "")), "tag": str((opts or {}).get("tag", ""))}
-    if action == "run-tests" and (o["kind"] not in ("web", "api", "mobile") or o["tag"] not in [""] + design.TAGS): return None, "unknown action"
+    if action == "run-tests" and (o["kind"] not in ("web", "api", "contract", "mobile") or o["tag"] not in [""] + design.TAGS): return None, "unknown action"
     if agents_missing(): return None, (f"Review mode: {' and '.join(agents_missing())} {'is' if len(agents_missing()) == 1 else 'are'} not on this PC, "
                                        "so agents cannot run here. Someone with Claude Code runs the command shown; everything else works here.")
     a, mt = ACTIONS[action], info["meta"]
@@ -296,25 +308,7 @@ def module_info(module):
     return info
 
 
-RUN_ID = re.compile(r"R-\d{8}-\d{2,}")
-
-
-def last_runs(module):
-    """The latest stored run of each kind (web, api, mobile) of the module: totals, and the cases that did not pass with their evidence."""
-    base = os.environ.get("TH_RUNS", "runs")
-    out = {}
-    for d in sorted(glob.glob(os.path.join(base, "R-*")), key=lambda p: (len(os.path.basename(p)), os.path.basename(p)), reverse=True):
-        if not RUN_ID.fullmatch(os.path.basename(d)): continue
-        try:
-            with open(os.path.join(d, "meta.json"), encoding="utf-8") as f: meta = json.load(f)
-            if meta.get("module") != module or meta.get("kind") in out: continue
-            with open(os.path.join(d, "results.json"), encoding="utf-8") as f: res = json.load(f)
-        except (OSError, ValueError): continue
-        bad = [c for c in res.get("cases", []) if c.get("status") != "passed"]
-        stub = [c for c in bad if c.get("status") == "skipped" or "placeholder" in (c.get("message") or "")]  # tests not written yet
-        out[meta["kind"]] = {"run": os.path.basename(d), "at": meta.get("collected_at", ""), "env": meta.get("env", ""), "totals": meta.get("totals", {}),
-                             "placeholders": len(stub), "problems": [{k: c.get(k) for k in ("id", "name", "status", "message", "evidence")} for c in bad if c not in stub][:50]}
-    return out
+RUN_ID, last_runs = automate.RUN_ID, automate.last_runs
 
 
 def latest_meta(folder):

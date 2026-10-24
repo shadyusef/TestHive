@@ -2,6 +2,13 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.13.0 (2026-10-24)
+- Phase 4b, contract tests: with Postman + Newman approved and an OpenAPI spec among the module's sources, `scaffold` (or `contract <MODULE>`) builds `api/collections/<MODULE>.contract.postman_collection.json`, one request per endpoint that checks the status is one the spec lists and the JSON body matches the spec's schema. No agent and no test data: request values come from the spec's examples. The collection remembers the spec's checksum, so a changed spec makes it stale until it is rebuilt. Run it with `run-api <MODULE> --contract` (bearer-protected endpoints get `TEST_API_TOKEN` from `.env`, passed to Newman in a temporary file, not on the command line). Spec paths that are not plain paths are skipped.
+- The gate needs the contract tests current and run since they were built; an endpoint that answers differently from the spec blocks approval until it is listed with its bug ID in `api/collections/<MODULE>.contract-bugs.txt`. Studio's Automation tab shows the contract tests, their state and failing endpoints, and runs them (**Contract tests** in the Run list); the next step points to them.
+- E2E journeys: the web fixture gains `api` (requests to `API_BASE_URL`), so a journey sets up or checks data through the API inside a Playwright test, with shared steps in `web/pages/<MODULE>/steps.ts`; placeholders of `@e2e` cases say so.
+- Demo `demo/phase4`: the contract tests run against the stand-in (they find two responses the spec does not list), a second app instance (`app.py --break-contract`, environment `.env.broken`) shows a wrong field type caught, and TC-SIGNUP-048 is now a web and API journey.
+- Fix: the phase 2b check stopped after the project picker check, before its API walkthrough.
+
 ## 0.12.0 (2026-10-24)
 - Phase 4a, automation: once the tools are approved, `scaffold <MODULE>` (or Studio) sets up the test project for Playwright, Postman + Newman and Maestro with one placeholder test per approved functional case marked Automation Yes. Each placeholder carries the case's steps, expected result, test data and tags and is skipped or fails until it is written; nothing that exists is overwritten; the case sheet's Automation Spec is filled. Case text is written as comments and string literals, never as code.
 - The engineers (Run buttons in Studio, or `/th-web`, `/th-api`, `/th-mobile`) replace the placeholders, smoke first, with page objects and a shared fixture for unique test data (`web/fixtures/testhive.ts`; `getByTestId` reads `data-qa`).

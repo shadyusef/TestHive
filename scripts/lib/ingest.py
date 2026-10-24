@@ -130,16 +130,25 @@ def convert(path):
     return None, None
 
 
+def source_dir(name):
+    """requirements/sources/<module>/ (as typed, upper or lower case), else requirements/sources/."""
+    return next((d for d in (f"requirements/sources/{name}", f"requirements/sources/{name.upper()}", f"requirements/sources/{name.lower()}") if os.path.isdir(d)), "requirements/sources")
+
+
+def source_files(src_dir):
+    return sorted(p for p in glob.glob(os.path.join(src_dir, "**", "*"), recursive=True)
+                  if os.path.isfile(p) and not os.path.basename(p).startswith(".") and ".masked." not in p
+                  and "_old" not in p.replace(os.sep, "/").split("/"))  # _old/: earlier versions kept by Studio
+
+
 def main():
     a = sys.argv[1:]
     mask = "--mask" in a
     a = [x for x in a if x != "--mask"]
     if len(a) != 1: die("Usage: ingest.sh <MODULE> [--mask]   (reads requirements/sources/<module>/ or requirements/sources/)")
     module = a[0].upper()
-    src_dir = next((d for d in (f"requirements/sources/{a[0]}", f"requirements/sources/{module}", f"requirements/sources/{a[0].lower()}") if os.path.isdir(d)), "requirements/sources")
-    files = sorted(p for p in glob.glob(os.path.join(src_dir, "**", "*"), recursive=True)
-                   if os.path.isfile(p) and not os.path.basename(p).startswith(".") and ".masked." not in p
-                   and "_old" not in p.replace(os.sep, "/").split("/"))  # _old/: earlier versions kept by Studio
+    src_dir = source_dir(a[0])
+    files = source_files(src_dir)
     if not files: die(f"No source files in {src_dir}/. Put the module's documents there first.")
     out_dir = os.path.join(OUT, "sources-text", module); os.makedirs(out_dir, exist_ok=True)
     if mask: import mask as masker

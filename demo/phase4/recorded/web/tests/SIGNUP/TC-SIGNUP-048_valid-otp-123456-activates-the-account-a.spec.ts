@@ -1,10 +1,11 @@
 import { test, expect } from '../../fixtures/testhive';
-import { SignupPage } from '../../pages/SIGNUP/SignupPage';
 import { OtpPage } from '../../pages/SIGNUP/OtpPage';
-import { person, toOtpPage } from '../../pages/SIGNUP/steps';
+import { person, signUpByApi } from '../../pages/SIGNUP/steps';
 
-test('[TC-SIGNUP-048] Valid OTP 123456 activates the account and gives 50 points @smoke @regression', async ({ page, data }) => {
-  await toOtpPage(page, person(data));
+// A journey across the API and the web: the sign-up (the precondition) goes through the API, the OTP is entered in the browser.
+test('[TC-SIGNUP-048] Valid OTP 123456 activates the account and gives 50 points @smoke @regression @e2e', async ({ page, data, api }) => {
+  const signupId = await signUpByApi(api, person(data));
+  await page.goto('/otp?id=' + encodeURIComponent(signupId));
   await new OtpPage(page).enter('123456');
   await expect(page.getByTestId('balance')).toHaveText('Your balance: 50 points');
 });

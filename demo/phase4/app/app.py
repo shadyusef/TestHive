@@ -1,5 +1,6 @@
 """A small stand-in for the fictional Nakhla Rewards sign-up (demo only): the web pages and the API the phase 4 tests run against.
-Usage: python app.py [port] [--resend-cooldown seconds]      prints "APP http://127.0.0.1:<port>" when it is ready
+Usage: python app.py [port] [--resend-cooldown seconds] [--break-contract]      prints "APP http://127.0.0.1:<port>" when it is ready
+--break-contract: the sign-up answers signupId as a number, not the string the spec gives (the contract tests catch it).
 Web: /signup -> /otp -> /welcome. API: POST /v1/signup, /v1/otp/verify, /v1/otp/resend (demo/phase1/sources/openapi.yaml).
 Numbers 0500000037 and 0500000087 are already registered; the OTP is always 123456. Everything is kept in memory."""
 import sys, json, re, time, secrets
@@ -10,6 +11,7 @@ REGISTERED = {"0500000037", "0500000087"}
 PENDING = {}  # signupId -> {"mobile", "sent"}
 a = sys.argv[1:]
 COOLDOWN = float(a[a.index("--resend-cooldown") + 1]) if "--resend-cooldown" in a else 30.0
+BROKEN = "--break-contract" in a
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{title} - Nakhla Rewards</title>
 <style>body{{font:16px system-ui;max-width:420px;margin:40px auto;padding:0 16px}}label{{display:block;margin-top:12px}}input,select{{width:100%;padding:8px}}
@@ -82,7 +84,7 @@ class App(BaseHTTPRequestHandler):
             if len(str(b["password"])) < 8: return self.send(400, {"error": "The password must have at least 8 characters."})
             if b["mobile"] in REGISTERED: return self.send(409, {"error": "already registered"})
             sid = secrets.token_hex(8); PENDING[sid] = {"mobile": b["mobile"], "sent": time.time()}
-            return self.send(201, {"signupId": sid})
+            return self.send(201, {"signupId": int(sid, 16) if BROKEN else sid})
         if p == "/v1/otp/verify":
             if b.get("signupId") not in PENDING: return self.send(404, {"error": "unknown signupId"})
             if b.get("code") != "123456": return self.send(400, {"error": "The code is incorrect."})

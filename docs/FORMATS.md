@@ -168,11 +168,22 @@ of the approved tool choice. One test per case, found by its ID:
 - Postman + Newman: a request named `[TC-ID] title @tag ...` in `api/collections/<MODULE>.postman_collection.json`; environment
   `api/environments/<MODULE>.postman_environment.json` (`API_BASE_URL`, filled from `.env` at run time).
 - Maestro: `mobile/flows/<MODULE>/<TC-ID>_<title>.yaml` with `tags:`; a case on Both is one flow for Android and iOS.
+- Journeys (cases tagged `e2e`, Playwright): the fixture's `api` (requests to `API_BASE_URL`) sets up or checks data; shared steps in
+  `web/pages/<MODULE>/steps.ts`.
+- Contract tests (`scripts/contract.sh`, also run by scaffold; with Postman + Newman approved and an OpenAPI file in
+  `requirements/sources/<MODULE>/`): `api/collections/<MODULE>.contract.postman_collection.json`, one request per operation named
+  `<METHOD> <path>`, marked `TESTHIVE:CONTRACT`, never edited by hand. Each checks that the status is listed in the spec (exact,
+  `2XX` or `default`) and that the JSON body matches its schema. Request values come from the spec's `example`, `default` or first
+  `enum` value, else a made-up value of the right type; a bearer-protected operation sends `TEST_API_TOKEN`. The collection's
+  `testhive` key holds `specs` (file -> SHA-256) and `built_at`: a changed spec makes it stale. Runs are stored with kind `contract`.
+  Known bugs: `api/collections/<MODULE>.contract-bugs.txt`, one `<METHOD> <path> <BUG-ID>` per line (`#` for notes).
+  The gate needs the contract current, run since it was built, and every failing endpoint listed there.
 A placeholder contains `TESTHIVE:STUB` (skipped with `test.fixme` in Playwright, failing in Newman and Maestro). The state of a case:
 missing, stub, written-no-check (no assertion), written, stable (`reports/stable-<TC-ID>.txt` from `stable.sh`), by-hand (a tool without
 a TestHive setup). A known bug: `test.fail(... BUG-<n>)`, a flow's `# BUG-<n>`, or `known bug: BUG-<n>` in a request's script.
 Scaffold fills the case sheet's empty Automation Spec cells. `automation/baseline/<MODULE>/v<n>/meta.json` is written when a human
-approves the stage: `module`, `version`, `approved_by`, `approved_at`, `git_commit`, `tools`, `cases` (ID -> state), `files` (path -> SHA-256).
+approves the stage: `module`, `version`, `approved_by`, `approved_at`, `git_commit`, `tools`, `cases` (ID -> state), `files` (path -> SHA-256;
+the test files, the fixture, the contract collection and its known bugs).
 Environments: `.env`, then `.env.<TEST_ENV>` over it (both git-ignored); `TEST_ENV` given on the command line wins.
 
 ## Design benchmark key (e.g. `demo/phase2/condition-key.csv`)
@@ -188,7 +199,7 @@ step: `$` commands, `writes` files, `>` messages, `!` errors) and, for agents, `
 ## Runs: `runs/<RUN-ID>/` (written by `scripts/collect-run.sh`)
 `RUN-ID` is `R-<yyyymmdd>-<nn>` (UTC date, then a sequence number).
 
-- `meta.json`: `run_id`, `kind` (mobile, api, web), `module`, `env`, `platform`, `collected_at`, `host_os`, `source`, `totals`.
+- `meta.json`: `run_id`, `kind` (mobile, api, contract, web), `module`, `env`, `platform`, `collected_at`, `host_os`, `source`, `totals`.
 - `results.json`: `{format, run_id, cases: [{id, name, suite, status, duration_s, message, evidence}]}`.
   `status` is `passed`, `failed`, `error` or `skipped`. `id` is the TC-ID found in the test name.
   `evidence` lists the files under `evidence/` whose name contains the TC-ID.

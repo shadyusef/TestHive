@@ -5,5 +5,6 @@
 # Postman + Newman -> api/collections/<MODULE>.postman_collection.json (a request per case) and its environment;
 # Maestro -> mobile/flows/<MODULE>/<TC-ID>_<title>.yaml. Each placeholder carries the case's steps and @tags and fails or is
 # skipped until an engineer writes it. Never overwrites what exists; fills the Automation Spec column; starts the stage.
+# With the API tool and an OpenAPI spec among the sources, it also builds the contract tests (scripts/contract.sh).
 . "$(dirname "$0")/_py.sh"
 $PY "$(dirname "$0")/lib/automate.py" scaffold "$@"

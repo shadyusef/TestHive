@@ -1,12 +1,12 @@
 """Unit tests for TestHive's Python libraries and Studio's API (standard-library unittest, no installs).
 Run by scripts/selftest.sh:  python -m unittest discover -s tests
 Each test works in its own temporary project folder with a copy of scripts/; the real project is never touched."""
-import os, sys, glob, json, shutil, tempfile, threading, subprocess, unittest, urllib.request, urllib.error
+import os, sys, re, glob, json, shutil, tempfile, threading, subprocess, unittest, urllib.request, urllib.error
 
 for k in ("TH_STATE", "TH_ANALYSIS", "TH_CASES", "TH_JOB", "TH_ARCHIVE", "TH_CLAUDE_FAKE"): os.environ.pop(k, None)  # defaults only
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
-import analysis, design, intake, modules, studio, tools, automate  # noqa: E402
+import analysis, design, intake, modules, studio, tools, automate, contract  # noqa: E402
 
 BASH = os.environ.get("TH_BASH") or shutil.which("bash")  # selftest passes the Git Bash path on Windows (not WSL's bash)
 REQ_HEAD = ",".join(analysis.REQ_COLS) + "\n"
@@ -384,6 +384,41 @@ class Automation(ToolAdvice):
         self.assertEqual(len(err), 2); self.assertIn("placeholder", err[0])
         r = self.stage("submit", "SIGNUP", "automation"); self.assertNotEqual(r.returncode, 0)
         self.assertEqual(design.module_rows(analysis.read_csv(design.CASE_FILE, design.CASE_COLS), "SIGNUP"), [], "no live sheet here: nothing written")
+
+    def test_contract_from_the_spec(self):
+        spec = {"openapi": "3.0.3", "security": [{"jwt": []}], "components": {
+                    "securitySchemes": {"jwt": {"type": "http", "scheme": "bearer"}},
+                    "schemas": {"Acc": {"type": "object", "required": ["id"], "properties": {
+                        "id": {"type": "integer", "minimum": 0, "exclusiveMinimum": True, "format": "int64"},
+                        "nick": {"type": "string", "nullable": True, "format": "phone", "example": "x"}, "me": {"$ref": "#/components/schemas/Acc"}}}}},
+                "paths": {"/acc/{id}": {"parameters": [{"name": "id", "in": "path", "required": True, "schema": {"type": "integer"}, "example": 7}],
+                                        "get": {"responses": {"200": {"content": {"application/json": {"schema": {"$ref": "#/components/schemas/Acc"}}}}, "404": {}}}}}}
+        self.write("requirements/sources/SIGNUP/api.json", json.dumps(spec))
+        self.assertEqual(automate.status("SIGNUP")["contract"]["state"], "missing")
+        self.assertIn("contract tests: not built yet", " ".join(automate.problems("SIGNUP")[0]))
+        automate.scaffold("SIGNUP")
+        [it] = load(contract.path("SIGNUP"))["item"]
+        self.assertEqual((it["name"], it["request"]["url"]), ("GET /acc/{id}", "{{API_BASE_URL}}/acc/7"))
+        self.assertIn({"key": "Authorization", "value": "Bearer {{TEST_API_TOKEN}}"}, it["request"]["header"])
+        js = "\n".join(it["event"][0]["script"]["exec"])
+        schemas = json.loads(re.search(r"schemas = (\{.*\});", js)[1])
+        acc = schemas["200"]
+        self.assertEqual(acc["properties"]["id"], {"type": "integer", "exclusiveMinimum": 0}, "3.0 exclusive bound as a number, unknown format dropped")
+        self.assertEqual(acc["properties"]["nick"], {"type": ["string", "null"]}, "nullable becomes a null type; example and unknown format dropped")
+        self.assertEqual(acc["properties"]["me"]["required"], ["id"], "$ref resolved (recursion stops by depth)")
+        self.assertIn('documented = ["200", "404"]', js)
+        st = automate.status("SIGNUP")["contract"]; self.assertEqual((st["state"], st["run"]), ("current", ""))
+        self.assertIn("not run since they were built", " ".join(automate.problems("SIGNUP", True)[0]))
+        run = os.path.join("runs", "R-29990101-01")  # a later run in which the endpoint failed
+        self.write(os.path.join(run, "meta.json"), json.dumps({"kind": "contract", "module": "SIGNUP", "collected_at": "2999-01-01T00:00:00Z"}))
+        self.write(os.path.join(run, "results.json"), json.dumps({"cases": [{"name": "the status is in the spec", "suite": "GET /acc/{id}", "status": "failed"}]}))
+        self.assertIn("GET /acc/{id} answers differently from the spec", " ".join(automate.problems("SIGNUP", True)[0]))
+        self.write(contract.bugs_path("SIGNUP"), "# known\nGET /acc/{id} BUG-7 wrong id\n")
+        err, warn = automate.problems("SIGNUP", True)
+        self.assertFalse([e for e in err if "contract" in e]); self.assertIn("expected to fail on BUG-7", " ".join(warn))
+        spec["paths"]["/acc/{id}"]["get"]["responses"]["410"] = {}
+        self.write("requirements/sources/SIGNUP/api.json", json.dumps(spec))
+        self.assertEqual(automate.status("SIGNUP")["contract"]["state"], "stale", "a changed spec marks the contract stale")
 
 
 def load(p):

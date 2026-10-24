@@ -21,8 +21,8 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 3 | Tool advice for functional tests: decision matrix per test type (Web UI, API, Android, iOS) from the approved design, weights and team skills, the human's choice with a reason, approval and baseline; Tools tab in Studio; Windows only from here on | Done (v0.11.0) |
 | 3b | Tool advice for non-functional tests: accessibility, security, performance | Planned |
 | 4a | Automation: test project for the approved tools (Playwright, Postman + Newman, Maestro), one placeholder per case with its steps and tags, run by tag and environment, unique test data, engineers from Studio, stability proof, gate and baseline; Automation tab | Done (v0.12.0) |
-| 4b | Contract tests from the OpenAPI spec; E2E journeys across web and API with shared steps | Next |
-| 5 | Execution: run picker (type, suite, environment, device, BrowserStack), video and step screenshots, API request/response logs, retest after fix, flaky quarantine | Planned |
+| 4b | Contract tests from the OpenAPI spec; E2E journeys across web and API with shared steps | Done (v0.13.0) |
+| 5 | Execution: run picker (type, suite, environment, device, BrowserStack), video and step screenshots, API request/response logs, retest after fix, flaky quarantine | Next |
 | 6 | Reporting: interactive HTML bug and test reports, management summary, trends, cost per stage, write-back to Jira / Azure | Planned |
 | 7 | More Studio: answer agent permission prompts from the browser (Claude Agent SDK), Android exploration from Studio | Planned |
 | 8 | Scale: scheduled CI runs, team roles, notifications, device farms, iOS on a Mac | Planned |

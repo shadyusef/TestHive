@@ -1,5 +1,5 @@
 """Drives Studio's automation stage through its API (demo/phase4/run.sh --check): the Automation data, Run the tests by tag,
-the last run, the evidence route's refusals, a recorded engineer run, and the gate. Usage: python walkthrough.py <studio address>."""
+the last run, the evidence route's refusals, the contract tests, a recorded engineer run, and the gate. Usage: python walkthrough.py <studio address>."""
 import sys, json, time, urllib.request, urllib.error
 from urllib.parse import urlparse, parse_qs
 
@@ -45,6 +45,12 @@ for bad in ("evidence/../meta.json", "meta.json", "evidence/../../../workflow/st
     code, _ = call(f"/api/run-file?m=SIGNUP&run={run.get('run')}&name={bad}")
     step(f"evidence route refuses {bad}", code == 404)
 step("evidence route refuses another run id form", call("/api/run-file?m=SIGNUP&run=..&name=evidence/x")[0] == 404)
+ct = module()["automation"]["contract"]
+step(f"Contract: {ct['operations']} endpoints, {ct['state']}; known bugs {[f['bug'] for f in ct['failed']]}",
+     (ct["operations"], ct["state"], sorted(f["bug"] for f in ct["failed"])) == (3, "current", ["BUG-SIGNUP-201", "BUG-SIGNUP-202"]))
+code, r = call("/api/run", {"module": "SIGNUP", "action": "run-tests", "options": {"kind": "contract", "tag": ""}})
+last = wait(); run = module()["automation"]["runs"].get("contract", {})
+step(f"Run the contract tests: {last['title']}: {last['status']}; {run.get('totals')}", code == 200 and run.get("totals", {}).get("passed") == 2)
 code, r = call("/api/run", {"module": "SIGNUP", "action": "automate-web"})
 last = wait()
 step(f"{last['title']} (recorded): {last['summary'][:110]}", code == 200 and last["status"] == "done")

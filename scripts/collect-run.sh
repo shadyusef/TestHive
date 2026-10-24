@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Stores one test run in runs/ in a common format, whatever the tool (Maestro, Newman, Playwright).
-# Usage: bash scripts/collect-run.sh <mobile|api|web> <module> [--env <env>] [--platform <android|ios|web|api>]
+# Usage: bash scripts/collect-run.sh <mobile|api|contract|web> <module> [--env <env>] [--platform <android|ios|web|api>]
 #                                     [--junit <file>] [--evidence <dir>]
 #   --junit     default: reports/<kind>-<module>.xml (what the run-*.sh scripts write)
 #   --evidence  folder of screenshots, videos and logs to keep with the run; files are linked to a case by its TC-ID
@@ -12,7 +12,7 @@ import sys, os, re, json, glob, time, shutil, platform, csv, xml.etree.ElementTr
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 def die(m): print(m); sys.exit(1)
 a = sys.argv[1:]
-if len(a) < 2 or a[0] not in ("mobile", "api", "web"): die("Usage: collect-run.sh <mobile|api|web> <module> [--env E] [--platform P] [--junit F] [--evidence D]")
+if len(a) < 2 or a[0] not in ("mobile", "api", "contract", "web"): die("Usage: collect-run.sh <mobile|api|contract|web> <module> [--env E] [--platform P] [--junit F] [--evidence D]")
 kind, mod, opt, i = a[0], a[1], {}, 2
 while i < len(a):
     if a[i] in ("--env", "--platform", "--junit", "--evidence") and i + 1 < len(a): opt[a[i][2:]] = a[i + 1]; i += 2
@@ -55,7 +55,7 @@ else:
 tot = {k: sum(1 for c in cases if c["status"] == k) for k in ("passed", "failed", "error", "skipped")}
 tot["total"] = len(cases)
 meta = {"format": "testhive-run/1", "run_id": rid, "kind": kind, "module": mod.upper(), "env": opt.get("env", ""),
-        "platform": opt.get("platform", {"mobile": "android", "api": "api", "web": "web"}[kind]),
+        "platform": opt.get("platform", {"mobile": "android", "api": "api", "contract": "api", "web": "web"}[kind]),
         "collected_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()), "host_os": platform.system(),
         "source": junit.replace(os.sep, "/"), "totals": tot}
 def dump(name, obj):

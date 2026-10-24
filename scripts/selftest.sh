@@ -259,7 +259,7 @@ if [ -d web/node_modules/@playwright/test ] && command -v newman >/dev/null 2>&1
   A_OUT=$(bash demo/phase4/run.sh --check 2>&1 || true); echo "$A_OUT" | grep -q "PHASE 4 CHECK PASS" || { echo "$A_OUT" | grep -E "WRONG|Error|NOT STABLE" | head; echo "phase 4 automation check failed"; exit 1; }
 else echo "(web tools or Newman not installed: skipping the phase 4 automation check)"; fi
 T_OUT=$(bash demo/phase3/run.sh --check 2>&1 || true); echo "$T_OUT" | grep -q "PHASE 3 CHECK PASS" || { echo "$T_OUT" | grep -E "WRONG|Error|Traceback" | head; echo "phase 3 tool advice check failed"; exit 1; }
-$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py scripts/lib/tools.py scripts/lib/automate.py
+$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py scripts/lib/tools.py scripts/lib/automate.py scripts/lib/contract.py
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then
   for f in scripts/*.ps1; do

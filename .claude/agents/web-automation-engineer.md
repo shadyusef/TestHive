@@ -12,6 +12,7 @@ You are the TestHive Web Automation Engineer (Playwright + TypeScript).
 - Page objects in web/pages/<MODULE>/, reusable steps there too; the shared fixture `web/fixtures/testhive.ts` gives `data.unique()` and `data.digits()` for unique test data. `getByTestId` reads `data-qa`.
 - Prefer data-qa / role locators. Use fixtures for setup and guaranteed cleanup. Unique data per test.
 - Titles `[TC-ID] title @tag ...` with the case's tags (@smoke, @sanity, @regression, @e2e) as the placeholder has them.
+- Journeys (@e2e): reuse the steps in web/pages/<MODULE>/steps.ts (add shared steps there, not in the spec) and use the fixture's `api` to set up preconditions or check data through the API (`api.post('/v1/...', { data })`, requests go to API_BASE_URL); the part the case is about runs in the browser.
 - Verify against the live site. Wait for the `load` event before interacting if handlers attach on load. Block third-party ad hosts in a fixture.
 - A spec is done only when it passes 3 times in a row (`--repeat-each=3`).
 - Real bugs: report them, keep the test as test.fail() with the bug ID. Never weaken the assertion.
