@@ -252,11 +252,11 @@ bash scripts/check-private.sh >/dev/null || { bash scripts/check-private.sh; exi
 PR=$(tmpd); mkdir -p "$PR/scripts"; cp scripts/check-private.sh scripts/_py.sh "$PR/scripts/"   # a planted name must fail
 (cd "$PR" && git init -q && printf 'Acme-Secret\n' > .private-names && printf 'see acme-secret here\n' > notes.txt && printf '.private-names\n' > .gitignore)
 bash "$PR/scripts/check-private.sh" >/dev/null 2>&1 && { echo "check-private missed a planted private name"; exit 1; }
-# phase 2d: Run buttons with the recorded agents (jobs, progress, Stop, lock, every step to an approved design)
-D_OUT=$(bash demo/phase2d/run.sh --check 2>&1 || true); echo "$D_OUT" | grep -q "STUDIO RUN CHECK PASS" || { echo "$D_OUT" | tail -25; echo "studio run check failed"; exit 1; }
-C_OUT=$(bash demo/phase2c/run.sh --check 2>&1 || true); echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | tail -25; echo "studio intake check failed"; exit 1; }
+# phase 2d: Run buttons with the recorded agents (jobs, progress, Stop, lock, every step to an approved design)  (each must exit cleanly, not only print PASS)
+D_OUT=$(bash demo/phase2d/run.sh --check 2>&1) && echo "$D_OUT" | grep -q "STUDIO RUN CHECK PASS" || { echo "$D_OUT" | tail -25; echo "studio run check failed"; exit 1; }
+C_OUT=$(bash demo/phase2c/run.sh --check 2>&1) && echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | tail -25; echo "studio intake check failed"; exit 1; }
 if [ -d web/node_modules/@playwright/test ] && command -v newman >/dev/null 2>&1; then  # phase 4 runs real tests: needs the web tools and Newman
-  A_OUT=$(bash demo/phase4/run.sh --check 2>&1 || true); echo "$A_OUT" | grep -q "PHASE 4 CHECK PASS" || { echo "$A_OUT" | grep -E "WRONG|Error|NOT STABLE" | head; echo "phase 4 automation check failed"; exit 1; }
+  A_OUT=$(bash demo/phase4/run.sh --check 2>&1) && echo "$A_OUT" | grep -q "PHASE 4 CHECK PASS" || { echo "$A_OUT" | grep -E "WRONG|Error|NOT STABLE" | head; echo "phase 4 automation check failed"; exit 1; }
 else echo "(web tools or Newman not installed: skipping the phase 4 automation check)"; fi
 T_OUT=$(bash demo/phase3/run.sh --check 2>&1 || true); echo "$T_OUT" | grep -q "PHASE 3 CHECK PASS" || { echo "$T_OUT" | grep -E "WRONG|Error|Traceback" | head; echo "phase 3 tool advice check failed"; exit 1; }
 $PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py scripts/lib/tools.py scripts/lib/automate.py scripts/lib/contract.py

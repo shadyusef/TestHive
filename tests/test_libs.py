@@ -531,7 +531,9 @@ class StudioExplore(StudioApi):
 
     def test_explore_needs_the_web_tools(self):
         self.module(); self.assertFalse(self.js("/api/module?m=LOGIN")[1]["web_tools"])  # a temporary project has no web/node_modules
-        code, r = self.js("/api/run", {"module": "LOGIN", "action": "explore-web"})
+        missing, studio.agents_missing = studio.agents_missing, lambda: []  # as on a PC with Claude Code (CI has none: review mode refuses first)
+        try: code, r = self.js("/api/run", {"module": "LOGIN", "action": "explore-web"})
+        finally: studio.agents_missing = missing
         self.assertEqual(code, 409); self.assertIn("web tools", r["message"])
 
 

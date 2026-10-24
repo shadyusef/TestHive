@@ -59,7 +59,7 @@ await check('Restore from the start page brings the module back', async () => {
   await page.getByText(/^Archived modules/).click(); await shot('3c-archived'); await page.locator('[data-unarch]').click();
   await dlg.getByRole('button', { name: 'Restore' }).click(); await page.locator('.module-card').first().waitFor();
   if (await page.getByText(/^Archived modules/).count()) throw new Error('still listed as archived'); });
-await page.getByRole('button', { name: 'Project' }).click();
+await page.getByRole('button', { name: 'Project', exact: true }).click();
 await check('the Project page shows the saved facts', async () => { await page.getByRole('heading', { name: 'Project details' }).waitFor();
   if ((await page.locator('#p-project').inputValue()) !== 'Nakhla Rewards') throw new Error('project name not shown'); });
 await shot('4-project');
