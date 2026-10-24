@@ -7,7 +7,7 @@ import sys, os, re, glob, json, time, hashlib, secrets, shutil, socket, subproce
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, intake, jobs, projects, pyrun, tools, automate
+import analysis, design, intake, jobs, projects, pyrun, tools, automate, execute
 import modules as archive
 from analysis import read_csv, refs
 
@@ -163,6 +163,20 @@ def next_step(module, m, info):
                             f"api/collections/{module}.contract-bugs.txt (\"<METHOD> <path> <BUG-ID>\"), or fix the spec, then run the contract tests again.",
                             f"{RUN} run-api {module} --contract", "run-contract")
             return step("Every test is written and stable: submit the automation in the Approvals tab.")
+        if st == "execution":
+            x = info["execution"]
+            if not x or not x.get("cycle"): return step("Start a test cycle in the Execution tab: its name and the environment it runs on.", f"{RUN} cycle start {module} \"<name>\" --env <name> --by <you>")
+            cs = x["cases"]
+            for kind in ("web", "api", "mobile"):
+                if any(c["kind"] == kind and c["result"] == "not-run" for c in cs):
+                    return step(f"Run the {KIND_LABEL[kind]} tests of the cycle on {x['cycle']['env'] or 'the default .env'}.", f"{RUN} run-{kind} {module}", f"cycle-{kind}")
+            if x.get("contract") is not None and not x["contract"]["run"]: return step("Run the contract tests of the cycle.", f"{RUN} run-api {module} --contract", "cycle-contract")
+            for kind in ("web", "api"):
+                if any(c["kind"] == kind and c["retest"] for c in cs): return step(f"Retest the {KIND_LABEL[kind]} tests of the fixed bugs.", f"{RUN} retest {kind} {module}", f"retest-{kind}")
+            todo = [c for c in cs if c["kind"] == "manual" and (c["result"] == "not-run" or c["retest"])]
+            if todo: return step(f"{len(todo)} cases are run by hand: record each result in the Execution tab (Passed, Failed with its bug, or Blocked).")
+            if x["check"]["errors"]: return step(f"{len(x['check']['errors'])} things to settle in the Execution tab (failures without a bug, flaky tests): see the list there.")
+            return step("Every case has its result: submit the execution in the Approvals tab.")
         return step(f"Stage '{st}' comes in a later TestHive phase.")
     return step("All stages are approved.")
 
@@ -197,6 +211,18 @@ ACTIONS = {
                                          [f"scripts/run-{o['kind']}.sh", m] + (["--tag", o["tag"]] if o["tag"] else [])},
     "run-contract": {"title": "Run the contract tests", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/run-api.sh", m, "--contract"]},
 }
+for _k in ("web", "api", "contract", "mobile"):  # the test cycle's runs: on the cycle's environment
+    ACTIONS[f"cycle-{_k}"] = {"title": f"Run the {dict(api='API').get(_k, _k)} tests of the cycle",
+                              "minutes": "1-15", "command": "", "cycle": True,
+                              "script": (lambda k: lambda m, o: ["scripts/run-api.sh", m, "--contract"] if k == "contract" else [f"scripts/run-{k}.sh", m] + (["--tag", o["tag"]] if o["tag"] else []))(_k)}
+for _k in ("web", "api"):
+    ACTIONS[f"retest-{_k}"] = {"title": f"Retest the {_k if _k == 'web' else 'API'} failures", "minutes": "1-10", "command": "", "cycle": True,
+                               "script": (lambda k: lambda m, o: ["scripts/retest.sh", k, m])(_k)}
+
+
+def envs():
+    """The named environments of this project: the names of its .env.<name> files (their contents are never read here)."""
+    return sorted(n[5:] for n in os.listdir(".") if n.startswith(".env.") and execute.ENV.fullmatch(n[5:]) and n[5:] not in ("example",) and os.path.isfile(n))
 KIND_LABEL = {"web": "web", "api": "API", "mobile": "mobile"}
 ENGINEER = {"web": "web-automation-engineer", "api": "api-backend-test-engineer", "mobile": "mobile-automation-engineer"}
 WHERE = {"web": "web/tests/{m}/ (page objects in web/pages/{m}/)", "api": "api/collections/{m}.postman_collection.json", "mobile": "mobile/flows/{m}/"}
@@ -214,8 +240,15 @@ for _k in ("web", "api", "mobile"):
 def start_action(module, action, info, opts=None):
     """Starts the Run button's job. Returns (job, error). opts: kind and tag for run-tests."""
     if action not in ACTIONS: return None, "unknown action"
-    o = {"kind": str((opts or {}).get("kind", "")), "tag": str((opts or {}).get("tag", ""))}
+    o = {"kind": str((opts or {}).get("kind", "")), "tag": str((opts or {}).get("tag", "")), "env": str((opts or {}).get("env", ""))}
     if action == "run-tests" and (o["kind"] not in ("web", "api", "contract", "mobile") or o["tag"] not in [""] + design.TAGS): return None, "unknown action"
+    if o["tag"] not in [""] + design.TAGS or o["env"] and o["env"] not in envs(): return None, "unknown action"
+    if ACTIONS[action].get("cycle"):
+        c = execute.current(module)
+        if not c: return None, "Start a test cycle first (Execution tab)."
+        if load_state()["modules"][module]["stages"]["execution"]["status"] in ("approved", "awaiting_approval"):
+            return None, "The cycle is submitted or approved: its results are frozen (reopen or reject it in Approvals to run more)."
+        o["env"] = c["env"]
     if agents_missing(): return None, (f"Review mode: {' and '.join(agents_missing())} {'is' if len(agents_missing()) == 1 else 'are'} not on this PC, "
                                        "so agents cannot run here. Someone with Claude Code runs the command shown; everything else works here.")
     a, mt = ACTIONS[action], info["meta"]
@@ -227,8 +260,9 @@ def start_action(module, action, info, opts=None):
     if "script" in a:
         if load_state()["modules"][module]["stages"]["tools"]["status"] != "approved": return None, "Approve the tools first."  # the test scripts
         cmd = [intake.bash()] + a["script"](module, o)
-        return jobs.start(module, "script", a["title"] + (f" ({o['kind']}{', ' + o['tag'] if o['tag'] else ''})" if action == "run-tests" else ""),
-                          cmd, task=" ".join(cmd[1:]))
+        where = f" on {o['env']}" if o["env"] else ""
+        return jobs.start(module, "script", a["title"] + (f" ({o['kind']}{', ' + o['tag'] if o['tag'] else ''})" if action == "run-tests" else "") + where,
+                          cmd, task=(f"TEST_ENV={o['env']} " if o["env"] else "") + " ".join(cmd[1:]), env={"TEST_ENV": o["env"]} if o["env"] else None)
     review = (sorted(glob.glob(os.path.join("reviews", f"DESIGN-{module}-*.md")), key=os.path.getmtime) or [""])[-1].replace(os.sep, "/")
     if action == "design-fix" and not review: return None, "There is no pre-review to fix yet."
     task = a["task"].format(m=module, review=review, explore=(" Explore the built product too:" + explore_note(mt) + ".") if mt.get("url") or mt.get("apk") else "")
@@ -292,6 +326,12 @@ def module_info(module):
         err, warn = automate.problems(module, True, au)
         info["automation"] = dict(au, runs=last_runs(module), check={"ok": not err, "errors": err, "warnings": warn})
     else: info["automation"] = None
+    ex = execute.status(module) if m["stages"]["automation"]["status"] == "approved" or execute.current(module) else None
+    if ex:
+        err, warn = execute.problems(module, True, ex)
+        info["execution"] = dict(ex, check={"ok": not err, "errors": err, "warnings": warn}, envs=envs())
+    else: info["execution"] = {"cycle": None, "envs": envs()} if m["stages"]["automation"]["status"] == "approved" else None
+    if info["automation"]: info["automation"]["envs"] = envs()
     info["approvals"] = approvals(module)
     a_hist = [h for h in m["stages"]["analysis"]["history"] if h["status"] == "approved"]
     info["meta"] = intake.meta(module)
@@ -712,6 +752,23 @@ def post_ingest(h, q, body, module):
 def post_mask_lists(h, q, body, module):
     t, a = intake.save_mask_lists(body.get("terms") or [], body.get("allow") or [])
     return h.send(200, {"ok": True, "message": f"Saved: {t} names to hide, {a} values to leave as they are. Read the documents again to apply."})
+
+
+@api("POST", "/api/execution", module="body", busy_check=True)
+def post_execution(h, q, body, module):
+    """The test cycle: start one, record results of cases run by hand, link bugs, mark bugs fixed, quarantine flaky tests.
+    The rules are execute.py's (the same as scripts/cycle.sh); the page sends the person's name with each."""
+    action, by = body.get("action"), str(body.get("by", "")).strip()
+    s = lambda k: str(body.get(k, "")).strip()
+    args = {"start": lambda: [module, s("name"), "--env", s("env")],
+            "result": lambda: [module, ",".join(str(x) for x in body.get("ids") or []), s("result")] + (["--bug", s("bug")] if s("bug") else []) + (["--note", s("note")] if s("note") else []),
+            "bug": lambda: [module, s("id"), s("bug")], "fixed": lambda: [module, s("bug")] + (["--note", s("note")] if s("note") else []),
+            "quarantine": lambda: [module, s("id"), "--reason", s("reason")], "unquarantine": lambda: [module, s("id")]}.get(action)
+    if not args or not isinstance(body.get("ids", []), list): return h.send(400, {"error": "bad request"})
+    if any(v.startswith("-") for v in args()[1:] if v not in ("--env", "--bug", "--note", "--reason")): return h.send(400, {"ok": False, "message": "A value cannot start with -"})
+    if not by: return h.send(400, {"ok": False, "message": "your name is needed: results are signed"})
+    code, out = intake.run_py("execute.py", [action] + args() + ["--by", by])
+    return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out.strip()})
 
 
 @api("POST", "/api/stage", module="body", busy_check=True)

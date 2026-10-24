@@ -1,12 +1,12 @@
 """Unit tests for TestHive's Python libraries and Studio's API (standard-library unittest, no installs).
 Run by scripts/selftest.sh:  python -m unittest discover -s tests
 Each test works in its own temporary project folder with a copy of scripts/; the real project is never touched."""
-import os, sys, re, glob, json, shutil, tempfile, threading, subprocess, unittest, urllib.request, urllib.error
+import os, sys, re, glob, json, time, shutil, tempfile, threading, subprocess, unittest, urllib.request, urllib.error
 
 for k in ("TH_STATE", "TH_ANALYSIS", "TH_CASES", "TH_JOB", "TH_ARCHIVE", "TH_CLAUDE_FAKE"): os.environ.pop(k, None)  # defaults only
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
-import analysis, design, intake, modules, studio, tools, automate, contract  # noqa: E402
+import analysis, design, intake, modules, studio, tools, automate, contract, execute  # noqa: E402
 
 BASH = os.environ.get("TH_BASH") or shutil.which("bash")  # selftest passes the Git Bash path on Windows (not WSL's bash)
 REQ_HEAD = ",".join(analysis.REQ_COLS) + "\n"
@@ -419,6 +419,69 @@ class Automation(ToolAdvice):
         spec["paths"]["/acc/{id}"]["get"]["responses"]["410"] = {}
         self.write("requirements/sources/SIGNUP/api.json", json.dumps(spec))
         self.assertEqual(automate.status("SIGNUP")["contract"]["state"], "stale", "a changed spec marks the contract stale")
+
+
+class Execution(Automation):
+    """Stage 5: a test cycle's results from the runs and by hand, bugs, flaky tests, quarantine, retest after a fix, and the gate."""
+    test_scaffold_state_and_gate = test_contract_from_the_spec = None
+
+    def setUp(self):
+        super().setUp()
+        automate.scaffold("SIGNUP")
+        with open(studio.STATE, encoding="utf-8") as f: s = json.load(f)
+        s["modules"]["SIGNUP"]["stages"]["automation"]["status"] = "approved"; self.write(studio.STATE, json.dumps(s))
+        self.n = 0
+
+    def ex(self, *a, env=None):
+        return subprocess.run([sys.executable, "scripts/lib/execute.py", *a], capture_output=True, text=True, encoding="utf-8", env=dict(os.environ, **(env or {})))
+
+    def run_of(self, kind, results, env="uat"):
+        self.n += 1; d = os.path.join("runs", f"R-29990101-{self.n:02d}")
+        self.write(os.path.join(d, "meta.json"), json.dumps({"run_id": os.path.basename(d), "kind": kind, "module": "SIGNUP", "env": env, "collected_at": execute.now()}))
+        self.write(os.path.join(d, "results.json"), json.dumps({"cases": [{"id": i, "status": st} for i, st in results]}))
+
+    def errors(self): return " | ".join(execute.problems("SIGNUP", True)[0])
+
+    def test_cycle_results_bugs_flaky_and_retest(self):
+        self.assertIn("no test cycle yet", self.errors())
+        self.assertNotEqual(self.ex("start", "SIGNUP", "1.0", "--env", "uat", "--by", "Sara", env={"TH_JOB": "x"}).returncode, 0, "an agent cannot start a cycle")
+        self.assertNotEqual(self.ex("start", "SIGNUP", "1.0", "--env", "../x", "--by", "Sara").returncode, 0, "the environment is a plain name")
+        self.assertEqual(self.ex("start", "SIGNUP", "1.0", "--env", "uat", "--by", "Sara").returncode, 0)
+        kinds = {c["ID"]: c["kind"] for c in execute.status("SIGNUP")["cases"]}
+        self.assertEqual(kinds, {"TC-SIGNUP-001": "web", "TC-SIGNUP-002": "api", "TC-SIGNUP-003": "mobile", "TC-SIGNUP-005": "manual"})
+        self.assertIn("TC-SIGNUP-001: no result", self.errors())
+        self.run_of("web", [("TC-SIGNUP-001", "failed")]); self.run_of("web", [("TC-SIGNUP-001", "passed")], env="prod")  # another environment: not counted
+        self.run_of("api", [("TC-SIGNUP-002", "passed"), ("TC-SIGNUP-002", "failed")])  # a request fails when one of its checks fails
+        self.run_of("mobile", [("TC-SIGNUP-003", "passed")])
+        st = {c["ID"]: c for c in execute.status("SIGNUP")["cases"]}
+        self.assertEqual((st["TC-SIGNUP-001"]["result"], st["TC-SIGNUP-002"]["result"]), ("failed", "failed"))
+        self.assertEqual(execute.status("SIGNUP")["other_env_runs"], 1)
+        self.assertIn("TC-SIGNUP-001: failed without a bug ID", self.errors())
+        self.assertNotEqual(self.ex("result", "SIGNUP", "TC-SIGNUP-001", "Passed", "--by", "Sara").returncode, 0, "an automated result comes from the runs")
+        self.assertNotEqual(self.ex("result", "SIGNUP", "TC-SIGNUP-005", "Failed", "--by", "Sara").returncode, 0, "a failure needs its bug")
+        self.assertNotEqual(self.ex("result", "SIGNUP", "TC-SIGNUP-005", "Blocked", "--by", "Sara").returncode, 0, "blocked needs a note")
+        self.assertEqual(self.ex("result", "SIGNUP", "TC-SIGNUP-005", "Failed", "--bug", "BUG-7", "--note", "=HYPERLINK(x)", "--by", "Lina").returncode, 0)
+        self.assertEqual(execute.read_log("SIGNUP", execute.current("SIGNUP"))[-1]["Note"], "'=HYPERLINK(x)", "never a formula in Excel")
+        time.sleep(1.1); self.ex("bug", "SIGNUP", "TC-SIGNUP-001", "BUG-8", "--by", "Sara"); self.ex("bug", "SIGNUP", "TC-SIGNUP-002", "BUG-9", "--by", "Sara")
+        self.assertEqual(self.errors(), "", "every failure has its bug")
+        self.run_of("api", [("TC-SIGNUP-002", "passed")])
+        self.assertIn("TC-SIGNUP-002: flaky (passed and failed: FP)", self.errors(), "it passed without a fix")
+        self.assertNotEqual(self.ex("quarantine", "SIGNUP", "TC-SIGNUP-002", "--by", "Sara").returncode, 0, "a quarantine needs its reason")
+        self.ex("quarantine", "SIGNUP", "TC-SIGNUP-002", "--reason", "timing", "--by", "Sara")
+        err, warn = execute.problems("SIGNUP", True)
+        self.assertEqual(err, []); self.assertIn("TC-SIGNUP-002: quarantined by Sara: timing", warn)
+        time.sleep(1.1); self.ex("fixed", "SIGNUP", "BUG-8", "--by", "Sara"); self.ex("fixed", "SIGNUP", "BUG-7", "--by", "Sara"); time.sleep(1.1)  # times are to the second
+        self.assertIn("TC-SIGNUP-001: BUG-8 is fixed: retest it", self.errors())
+        self.assertIn("TC-SIGNUP-005: BUG-7 is fixed: retest it", self.errors(), "a case run by hand is recorded again after the fix")
+        self.assertEqual(self.ex("retest", "web", "SIGNUP").stdout.strip(), "TC-SIGNUP-001")
+        self.run_of("web", [("TC-SIGNUP-001", "passed")])
+        self.ex("result", "SIGNUP", "TC-SIGNUP-005", "Passed", "--by", "Lina")
+        self.assertEqual(self.errors(), "", "fail, fix, pass is not flaky")
+        r = self.stage("submit", "SIGNUP", "execution"); self.assertEqual(r.returncode, 0, r.stdout)
+        self.assertNotEqual(self.ex("result", "SIGNUP", "TC-SIGNUP-005", "Failed", "--bug", "BUG-1", "--by", "Lina").returncode, 0, "frozen while waiting for approval")
+        r = self.stage("approve", "SIGNUP", "execution", "--by", "Omar"); self.assertEqual(r.returncode, 0, r.stdout)
+        meta = load(os.path.join(execute.DIR, "baseline", "SIGNUP", "v1", "meta.json"))
+        self.assertEqual((meta["cycle"]["id"], meta["cases"]["TC-SIGNUP-002"]["quarantine"], len(meta["runs"])), ("C1", "timing", 5))
 
 
 def load(p):

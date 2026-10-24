@@ -22,7 +22,7 @@ def save(s):
     os.replace(SF + ".tmp", SF)
 LIBS = {"analysis": ("analysis.py", os.path.join(os.environ.get("TH_ANALYSIS", "analysis"), "requirements.csv")),
         "design": ("design.py", os.path.join(os.environ.get("TH_CASES", "test-cases"), "TestCases.csv")),
-        "tools": ("tools.py", None), "automation": ("automate.py", None)}  # None: always checked (the check itself needs the approved design)
+        "tools": ("tools.py", None), "automation": ("automate.py", None), "execution": ("execute.py", None)}  # None: always checked (the check itself needs the approved design)
 def has_files(st): return st in LIBS and (LIBS[st][1] is None or os.path.exists(LIBS[st][1]))
 def ready(name, st):
     """Runs the stage's own --for-approval check when the stage has one and its files exist. True if fine."""
@@ -120,7 +120,8 @@ elif cmd == "submit":
     if i and m["stages"][STAGES[i - 1]]["status"] != "approved": die(f"BLOCKED: {STAGES[i - 1]} is not approved (it was reopened); approve it first", 2)
     if not ready(pos[0].upper(), st):
         die("BLOCKED: not ready to submit. " + {"tools": "Choose a tool for each test type (tool-advice), then submit.",
-            "automation": "Write every test and prove it stable (check-automation), then submit."}.get(st,
+            "automation": "Write every test and prove it stable (check-automation), then submit.",
+            "execution": "Every case needs its result in the test cycle, failures a bug ID (cycle.sh check), then submit."}.get(st,
             "Give the workbook to the human, import the review, re-check, then submit."), 2)
     mark(m, st, "awaiting_approval"); save(s); print(f"{pos[0].upper()} {st}: waiting for human approval")
 elif cmd in ("approve", "reject", "reopen", "archive", "restore") and os.environ.get("TH_JOB"):

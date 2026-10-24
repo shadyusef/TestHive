@@ -9,6 +9,7 @@ $PY -c "import sys,yaml; s=yaml.safe_load(open(sys.argv[1],encoding='utf-8')); p
 for st in analysis design; do
   bash scripts/stage.sh start SIGNUP $st >/dev/null
   [ $st = design ] && cp "$P2"/recorded/recheck-1/TestCases.csv "$P2"/recorded/recheck-1/requests.csv test-cases/ && cp "$P2"/recorded/recheck-1/gaps.csv analysis/
+  [ $st = design ] && [ -n "$ONLY_AUTOMATE" ] && $PY -c "import csv,sys; p='test-cases/TestCases.csv'; r=list(csv.DictReader(open(p,encoding='utf-8-sig'))); keep=set(sys.argv[1].split(',')); [x.update(Automation='Yes' if x['ID'] in keep else 'No') for x in r if x['Automation'] in ('Yes','Candidate') or x['ID'] in keep]; w=csv.DictWriter(open(p,'w',encoding='utf-8',newline=''),r[0].keys(),lineterminator='\n'); w.writeheader(); w.writerows(r)" "$ONLY_AUTOMATE"  # phase 5: only the recorded tests are automated
   bash scripts/stage.sh submit SIGNUP $st >/dev/null; bash scripts/stage.sh approve SIGNUP $st --by "Sara (QA lead)" >/dev/null
 done
 bash scripts/stage.sh start SIGNUP tools >/dev/null

@@ -24,9 +24,11 @@ export function renderAutomation() {
       { label: 'Known bugs', value: bugs, sub: bugs ? 'tests expected to fail until the bug is fixed' : 'no test waits for a fix' },
     ])}
     ${kinds.length ? `<section class="block"><div class="blockhead"><div class="grow"><h2>Run the tests</h2>
-      <p class="small muted">Against the environment in .env (TEST_ENV picks .env.&lt;name&gt;). Each run is kept in runs/ with its screenshots, videos and logs.</p></div></div>
+      <p class="small muted">Against the environment you pick: .env, or a named one (.env.&lt;name&gt;).
+        These runs prove the tests; the results that count for a release are the test cycle's (Execution tab). Each run is kept in runs/ with its screenshots, videos and logs.</p></div></div>
       <div class="decide"><select id="rk" aria-label="Which tests">${kinds.map(k => `<option value="${k}">${KIND[k]} tests</option>`).join('')}</select>
         <select id="rt" aria-label="Tag"><option value="">every tag</option>${TAGS.map(t => `<option>${t}</option>`).join('')}</select>
+        <select id="re" aria-label="Environment"><option value="">the default .env</option>${(a.envs || []).map(e => `<option value="${esc(e)}">.env.${esc(e)}</option>`).join('')}</select>
         <button class="primary" id="rgo" ${S.agents === 'review' || S.data.job ? 'disabled' : ''}>Run</button></div></section>` : ''}
     ${ct ? contractBlock(ct) : ''}
     ${Object.entries(a.runs).map(([k, r]) => runBlock(k, r)).join('')}
@@ -40,9 +42,9 @@ export function renderAutomation() {
     </tbody></table></div></section>`;
   bindFilters(renderAutomation);
   if ($('#rgo')) $('#rgo').onclick = async () => {
-    const kind = $('#rk').value, tag = kind === 'contract' ? '' : $('#rt').value;
-    if (!await ask(`Run the ${KIND[kind]} tests of ${S.module}${tag ? ` tagged ${tag}` : ''} now? They run against the environment in .env.`, { ok: 'Run' })) return;
-    const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: S.module, action: 'run-tests', options: { kind, tag } }) });
+    const kind = $('#rk').value, tag = kind === 'contract' ? '' : $('#rt').value, env = $('#re').value;
+    if (!await ask(`Run the ${KIND[kind]} tests of ${S.module}${tag ? ` tagged ${tag}` : ''} now, on ${env ? '.env.' + env : 'the default .env'}?`, { ok: 'Run' })) return;
+    const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: S.module, action: 'run-tests', options: { kind, tag, env } }) });
     toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(S.module, true);
   };
 }

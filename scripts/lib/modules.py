@@ -7,7 +7,7 @@ Nothing is deleted. Called by scripts/stage.sh (archive, restore), which also mo
 An archive folder holds files/<original path> and rows/<register path> (the module's rows of the shared registers)."""
 import sys, os, re, json, glob, shutil, time, hashlib, fnmatch
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, tools, automate
+import analysis, design, tools, automate, execute
 from analysis import read_csv, write_csv, die
 
 ARCHIVE = os.environ.get("TH_ARCHIVE", "archive")
@@ -32,7 +32,7 @@ def fixed_paths(m):
             os.path.join(analysis.DIR, "exploration", m), os.path.join(analysis.DIR, "baseline", m),
             os.path.join(design.TC_DIR, "baseline", m), os.path.join(tools.DIR, "baseline", m),
             os.path.join(automate.DIR, "baseline", m), os.path.join("web", "tests", m), os.path.join("mobile", "flows", m), automate.collection(m),
-            automate.contract.path(m), automate.contract.bugs_path(m),
+            automate.contract.path(m), automate.contract.bugs_path(m), os.path.join(execute.DIR, m), os.path.join(execute.DIR, "baseline", m),
             os.path.join("api", "environments", f"{m}.postman_environment.json"), os.path.join(analysis.DIR, f"{m}-analysis.xlsx"),
             os.path.join(design.TC_DIR, f"{m}-design.xlsx")]
 

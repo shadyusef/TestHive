@@ -2,6 +2,15 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.14.0 (2026-10-24)
+- Phase 5a, execution: once the automation is approved, `cycle start <MODULE> "<name>" --env <name>` (or Studio's new **Execution** tab) starts a test cycle on one environment. Every functional case of the approved design gets its result in it: automated cases from the runs on that environment since the cycle started, the others recorded by hand (Passed, Failed with its bug, Blocked with a note), signed.
+- Bugs: a failed automated test is linked to its bug (`cycle bug`); a bug marked fixed (`cycle fixed`) makes its cases due for a retest, and `retest web|api <MODULE>` reruns only those (`run-web` and `run-api` take `--ids`). A test that passed and failed with no fix in between is flaky and blocks the cycle until it is fixed or quarantined with a reason (it keeps running).
+- The execution stage is approved on the cycle's results (`cycle check --for-approval`), recorded in `execution/baseline/<MODULE>/v<n>/`; the cycle is frozen while it waits for approval and after it.
+- Evidence: a failed web test keeps its video (new), screenshot and trace; every API request keeps a text log of the request, the response and its checks, with Authorization, cookies and secret-looking fields masked. Studio opens them from the run.
+- Run picker: Studio's Run (Automation tab) picks the environment from the project's `.env.<name>` files (names only); the cycle's runs use the cycle's environment.
+- New demo `demo/phase5/run.sh`: build 1.0 of the stand-in app has a planted bug and a flaky resend; the cycle finds both, the tester records the cases run by hand, build 1.0.1 fixes the bug, the failure is retested and the cycle approved (also in the selftest and CI).
+- Fixes: the phase 4b token change had not applied (`TEST_API_TOKEN` was still on Newman's command line); the demos no longer copy your `.env.<name>` files into their temporary folder.
+
 ## 0.13.0 (2026-10-24)
 - Phase 4b, contract tests: with Postman + Newman approved and an OpenAPI spec among the module's sources, `scaffold` (or `contract <MODULE>`) builds `api/collections/<MODULE>.contract.postman_collection.json`, one request per endpoint that checks the status is one the spec lists and the JSON body matches the spec's schema. No agent and no test data: request values come from the spec's examples. The collection remembers the spec's checksum, so a changed spec makes it stale until it is rebuilt. Run it with `run-api <MODULE> --contract` (bearer-protected endpoints get `TEST_API_TOKEN` from `.env`, passed to Newman in a temporary file, not on the command line). Spec paths that are not plain paths are skipped.
 - The gate needs the contract tests current and run since they were built; an endpoint that answers differently from the spec blocks approval until it is listed with its bug ID in `api/collections/<MODULE>.contract-bugs.txt`. Studio's Automation tab shows the contract tests, their state and failing endpoints, and runs them (**Contract tests** in the Run list); the next step points to them.

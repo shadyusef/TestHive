@@ -11,6 +11,7 @@ export default defineConfig({
     testIdAttribute: process.env.TEST_ID_ATTRIBUTE || 'data-qa', // getByTestId() finds data-qa="..." (the agents' locator rule)
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
+    video: 'retain-on-failure', // the evidence of a failed test: its video, screenshot and trace (each step) are kept with the run
   },
   // Windows uses the installed Microsoft Edge (no browser download); elsewhere Playwright's Chromium. TH_BROWSER_CHANNEL overrides.
   projects: [{ name: 'browser', use: { ...devices['Desktop Chrome'], channel: process.env.TH_BROWSER_CHANNEL || (process.platform === 'win32' ? 'msedge' : undefined) } }],

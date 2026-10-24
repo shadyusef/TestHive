@@ -186,6 +186,19 @@ approves the stage: `module`, `version`, `approved_by`, `approved_at`, `git_comm
 the test files, the fixture, the contract collection and its known bugs).
 Environments: `.env`, then `.env.<TEST_ENV>` over it (both git-ignored); `TEST_ENV` given on the command line wins.
 
+## Execution (stage 5, written by `scripts/cycle.sh`, Studio and `stage.sh`)
+A test cycle is `execution/<MODULE>/C<n>/` (the latest is the current one):
+- `cycle.json`: `id`, `module`, `name`, `env` (the `TEST_ENV` name; empty for `.env`), `started_at`, `started_by`.
+- `log.csv`, append-only: `At`, `By`, `Action` (result, bug, fixed, quarantine, unquarantine), `ID`, `Result` (Passed, Failed, Blocked), `Bug`, `Note`.
+  The latest row of a case wins. Notes and names are one line; a leading `= + - @` gets a `'` so Excel never reads a formula.
+The cases are the active functional cases of the latest design baseline. An automated case's result is from the module's stored
+runs with the cycle's `env` collected after `started_at` (a request fails if any of its checks fails); `known-bug` is a pass of a test
+marked as expected to fail. The others are recorded by hand. Flaky: passed and failed in the cycle with no fixed bug between.
+Retest: a bug marked fixed whose case has not passed (or, by hand, not been recorded) since. The gate needs every case with a result,
+every failure with a bug, no flaky case unless quarantined, no retest left, and the contract tests run in the cycle with every failing
+endpoint listed. `execution/baseline/<MODULE>/v<n>/meta.json`: `module`, `version`, `approved_by`, `approved_at`, `git_commit`, `cycle`,
+`runs`, `contract`, `cases` (ID -> kind, result, bug, flaky, quarantine).
+
 ## Design benchmark key (e.g. `demo/phase2/condition-key.csv`)
 Columns `Key`, `Condition`, `Requirement` (`|`-separated REQ IDs; a matching case must link one of them; empty = any case),
 `Keywords` (as in the analysis key; a number must match a whole number, so `7` does not match `17`). `scripts/score-design.sh`
@@ -204,7 +217,9 @@ step: `$` commands, `writes` files, `>` messages, `!` errors) and, for agents, `
   `status` is `passed`, `failed`, `error` or `skipped`. `id` is the TC-ID found in the test name.
   `evidence` lists the files under `evidence/` whose name contains the TC-ID.
 - `junit.xml`: the original results file.
-- `evidence/`: screenshots, videos and logs (git-ignored: large files stay on the PC or in CI artifacts).
+- `evidence/`: screenshots, videos and logs (git-ignored: large files stay on the PC or in CI artifacts). Web: Playwright's folder per
+  failed test (video, screenshot, trace). API: one text file per request, `<n>-<TC-ID>-<name>.txt`, with the request, the response and
+  each check; Authorization, cookie, token and key headers and secret-looking JSON fields (password, token, otp, ...) are `***`.
 - `runs/index.csv`: one line per run, for history and trends.
 
 ## Masking: `.mask-terms`, `.mask-allow`, `.mask-map.json` (all git-ignored, never leave the PC)

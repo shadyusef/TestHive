@@ -149,8 +149,8 @@ def _follow(job, proc):
         save(job)
 
 
-def start(module, kind, title, cmd, task="", agent=""):
-    """Starts a job unless the module already has one. Returns (job, error)."""
+def start(module, kind, title, cmd, task="", agent="", env=None):
+    """Starts a job unless the module already has one. Returns (job, error). env: extra environment (TEST_ENV for a run)."""
     with LOCK:
         load_history()
         if running(module): return None, f"{running(module)['title']} is still working on {module}. Wait for it or stop it first."
@@ -159,7 +159,7 @@ def start(module, kind, title, cmd, task="", agent=""):
         job["_dir"] = os.path.abspath(os.path.join(DIR, job["id"]))  # stays in this project even if Studio switches project later
         save(job)
         kw = {"start_new_session": True} if os.name != "nt" else {"creationflags": subprocess.CREATE_NEW_PROCESS_GROUP}
-        env = dict(os.environ, PYTHONIOENCODING="utf-8", TH_JOB=job["id"])  # stage.sh and the hooks treat it as an agent, not a person
+        env = dict(os.environ, **(env or {}), PYTHONIOENCODING="utf-8", TH_JOB=job["id"])  # stage.sh and the hooks treat it as an agent, not a person
         try:
             proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL, text=True,
                                     encoding="utf-8", errors="replace", env=env, **kw)

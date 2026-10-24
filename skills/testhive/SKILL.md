@@ -35,7 +35,7 @@ Agent definitions live in `.claude/agents/`. In Claude Code the user can also ru
 - Never assume app behaviour; verify on the real app.
 
 ## Workflow
-Stages with a human approval after each (`scripts/stage.sh`): analysis (registers, Excel Q&A, baseline) -> design (cases, pre-review, Excel review, baseline) -> tools (decision matrix per test type, human choice, baseline) -> automation (scaffold, placeholders per case, engineers write and prove them, gate, baseline) -> execution -> reporting.
+Stages with a human approval after each (`scripts/stage.sh`): analysis (registers, Excel Q&A, baseline) -> design (cases, pre-review, Excel review, baseline) -> tools (decision matrix per test type, human choice, baseline) -> automation (scaffold, placeholders per case, engineers write and prove them, gate, baseline) -> execution (test cycle on one environment: results from the runs and by hand, bugs, retest, quarantine, gate, baseline) -> reporting.
 Plan -> analysis -> designed cases -> automate P0/P1 first -> run -> triage failures -> review -> fix -> stability run (3 passes in a row) -> final run -> bug report, final test report, brief.
 Loop until the reviewer has no open Blocker or Major finding, then sign off.
 
@@ -58,6 +58,7 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/check-intake.sh` - older projects: flags unfilled intake sections and business rules with no test case.
 - `setup` (`setup.sh` / `setup.ps1`) - prerequisites check and installer (git, node, python + requirements.txt, java 17, maestro, adb, newman, claude code; `--web` Playwright, `--ocr` Tesseract with Arabic).
 - `tool-advice` - stage 3: the decision matrix per test type for the functional cases, the human's choice (`choose`), `check`, `settings` (weights, team skills).
+- `cycle`, `retest` - stage 5: a test cycle on one environment (results by hand and from the runs, bugs, fixed, quarantine of flaky tests, the gate); `retest web|api` reruns the failures.
 - `scaffold`, `check-automation` - stage 4: placeholders for the approved tools, and the gate (every Yes case written and stable). `contract` builds contract tests from the OpenAPI spec (`run-api <M> --contract`); @e2e journeys use the web fixture's `api`. Run scripts take `--tag smoke|sanity|regression|e2e`; `TEST_ENV=<name>` loads `.env.<name>` over `.env`.
 - `stage` - stage gates and approvals, and archive/restore of a module; `collect-run` - stores runs; `mask` - hides personal data (`suggest`/`review` are for the human only).
 - On Windows every script runs as `.\hive <name> ...`; see README and docs/TROUBLESHOOTING.md.

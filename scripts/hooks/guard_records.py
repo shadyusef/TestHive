@@ -7,6 +7,7 @@ PROTECTED = {"workflow/APPROVALS.md": "the approvals log is append-only and writ
              "workflow/state.json": "stage status changes only through stage.sh (start, submit; approve and reject by a named human)"}
 PROTECTED_DIRS = {"analysis/baseline/": "an approved analysis baseline is frozen",
                   "test-cases/baseline/": "an approved design baseline is frozen", "tools/baseline/": "an approved tool choice is frozen", "automation/baseline/": "an approved automation is recorded",
+                  "execution/": "test cycles and their results are recorded with cycle.sh (results, bugs, quarantine) or in Studio",
                   "tools/choices.csv": "tool choices are a person's decision, saved with tool-advice.sh choose or in Studio",
                   "tools/settings.json": "the weights and team skills are a person's decision (tool-advice.sh settings or Studio)"}
 
@@ -30,7 +31,7 @@ fold = (lambda x: x.lower()) if os.name == "nt" else (lambda x: x)  # Windows pa
 why = next((w for f, w in PROTECTED.items() if fold(rel) == fold(f)), None) or \
       next((w for d, w in PROTECTED_DIRS.items() if fold(rel).startswith(fold(d))), None)
 if why:
-    record = rel.startswith(("workflow/", "analysis/baseline/", "test-cases/baseline/", "tools/", "automation/"))
+    record = rel.startswith(("workflow/", "analysis/baseline/", "test-cases/baseline/", "tools/", "automation/", "execution/"))
     print(f"Refused: {rel} is not edited directly ({why})." + (" Use bash scripts/stage.sh (status, start, submit, reopen); "
           "approvals and rejections are made by a named human." if record else ""), file=sys.stderr)
     sys.exit(2)

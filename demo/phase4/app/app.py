@@ -1,6 +1,8 @@
 """A small stand-in for the fictional Nakhla Rewards sign-up (demo only): the web pages and the API the phase 4 tests run against.
 Usage: python app.py [port] [--resend-cooldown seconds] [--break-contract]      prints "APP http://127.0.0.1:<port>" when it is ready
 --break-contract: the sign-up answers signupId as a number, not the string the spec gives (the contract tests catch it).
+--bug otp-message: a planted bug (phase 5): a wrong code shows "Invalid code" instead of "The code is incorrect."
+--flaky-resend: the first resend request fails with 503 (phase 5: a flaky test, quarantined).
 Web: /signup -> /otp -> /welcome. API: POST /v1/signup, /v1/otp/verify, /v1/otp/resend (demo/phase1/sources/openapi.yaml).
 Numbers 0500000037 and 0500000087 are already registered; the OTP is always 123456. Everything is kept in memory."""
 import sys, json, re, time, secrets
@@ -12,6 +14,8 @@ PENDING = {}  # signupId -> {"mobile", "sent"}
 a = sys.argv[1:]
 COOLDOWN = float(a[a.index("--resend-cooldown") + 1]) if "--resend-cooldown" in a else 30.0
 BROKEN = "--break-contract" in a
+WRONG_MESSAGE = "--bug" in a and a[a.index("--bug") + 1] == "otp-message"
+FLAKY = {"resend": "--flaky-resend" in a}
 
 PAGE = """<!doctype html><html lang="en"><head><meta charset="utf-8"><title>{title} - Nakhla Rewards</title>
 <style>body{{font:16px system-ui;max-width:420px;margin:40px auto;padding:0 16px}}label{{display:block;margin-top:12px}}input,select{{width:100%;padding:8px}}
@@ -50,7 +54,7 @@ document.querySelector('#f').onsubmit = async e => {
     body: JSON.stringify({signupId: new URLSearchParams(location.search).get('id'), code})});
   const b = await r.json();
   if (r.status === 200) location.href = '/welcome?points=' + b.points;
-  else document.querySelector('.err').textContent = 'The code is incorrect.';
+  else document.querySelector('.err').textContent = '{wrong}';
 };
 </script>"""
 
@@ -68,7 +72,7 @@ class App(BaseHTTPRequestHandler):
 
     def do_GET(self):
         p = urlparse(self.path).path
-        pages = {"/signup": ("Create your account", SIGNUP), "/otp": ("Verify your mobile number", OTP), "/welcome": ("Welcome to Nakhla Rewards", WELCOME)}
+        pages = {"/signup": ("Create your account", SIGNUP), "/otp": ("Verify your mobile number", OTP.replace("{wrong}", "Invalid code" if WRONG_MESSAGE else "The code is incorrect.")), "/welcome": ("Welcome to Nakhla Rewards", WELCOME)}
         if p == "/": p = "/signup"
         if p not in pages: return self.send(404, {"error": "not found"})
         self.send(200, PAGE.format(title=pages[p][0], body=pages[p][1]), "text/html")
@@ -92,6 +96,7 @@ class App(BaseHTTPRequestHandler):
             return self.send(200, {"accessToken": secrets.token_hex(16), "points": 50})
         if p == "/v1/otp/resend":
             s = PENDING.get(b.get("signupId"))
+            if FLAKY["resend"]: FLAKY["resend"] = False; return self.send(503, {"error": "busy, try again"})
             if not s: return self.send(404, {"error": "unknown signupId"})
             if time.time() - s["sent"] < COOLDOWN: return self.send(429, {"error": "wait before asking for a new code"})
             s["sent"] = time.time(); return self.send(202, {"sent": True})

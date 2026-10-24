@@ -2,7 +2,7 @@
 # TH_KEEP_DEMO=1 keeps the folder to look around afterwards.
 #   demo_copy [tar --exclude options...]   copies the tool from $SRC into a new temporary folder $W and enters it
 #   drop_files <name>...                    removes the project's own top-level files from the copy, by full path
-# The owner's private files (.env, masking lists and map, .private-names, HANDOVER.md) never stay in a copy.
+# The owner's private files (.env, .env.<name>, masking lists and map, .private-names, HANDOVER.md) never reach a copy.
 demo_cleanup() {
   set +e; cd / || return
   for p in $(jobs -p); do  # a Studio started with & : give it time to close after /api/shutdown, then stop it
@@ -14,7 +14,7 @@ demo_cleanup() {
 demo_copy() {
   W=$(mktemp -d); trap demo_cleanup EXIT
   export TH_STUDIO_CONFIG="$W/.studio.json"  # the demo's Studio does not add its throw-away folder to your recent projects
-  (cd "$SRC" && tar --exclude=.git --exclude='./runs/R-*' --exclude=./runs/agents --exclude='./demo/*/output' "$@" -cf - .) | (cd "$W" && tar -xf -)
+  (cd "$SRC" && tar --exclude=.git --exclude='./.env.*' --exclude='./runs/R-*' --exclude=./runs/agents --exclude='./demo/*/output' "$@" -cf - .) | (cd "$W" && tar -xf -)
   drop_files .env .mask-terms .mask-allow .mask-map.json .private-names HANDOVER.md
   cd "$W"
 }
