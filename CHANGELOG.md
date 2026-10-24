@@ -2,6 +2,12 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.15.0 (2026-10-24)
+- Phase 5b, run targets: `targets.json` (default `templates/targets.json`) names where tests run: local Edge or Chrome, an Android device on this PC, BrowserStack browsers and BrowserStack real Android and iOS devices. `run-web` and `run-mobile` take `--target <name>` (and a local device ID); each run records its target; Studio's Run picker offers the targets and the Android devices adb sees; `targets` lists them.
+- BrowserStack web: the Playwright tests connect to BrowserStack's browsers as they are (no SDK, nothing installed); the session link is kept with each test. BrowserStack mobile: `scripts/lib/browserstack.py` uploads the app and the module's flows, starts the build on the device, waits and writes the results as junit with each flow's video link, so cycles and the gate work as before.
+- The keys (`BROWSERSTACK_USERNAME`, `BROWSERSTACK_ACCESS_KEY`) stay in `.env`: they go only to BrowserStack (or a local stand-in on 127.0.0.1), never on a command line, into a run or to the page; Studio only says whether they are set. `run-mobile` no longer passes them (or any `BROWSERSTACK_` value) to local Maestro runs.
+- New demo `demo/phase5b/run.sh`: the same smoke tests on local Edge and on a remote browser, and two flows on a BrowserStack device, with local stand-ins for BrowserStack and made-up keys (also in the selftest and CI). Not checked against the real BrowserStack service yet.
+
 ## 0.14.0 (2026-10-24)
 - Phase 5a, execution: once the automation is approved, `cycle start <MODULE> "<name>" --env <name>` (or Studio's new **Execution** tab) starts a test cycle on one environment. Every functional case of the approved design gets its result in it: automated cases from the runs on that environment since the cycle started, the others recorded by hand (Passed, Failed with its bug, Blocked with a note), signed.
 - Bugs: a failed automated test is linked to its bug (`cycle bug`); a bug marked fixed (`cycle fixed`) makes its cases due for a retest, and `retest web|api <MODULE>` reruns only those (`run-web` and `run-api` take `--ids`). A test that passed and failed with no fix in between is flaky and blocks the cycle until it is fixed or quarantined with a reason (it keeps running).

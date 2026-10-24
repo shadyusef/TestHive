@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.14.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines); phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single Windows program for colleagues with review mode, Excel review packs and a team guide, phase 3, tool advice (a decision matrix per test type for the functional cases, the human's choice with a reason, approval), phase 4, automation (the test project set up for the approved tools, one placeholder per case, the engineers' tests run by tag and environment, proven stable, approved; contract tests built from the OpenAPI spec; end-to-end journeys across web and API) and phase 5a, execution (test cycles per environment, results by hand and from the runs, bugs, retest after a fix, flaky tests quarantined, evidence per failure). Still being built phase by phase: BrowserStack and device picking (5b), HTML reports: see [docs/ROADMAP.md](docs/ROADMAP.md). TestHive targets Windows (tested on Windows 11; CI runs on Windows); the bash scripts run in Git Bash.
+> **Status (v0.15.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines); phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single Windows program for colleagues with review mode, Excel review packs and a team guide, phase 3, tool advice (a decision matrix per test type for the functional cases, the human's choice with a reason, approval), phase 4, automation (the test project set up for the approved tools, one placeholder per case, the engineers' tests run by tag and environment, proven stable, approved; contract tests built from the OpenAPI spec; end-to-end journeys across web and API) and phase 5a, execution (test cycles per environment, results by hand and from the runs, bugs, retest after a fix, flaky tests quarantined, evidence per failure) and phase 5b, run targets (local browsers and devices, BrowserStack browsers and real devices). Still being built phase by phase: HTML reports: see [docs/ROADMAP.md](docs/ROADMAP.md). TestHive targets Windows (tested on Windows 11; CI runs on Windows); the bash scripts run in Git Bash.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -15,7 +15,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 | Git (on Windows it also gives Git Bash) | To get TestHive, and to run its bash scripts; `hive.cmd` finds Git Bash for you | Install it first. Windows: `winget install --id Git.Git -e` |
 | Python 3, Node.js, Java 17+, Maestro, adb, Newman | Scripts, mobile and API runs | `setup --install` installs them |
 | An Android phone with USB debugging, or an emulator | Mobile tests | You |
-| A Mac (or BrowserStack, later phase) | iOS tests; Windows cannot run the iOS Simulator | You |
+| A Mac, or a BrowserStack account (`run-mobile --target bs-iphone15`) | iOS tests; Windows cannot run the iOS Simulator | You |
 | Optional: Tesseract OCR | Blacking out personal data in screenshots | `setup --install --ocr` |
 | Administrator rights on Windows, or IT help | Several installers (Git, Node.js, Python, Java, Tesseract) install for all users and ask for admin rights. Maestro, adb, Newman and Claude Code do not. | You / IT |
 
@@ -111,7 +111,7 @@ After the tools are approved, `scaffold` sets up the test project for Playwright
 .\hive stage submit SIGNUP automation; .\hive stage approve SIGNUP automation --by "<name>"   recorded in automation/baseline/
 ```
 An endpoint that answers differently from the spec blocks the approval until it is reported and listed in `api/collections/<MODULE>.contract-bugs.txt` (`<METHOD> <path> <BUG-ID>` per line), or the spec is fixed.
-In Studio: the **Automation** tab (the state of each test, the contract tests, **Run** by type and tag, the last run with its evidence); the Run button starts the engineers. See it: `.\hive demo/phase4/run.sh` (a small local stand-in of the demo app, recorded engineers, real tests; the contract tests find two responses the spec does not list, and a second environment shows a wrong field type caught).
+In Studio: the **Automation** tab (the state of each test, the contract tests, **Run** by type, tag, environment and target (and the Android device), the last run with its evidence); the Run button starts the engineers. See it: `.\hive demo/phase4/run.sh` (a small local stand-in of the demo app, recorded engineers, real tests; the contract tests find two responses the spec does not list, and a second environment shows a wrong field type caught).
 
 ## Execute (stage 5)
 After the automation is approved, a **test cycle** runs every functional case of the approved design once on one environment (for example "1.4 UAT" on `.env.uat`). Every run of the module on that environment after the cycle starts counts in it: the automated cases take their result from the runs, the others are run by hand and recorded with the tester's name. A failure needs a bug ID; a test that both passed and failed with no fix in between is **flaky** and blocks the cycle until it is fixed or **quarantined** with a reason (it still runs). When a bug is marked fixed its cases must be retested: `retest` reruns only those. The stage is approved on the cycle's results, recorded in `execution/baseline/`.
@@ -125,6 +125,14 @@ After the automation is approved, a **test cycle** runs every functional case of
 .\hive cycle check SIGNUP --for-approval; .\hive stage submit SIGNUP execution; .\hive stage approve SIGNUP execution --by "<name>"
 ```
 Each run keeps its evidence: a failed web test its video, screenshot and Playwright trace (every step), an API test each request and response with Authorization, cookies and secret-looking fields masked. In Studio: the **Execution** tab (start a cycle, run its tests and retests, record the cases run by hand, link bugs, mark them fixed, quarantine flaky tests); the Automation tab's **Run** also picks the environment. See it: `.\hive demo/phase5/run.sh` (build 1.0 of the stand-in app has a planted bug and a flaky resend; build 1.0.1 fixes the bug).
+
+**Where the tests run (targets).** `targets.json` (copy `templates/targets.json` to change it; no secrets in it) names each target: a local browser (`edge`, `chrome`), an Android device on this PC (`android`), a BrowserStack browser (`bs-win11-chrome`, `bs-mac-safari`) or a BrowserStack device (`bs-pixel7`, `bs-galaxy-s23`, `bs-iphone15`; iOS needs no Mac). `.\hive targets` lists them, the devices adb sees and whether the keys are set. For BrowserStack, put `BROWSERSTACK_USERNAME` and `BROWSERSTACK_ACCESS_KEY` in `.env` yourself (and `APP_FILE` / `IOS_APP_FILE`, the app it installs): the keys go only to BrowserStack, never on a command line, into a run, to an agent or to the page. Web tests connect to BrowserStack's browsers as they are (Playwright), and its session link is kept with each test; Maestro flows are uploaded with the app, run on the device and read back as a normal run with each flow's video link. Every run records its target, and Studio's **Run** picks it (and the Android device).
+```
+.\hive targets
+.\hive run-web SIGNUP --tag smoke --target bs-win11-chrome
+.\hive run-mobile SIGNUP --target bs-pixel7          (or a local device: --target android <device-id>)
+```
+Your test environment must be reachable from the internet for BrowserStack (BrowserStack Local, the tunnel, is not set up by TestHive yet). See it: `.\hive demo/phase5b/run.sh` (local stand-ins play BrowserStack; nothing is sent to it).
 
 ## TestHive Studio (no terminal needed)
 Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md).
@@ -174,8 +182,9 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `tool-advice` | Stage 3: the decision matrix per test type, the choice (`choose`), its check (`check`) and the project's weights and team skills (`settings`) |
 | `studio` | Opens TestHive Studio in the browser (local only); `--project <folder>`, `--port N`, `--no-browser` |
 | `check-private` | Fails if a private name from your git-ignored `.private-names` list is in a file that would be published |
-| `run-mobile` / `run-api` / `run-web` | Run a module's tests (`--tag smoke`; `--ids` for web and API; `run-api --contract`; `TEST_ENV=<name>` loads `.env.<name>`); each run is stored in `runs/` with its evidence |
-| `cycle` / `retest` | Stage 5: the test cycle (start, status, results by hand, bugs, fixed, quarantine, check), and rerunning its failures |
+| `run-mobile` / `run-api` / `run-web` | Run a module's tests (`--tag smoke`; `--ids` for web and API; `--target <name>` for web and mobile, see `targets`; `run-mobile --app <apk|ipa>` for BrowserStack; `run-api --contract`; `TEST_ENV=<name>` loads `.env.<name>`); each run is stored in `runs/` with its evidence and target |
+| `targets` | Where the tests can run (targets.json), the Android devices adb sees, and whether the BrowserStack keys are set |
+| `cycle` / `retest` | Stage 5: the test cycle (start, status, results by hand, bugs, fixed, quarantine, check), and rerunning its failures (`retest` takes `--target`) |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |
 | `gate` | Definition-of-done check on the case sheet |
 | `mask` | Hides personal data in documents and screenshots before Claude sees them (Arabic + English) |

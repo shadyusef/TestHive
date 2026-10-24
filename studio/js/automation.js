@@ -1,5 +1,5 @@
 // Automation tab (stage 4): the test of each approved case (placeholder, written, stable), running the tests by tag, and the last runs.
-import { TOKEN, S, $, esc, api, toast, ask, strip, filterBar, bindFilters, matches } from './core.js';
+import { TOKEN, S, $, esc, api, toast, ask, strip, filterBar, bindFilters, matches, targetSelects, wireTargets, targetOptions } from './core.js';
 import { openModule } from './module.js';
 
 const STATE = { missing: ['No test yet', 'High'], stub: ['Placeholder', 'Medium'], 'written-no-check': ['Checks nothing', 'High'],
@@ -28,6 +28,7 @@ export function renderAutomation() {
         These runs prove the tests; the results that count for a release are the test cycle's (Execution tab). Each run is kept in runs/ with its screenshots, videos and logs.</p></div></div>
       <div class="decide"><select id="rk" aria-label="Which tests">${kinds.map(k => `<option value="${k}">${KIND[k]} tests</option>`).join('')}</select>
         <select id="rt" aria-label="Tag"><option value="">every tag</option>${TAGS.map(t => `<option>${t}</option>`).join('')}</select>
+        ${targetSelects('rtg', 'rdv')}
         <select id="re" aria-label="Environment"><option value="">the default .env</option>${(a.envs || []).map(e => `<option value="${esc(e)}">.env.${esc(e)}</option>`).join('')}</select>
         <button class="primary" id="rgo" ${S.agents === 'review' || S.data.job ? 'disabled' : ''}>Run</button></div></section>` : ''}
     ${ct ? contractBlock(ct) : ''}
@@ -40,11 +41,11 @@ export function renderAutomation() {
       <td class="small">${esc(c.Tags)}</td><td class="status"><span class="pill ${STATE[c.state][1]}">${esc(STATE[c.state][0])}</span></td></tr>`).join('') ||
       '<tr><td colspan="5" class="muted">No test matches.</td></tr>'}
     </tbody></table></div></section>`;
-  bindFilters(renderAutomation);
+  bindFilters(renderAutomation); wireTargets('rk', 'rtg', 'rdv');
   if ($('#rgo')) $('#rgo').onclick = async () => {
     const kind = $('#rk').value, tag = kind === 'contract' ? '' : $('#rt').value, env = $('#re').value;
     if (!await ask(`Run the ${KIND[kind]} tests of ${S.module}${tag ? ` tagged ${tag}` : ''} now, on ${env ? '.env.' + env : 'the default .env'}?`, { ok: 'Run' })) return;
-    const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: S.module, action: 'run-tests', options: { kind, tag, env } }) });
+    const r = await api('/api/run', { method: 'POST', body: JSON.stringify({ module: S.module, action: 'run-tests', options: { kind, tag, env, ...targetOptions('rtg', 'rdv') } }) });
     toast(r.message || r.error, r.ok ? 'ok' : 'bad'); if (r.ok) openModule(S.module, true);
   };
 }
@@ -60,7 +61,7 @@ function contractBlock(ct) {
 
 function runBlock(kind, r) {
   const t = r.totals || {}, file = (run, name) => `/api/run-file?m=${encodeURIComponent(S.module)}&run=${encodeURIComponent(run)}&name=${encodeURIComponent(name)}&t=${encodeURIComponent(TOKEN)}`;
-  return `<section class="block"><div class="blockhead"><div class="grow"><h2>Last ${KIND[kind] || esc(kind)} run <span class="muted small">${esc(r.run)} · ${esc(r.at.replace('T', ' ').slice(0, 16))} UTC${r.env ? ' · ' + esc(r.env) : ''}</span></h2>
+  return `<section class="block"><div class="blockhead"><div class="grow"><h2>Last ${KIND[kind] || esc(kind)} run <span class="muted small">${esc(r.run)} · ${esc(r.at.replace('T', ' ').slice(0, 16))} UTC${r.env ? ' · ' + esc(r.env) : ''}${r.target ? ' · ' + esc(r.target) : ''}</span></h2>
     <p class="small muted">${t.total || 0} results: ${t.passed || 0} passed, ${r.problems.length} failed, ${r.placeholders} placeholders not written yet${kind === 'api' || kind === 'contract' ? ' (Newman counts each check)' : ''}</p></div></div>
     ${r.problems.length ? `<ul class="plain">${r.problems.slice(0, 20).map(p => `<li><b>${esc(p.id || p.suite || p.name)}</b> ${esc(p.status)}: <span class="small">${esc((p.message || '').slice(0, 200))}</span>
       ${(p.evidence || []).map(e => `<a class="small" href="${file(r.run, e)}" target="_blank" rel="noopener noreferrer">${esc(e.split('/').pop())}</a>`).join(' ')}</li>`).join('')}</ul>` : ''}</section>`;

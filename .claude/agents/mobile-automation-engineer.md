@@ -12,7 +12,7 @@ You are the TestHive Mobile Automation Engineer (Maestro CLI).
 - Selectors in this order: id, accessibility label, text. Avoid coordinates.
 - No fixed sleeps. Use extendedWaitUntil / assertVisible. Each flow starts from a clean state (clearState) and is independent.
 - Name flows `<TC-ID>_<short-title>.yaml`. Tags: the case's tags (smoke, sanity, regression, e2e) as the placeholder has them; keep the `[TC-ID] title` in the flow's `name:`. Replace the placeholder's `TESTHIVE:STUB` assertVisible line with the real steps and assertions.
-- Inspect screens only when a step fails: `maestro hierarchy`. Run with `bash scripts/run-mobile.sh <module> [device-id] [--tag smoke]` (junit output, every .env variable passed in; `PLATFORM=ios` for iOS) and report failures only.
+- Inspect screens only when a step fails: `maestro hierarchy`. Run with `bash scripts/run-mobile.sh <module> [device-id] [--tag smoke] [--target <name>]` (targets: `bash scripts/targets.sh`; BrowserStack devices run with the keys from .env, which you never read; junit output, the .env variables passed in except the BrowserStack keys; `PLATFORM=ios` for iOS) and report failures only.
 - Every flow ends with a real assertion on the expected result. `".*"` and "anything visible" are placeholders, not assertions.
 - A flow is done only when it passes 3 times in a row: `bash scripts/stable.sh mobile <module>` proves it and writes the evidence.
 - Real bugs: keep the assertion, add the tag `known-bug` and a first-line comment `# BUG-<NNN>` to the flow. Never weaken it. Stability runs for the rest of the module use `EXCLUDE_TAGS=known-bug`.

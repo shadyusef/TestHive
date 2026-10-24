@@ -258,9 +258,10 @@ C_OUT=$(bash demo/phase2c/run.sh --check 2>&1) && echo "$C_OUT" | grep -q "STUDI
 if [ -d web/node_modules/@playwright/test ] && command -v newman >/dev/null 2>&1; then  # phase 4 runs real tests: needs the web tools and Newman
   A_OUT=$(bash demo/phase4/run.sh --check 2>&1) && echo "$A_OUT" | grep -q "PHASE 4 CHECK PASS" || { echo "$A_OUT" | grep -E "WRONG|Error|NOT STABLE" | head; echo "phase 4 automation check failed"; exit 1; }
   X_OUT=$(bash demo/phase5/run.sh --check 2>&1) && echo "$X_OUT" | grep -q "PHASE 5 CHECK PASS" || { echo "$X_OUT" | grep -E "WRONG|Error" | head; echo "phase 5 execution check failed"; exit 1; }
+  T_OUT=$(bash demo/phase5b/run.sh --check 2>&1) && echo "$T_OUT" | grep -q "PHASE 5B CHECK PASS" || { echo "$T_OUT" | grep -E "WRONG|Error" | head; echo "phase 5b targets check failed"; exit 1; }
 else echo "(web tools or Newman not installed: skipping the phase 4 automation and phase 5 execution checks)"; fi
 T_OUT=$(bash demo/phase3/run.sh --check 2>&1 || true); echo "$T_OUT" | grep -q "PHASE 3 CHECK PASS" || { echo "$T_OUT" | grep -E "WRONG|Error|Traceback" | head; echo "phase 3 tool advice check failed"; exit 1; }
-$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py scripts/lib/tools.py scripts/lib/automate.py scripts/lib/contract.py scripts/lib/execute.py scripts/lib/api_evidence.py
+$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py scripts/lib/tools.py scripts/lib/automate.py scripts/lib/contract.py scripts/lib/execute.py scripts/lib/api_evidence.py scripts/lib/targets.py scripts/lib/browserstack.py
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then
   for f in scripts/*.ps1; do

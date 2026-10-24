@@ -23,7 +23,8 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 4a | Automation: test project for the approved tools (Playwright, Postman + Newman, Maestro), one placeholder per case with its steps and tags, run by tag and environment, unique test data, engineers from Studio, stability proof, gate and baseline; Automation tab | Done (v0.12.0) |
 | 4b | Contract tests from the OpenAPI spec; E2E journeys across web and API with shared steps | Done (v0.13.0) |
 | 5a | Execution: test cycles per environment, results by hand and from the runs, run picker (type, suite, environment), video, screenshots and traces, API request/response logs, retest after a fix, flaky quarantine, gate and baseline; Execution tab | Done (v0.14.0) |
-| 5b | BrowserStack and device picking for mobile and web | Next |
+| 5b | Run targets: local browsers and Android devices, BrowserStack browsers (Playwright) and real devices (Maestro), picked per run and recorded with it | Done (v0.15.0) |
+| 5c | BrowserStack Local (a tunnel to test environments that are not on the internet), several targets in one run | Planned |
 | 6 | Reporting: interactive HTML bug and test reports, management summary, trends, cost per stage, write-back to Jira / Azure | Planned |
 | 7 | More Studio: answer agent permission prompts from the browser (Claude Agent SDK), Android exploration from Studio | Planned |
 | 8 | Scale: scheduled CI runs, team roles, notifications, device farms, iOS on a Mac | Planned |

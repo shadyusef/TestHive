@@ -58,6 +58,7 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/check-intake.sh` - older projects: flags unfilled intake sections and business rules with no test case.
 - `setup` (`setup.sh` / `setup.ps1`) - prerequisites check and installer (git, node, python + requirements.txt, java 17, maestro, adb, newman, claude code; `--web` Playwright, `--ocr` Tesseract with Arabic).
 - `tool-advice` - stage 3: the decision matrix per test type for the functional cases, the human's choice (`choose`), `check`, `settings` (weights, team skills).
+- `targets` - where tests run (targets.json: local browsers and Android devices, BrowserStack browsers and devices); `run-web` / `run-mobile --target <name>`.
 - `cycle`, `retest` - stage 5: a test cycle on one environment (results by hand and from the runs, bugs, fixed, quarantine of flaky tests, the gate); `retest web|api` reruns the failures.
 - `scaffold`, `check-automation` - stage 4: placeholders for the approved tools, and the gate (every Yes case written and stable). `contract` builds contract tests from the OpenAPI spec (`run-api <M> --contract`); @e2e journeys use the web fixture's `api`. Run scripts take `--tag smoke|sanity|regression|e2e`; `TEST_ENV=<name>` loads `.env.<name>` over `.env`.
 - `stage` - stage gates and approvals, and archive/restore of a module; `collect-run` - stores runs; `mask` - hides personal data (`suggest`/`review` are for the human only).

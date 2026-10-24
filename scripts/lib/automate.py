@@ -53,7 +53,7 @@ def last_runs(module):
         except (OSError, ValueError): continue
         bad = [c for c in res.get("cases", []) if c.get("status") != "passed"]
         stub = [c for c in bad if c.get("status") == "skipped" or "placeholder" in (c.get("message") or "")]  # tests not written yet
-        out[meta["kind"]] = {"run": os.path.basename(d), "at": meta.get("collected_at", ""), "env": meta.get("env", ""), "totals": meta.get("totals", {}),
+        out[meta["kind"]] = {"run": os.path.basename(d), "at": meta.get("collected_at", ""), "env": meta.get("env", ""), "target": meta.get("target", ""), "totals": meta.get("totals", {}),
                              "placeholders": len(stub), "problems": [{k: c.get(k) for k in ("id", "name", "suite", "status", "message", "evidence")} for c in bad if c not in stub][:50]}
     return out
 
@@ -148,9 +148,19 @@ FIXTURE = """// Shared by every TestHive web test (written by scaffold.sh, kept 
 // for journeys that set up or check data through the API (requests go to API_BASE_URL, or BASE_URL when it is not set).
 // scripts/run-web.sh loads .env (and .env.<TEST_ENV>), so BASE_URL and the other values are in process.env.
 import { test as base, expect, APIRequestContext } from '@playwright/test';
+import * as fs from 'fs';
 
 type Data = { unique: (prefix?: string) => string; digits: (n: number) => string; env: string };
-export const test = base.extend<{ data: Data; api: APIRequestContext }>({
+export const test = base.extend<{ data: Data; api: APIRequestContext; browserstack: void }>({
+  browserstack: [async ({ page }, use, info) => {  // on a BrowserStack target: the session's link is kept with the test's evidence
+    await use();
+    if (!process.env.TH_BS_CAPS) return;
+    try {
+      const d = JSON.parse(await page.evaluate(() => {}, `browserstack_executor: ${JSON.stringify({ action: 'getSessionDetails' })}`) as string);
+      fs.writeFileSync(info.outputPath('browserstack.txt'), `BrowserStack session ${d.hashed_id}: ${d.public_url || ''}
+`);
+    } catch { /* not at BrowserStack (a local stand-in) */ }
+  }, { auto: true }],
   api: async ({ playwright }, use) => {
     const ctx = await playwright.request.newContext({ baseURL: process.env.API_BASE_URL || process.env.BASE_URL });
     await use(ctx);

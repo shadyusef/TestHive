@@ -1,0 +1,13 @@
+{
+  "about": "Where the tests run (run-web / run-mobile --target <name>, Studio's Run). Copy this file to the project folder as targets.json to change it. No secrets here: the BrowserStack keys are in .env. BrowserStack names (browser, os, os_version, device) are BrowserStack's own, see its device list.",
+  "targets": {
+    "edge": {"kind": "web", "where": "local", "channel": "msedge", "label": "Microsoft Edge on this PC"},
+    "chrome": {"kind": "web", "where": "local", "channel": "chrome", "label": "Google Chrome on this PC"},
+    "bs-win11-chrome": {"kind": "web", "where": "browserstack", "browser": "chrome", "os": "Windows", "os_version": "11", "label": "BrowserStack: Chrome on Windows 11"},
+    "bs-mac-safari": {"kind": "web", "where": "browserstack", "browser": "playwright-webkit", "os": "OS X", "os_version": "Sonoma", "label": "BrowserStack: Safari (WebKit) on macOS"},
+    "android": {"kind": "mobile", "where": "local", "platform": "android", "label": "An Android phone or emulator on this PC (adb)"},
+    "bs-pixel7": {"kind": "mobile", "where": "browserstack", "platform": "android", "device": "Google Pixel 7-13.0", "label": "BrowserStack: Google Pixel 7, Android 13"},
+    "bs-galaxy-s23": {"kind": "mobile", "where": "browserstack", "platform": "android", "device": "Samsung Galaxy S23-13.0", "label": "BrowserStack: Samsung Galaxy S23, Android 13"},
+    "bs-iphone15": {"kind": "mobile", "where": "browserstack", "platform": "ios", "device": "iPhone 15-17.0", "label": "BrowserStack: iPhone 15, iOS 17"}
+  }
+}

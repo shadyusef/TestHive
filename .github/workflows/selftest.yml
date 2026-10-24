@@ -38,6 +38,9 @@ jobs:
       - name: Phase 5 demo (execution; a test cycle with a planted bug, a fix and a flaky test)
         run: bash demo/phase5/run.sh --check
         shell: bash
+      - name: Phase 5b demo (run targets; BrowserStack played by local stand-ins, made-up keys)
+        run: bash demo/phase5b/run.sh --check
+        shell: bash
       - name: Windows launcher
         shell: pwsh
         run: |

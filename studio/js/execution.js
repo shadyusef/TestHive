@@ -1,6 +1,6 @@
 // Execution tab (stage 5): the test cycle. Its runs on one environment, the result of every case (from the runs, or recorded by
 // hand), bugs and their fixes, retests, and flaky tests to quarantine. The rules are execute.py's (the same as scripts/cycle.sh).
-import { S, $, esc, api, toast, ask, me, askName, strip, filterBar, bindFilters, matches } from './core.js';
+import { S, $, esc, api, toast, ask, me, askName, strip, filterBar, bindFilters, matches, targetSelects, wireTargets, targetOptions } from './core.js';
 import { openModule } from './module.js';
 
 const RESULT = { passed: ['Passed', 'ok'], 'known-bug': ['Known bug', 'Medium'], failed: ['Failed', 'High'], blocked: ['Blocked', 'Medium'], 'not-run': ['Not run', 'Low'] };
@@ -45,6 +45,7 @@ export function renderExecution() {
       <p class="small muted">On ${esc(c.env || 'the default .env')}, the cycle's environment. Each run is kept in runs/ with its evidence; failed web tests keep their video, screenshot and trace, API tests each request and response.</p></div></div>
       ${kinds.length ? `<div class="decide"><select id="xk" aria-label="Which tests">${kinds.map(k => `<option value="${k}">${KIND[k]} tests</option>`).join('')}</select>
         <select id="xt" aria-label="Suite"><option value="">every tag</option>${TAGS.map(t => `<option>${t}</option>`).join('')}</select>
+        ${targetSelects('xtg', 'xdv')}
         <button class="primary" id="xgo" ${off ? 'disabled' : ''}>Run</button>
         ${retest.map(k => `<button data-retest="${k}" ${off ? 'disabled' : ''}>Retest the ${KIND[k]} failures</button>`).join('')}</div>` : '<p class="small muted">No automated tests: every case is run by hand.</p>'}</section>
     ${bugs.length ? `<section class="block"><div class="blockhead"><div class="grow"><h2>Bugs in this cycle</h2>
@@ -58,12 +59,12 @@ export function renderExecution() {
     <div class="table-wrap"><table class="list"><thead><tr><th>ID</th><th>P</th><th class="wide">Title</th><th>Run</th><th class="status">Result</th><th>Record</th></tr></thead><tbody>
     ${shown.map(row).join('') || '<tr><td colspan="6" class="muted">No case matches.</td></tr>'}
     </tbody></table></div></section>`;
-  bindFilters(renderExecution);
+  bindFilters(renderExecution); wireTargets('xk', 'xtg', 'xdv');
   if ($('#xgo')) $('#xgo').onclick = async () => {
     const k = $('#xk').value, tag = k === 'contract' ? '' : $('#xt').value;
-    if (await ask(`Run the ${KIND[k]} tests${tag ? ` tagged ${tag}` : ''} of ${S.module} on ${c.env || 'the default .env'}?`, { ok: 'Run' })) run(`cycle-${k}`, { tag });
+    if (await ask(`Run the ${KIND[k]} tests${tag ? ` tagged ${tag}` : ''} of ${S.module} on ${c.env || 'the default .env'}?`, { ok: 'Run' })) run(`cycle-${k}`, { tag, ...targetOptions('xtg', 'xdv') });
   };
-  document.querySelectorAll('[data-retest]').forEach(b => b.onclick = () => run(`retest-${b.dataset.retest}`));
+  document.querySelectorAll('[data-retest]').forEach(b => b.onclick = () => run(`retest-${b.dataset.retest}`, b.dataset.retest === 'web' && $('#xk').value === 'web' ? { target: targetOptions('xtg', 'xdv').target } : {}));
   document.querySelectorAll('[data-fixed]').forEach(b => b.onclick = async () => {
     if (await ask(`Mark ${b.dataset.fixed} as fixed? Its cases must be retested before the cycle can be approved.`, { ok: 'Mark fixed' })) send('fixed', { bug: b.dataset.fixed });
   });

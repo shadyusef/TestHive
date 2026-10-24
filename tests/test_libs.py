@@ -6,7 +6,7 @@ import os, sys, re, glob, json, time, shutil, tempfile, threading, subprocess, u
 for k in ("TH_STATE", "TH_ANALYSIS", "TH_CASES", "TH_JOB", "TH_ARCHIVE", "TH_CLAUDE_FAKE"): os.environ.pop(k, None)  # defaults only
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
-import analysis, design, intake, modules, studio, tools, automate, contract, execute  # noqa: E402
+import analysis, design, intake, modules, studio, tools, automate, contract, execute, targets  # noqa: E402
 
 BASH = os.environ.get("TH_BASH") or shutil.which("bash")  # selftest passes the Git Bash path on Windows (not WSL's bash)
 REQ_HEAD = ",".join(analysis.REQ_COLS) + "\n"
@@ -482,6 +482,34 @@ class Execution(Automation):
         r = self.stage("approve", "SIGNUP", "execution", "--by", "Omar"); self.assertEqual(r.returncode, 0, r.stdout)
         meta = load(os.path.join(execute.DIR, "baseline", "SIGNUP", "v1", "meta.json"))
         self.assertEqual((meta["cycle"]["id"], meta["cases"]["TC-SIGNUP-002"]["quarantine"], len(meta["runs"])), ("C1", "timing", 5))
+
+
+class Targets(unittest.TestCase):
+    """Run targets: only valid entries, the BrowserStack keys only go to BrowserStack or 127.0.0.1, values are shell-quoted."""
+
+    def setUp(self):
+        self.old, self.dir = os.getcwd(), tempfile.mkdtemp(); os.chdir(self.dir)
+
+    def tearDown(self):
+        os.chdir(self.old); shutil.rmtree(self.dir, ignore_errors=True)
+        for k in ("TH_BS_WS", "TH_BS_API"): os.environ.pop(k, None)
+
+    def test_targets_and_the_keys(self):
+        with open("targets.json", "w", encoding="utf-8") as f: json.dump({"targets": {
+            "ok-web": {"kind": "web", "where": "browserstack", "browser": "chrome", "os": "Windows", "os_version": "11"},
+            "bad-chan": {"kind": "web", "where": "local", "channel": "/bin/sh"}, "Bad Name": {"kind": "web", "where": "local", "channel": "msedge"},
+            "inject": {"kind": "mobile", "where": "browserstack", "platform": "android", "device": "Pixel'; rm -rf /"}}}, f)
+        self.assertEqual(list(targets.load()), ["ok-web"], "only valid targets")
+        self.assertIn("export TH_BS_WS=wss://cdp.browserstack.com/playwright", targets.shell("ok-web", "web"))
+        os.environ["TH_BS_WS"] = "wss://evil.example/playwright"
+        with self.assertRaises(SystemExit): targets.shell("ok-web", "web")
+        os.environ["TH_BS_WS"] = "ws://127.0.0.1:9999/"; self.assertIn("127.0.0.1:9999", targets.shell("ok-web", "web"))
+        os.environ["TH_BS_API"] = "http://127.0.0.1.evil.example:80"
+        with self.assertRaises(SystemExit): targets.endpoint("mobile")
+        self.assertFalse(targets.keys_set())
+        with open(".env", "w") as f: f.write("BROWSERSTACK_USERNAME=u" + chr(10))
+        with open(".env.uat", "w") as f: f.write("BROWSERSTACK_ACCESS_KEY=k" + chr(10))
+        self.assertEqual((targets.keys_set(), targets.keys_set("uat"), targets.keys_set("../uat")), (False, True, False))
 
 
 def load(p):

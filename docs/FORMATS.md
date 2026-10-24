@@ -199,6 +199,12 @@ every failure with a bug, no flaky case unless quarantined, no retest left, and 
 endpoint listed. `execution/baseline/<MODULE>/v<n>/meta.json`: `module`, `version`, `approved_by`, `approved_at`, `git_commit`, `cycle`,
 `runs`, `contract`, `cases` (ID -> kind, result, bug, flaky, quarantine).
 
+## Run targets: `targets.json` (or `templates/targets.json`)
+`{"targets": {<name>: {kind, where, ...}}}`. `name`: lower case letters, digits, `. _ -`. `kind` web or mobile; `where` local or browserstack.
+Local web: `channel` (msedge, chrome, chromium). Local mobile: `platform` android. BrowserStack web: `browser`, `os`, `os_version`
+(BrowserStack's names, for example chrome / Windows / 11, playwright-webkit / OS X / Sonoma). BrowserStack mobile: `platform` (android,
+ios) and `device` (`<device>-<os version>`, for example `Google Pixel 7-13.0`). `label` is shown in Studio. A broken entry is left out.
+
 ## Design benchmark key (e.g. `demo/phase2/condition-key.csv`)
 Columns `Key`, `Condition`, `Requirement` (`|`-separated REQ IDs; a matching case must link one of them; empty = any case),
 `Keywords` (as in the analysis key; a number must match a whole number, so `7` does not match `17`). `scripts/score-design.sh`
@@ -212,7 +218,9 @@ step: `$` commands, `writes` files, `>` messages, `!` errors) and, for agents, `
 ## Runs: `runs/<RUN-ID>/` (written by `scripts/collect-run.sh`)
 `RUN-ID` is `R-<yyyymmdd>-<nn>` (UTC date, then a sequence number).
 
-- `meta.json`: `run_id`, `kind` (mobile, api, contract, web), `module`, `env`, `platform`, `collected_at`, `host_os`, `source`, `totals`.
+- `meta.json`: `run_id`, `kind` (mobile, api, contract, web), `module`, `env`, `platform`, `target` (from `targets.json`; empty: the default
+  browser or device), `collected_at`, `host_os`, `source`, `totals`. A BrowserStack mobile run's `junit.xml` is written by TestHive from the
+  build's test cases; its evidence is one text file per flow with its video and log links.
 - `results.json`: `{format, run_id, cases: [{id, name, suite, status, duration_s, message, evidence}]}`.
   `status` is `passed`, `failed`, `error` or `skipped`. `id` is the TC-ID found in the test name.
   `evidence` lists the files under `evidence/` whose name contains the TC-ID.

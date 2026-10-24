@@ -13,5 +13,5 @@ Platform differences use tags (`android`, `ios`) and env variables, not copied f
 
 `scaffold <MODULE>` (stage 4) writes one placeholder flow per case (marked `TESTHIVE:STUB`, failing until written), with the case's tags.
 
-Run: `bash scripts/run-mobile.sh <module> [--tag smoke]`, or `maestro test -e APP_ID=$APP_ID mobile/flows/<module>`
+Run: `bash scripts/run-mobile.sh <module> [device-id] [--tag smoke] [--target android|bs-pixel7|bs-iphone15|...]` (targets: `bash scripts/targets.sh`; BrowserStack uploads `APP_FILE` / `IOS_APP_FILE` from `.env`, or `--app <file>`: an .apk, .aab or .ipa only), or `maestro test -e APP_ID=$APP_ID mobile/flows/<module>`
 Single device: add `--device <id>`. Report: add `--format junit --output reports/junit.xml`.

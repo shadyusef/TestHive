@@ -7,7 +7,7 @@ import sys, os, re, glob, json, time, hashlib, secrets, shutil, socket, subproce
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, intake, jobs, projects, pyrun, tools, automate, execute
+import analysis, design, intake, jobs, projects, pyrun, tools, automate, execute, targets
 import modules as archive
 from analysis import read_csv, refs
 
@@ -207,17 +207,22 @@ ACTIONS = {
     "explore-web": {"title": "Explore the built product", "minutes": "1-5", "command": ""},
     "scaffold": {"title": "Set up the test project", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/scaffold.sh", m]},
     "run-tests": {"title": "Run the tests", "minutes": "1-15", "command": "",
-                  "script": lambda m, o: ["scripts/run-api.sh", m, "--contract"] if o["kind"] == "contract" else
-                                         [f"scripts/run-{o['kind']}.sh", m] + (["--tag", o["tag"]] if o["tag"] else [])},
+                  "script": lambda m, o: run_cmd(o["kind"], m, o)},
     "run-contract": {"title": "Run the contract tests", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/run-api.sh", m, "--contract"]},
 }
 for _k in ("web", "api", "contract", "mobile"):  # the test cycle's runs: on the cycle's environment
     ACTIONS[f"cycle-{_k}"] = {"title": f"Run the {dict(api='API').get(_k, _k)} tests of the cycle",
                               "minutes": "1-15", "command": "", "cycle": True,
-                              "script": (lambda k: lambda m, o: ["scripts/run-api.sh", m, "--contract"] if k == "contract" else [f"scripts/run-{k}.sh", m] + (["--tag", o["tag"]] if o["tag"] else []))(_k)}
+                              "script": (lambda k: lambda m, o: run_cmd(k, m, o))(_k)}
 for _k in ("web", "api"):
     ACTIONS[f"retest-{_k}"] = {"title": f"Retest the {_k if _k == 'web' else 'API'} failures", "minutes": "1-10", "command": "", "cycle": True,
-                               "script": (lambda k: lambda m, o: ["scripts/retest.sh", k, m])(_k)}
+                               "script": (lambda k: lambda m, o: ["scripts/retest.sh", k, m] + (["--target", o["target"]] if o["target"] else []))(_k)}
+
+
+def run_cmd(kind, m, o):
+    """The run script for a kind of tests with the picked tag, target and (local Android) device."""
+    if kind == "contract": return ["scripts/run-api.sh", m, "--contract"]
+    return [f"scripts/run-{kind}.sh", m] + (["--tag", o["tag"]] if o["tag"] else []) + (["--target", o["target"]] if o["target"] else []) + ([o["device"]] if o["device"] else [])
 
 
 def envs():
@@ -240,9 +245,14 @@ for _k in ("web", "api", "mobile"):
 def start_action(module, action, info, opts=None):
     """Starts the Run button's job. Returns (job, error). opts: kind and tag for run-tests."""
     if action not in ACTIONS: return None, "unknown action"
-    o = {"kind": str((opts or {}).get("kind", "")), "tag": str((opts or {}).get("tag", "")), "env": str((opts or {}).get("env", ""))}
+    o = {k: str((opts or {}).get(k, "")) for k in ("kind", "tag", "env", "target", "device")}
     if action == "run-tests" and (o["kind"] not in ("web", "api", "contract", "mobile") or o["tag"] not in [""] + design.TAGS): return None, "unknown action"
     if o["tag"] not in [""] + design.TAGS or o["env"] and o["env"] not in envs(): return None, "unknown action"
+    kind = o["kind"] if action == "run-tests" else action.split("-", 1)[1] if action.startswith(("cycle-", "retest-")) else ""
+    t = targets.load().get(o["target"]) if o["target"] else None
+    if o["target"] and (not t or t["kind"] != kind): return None, "unknown action"
+    if o["device"] and (kind != "mobile" or (t and t["where"] != "local") or o["device"] not in targets.adb_devices()): return None, "unknown action"
+    if t and t["where"] == "browserstack" and not targets.keys_set(o["env"] or ((execute.current(module) or {}).get("env", "") if ACTIONS[action].get("cycle") else "")): return None, "Add BROWSERSTACK_USERNAME and BROWSERSTACK_ACCESS_KEY to .env first (you, in the file; Studio never shows them)."
     if ACTIONS[action].get("cycle"):
         c = execute.current(module)
         if not c: return None, "Start a test cycle first (Execution tab)."
@@ -260,7 +270,7 @@ def start_action(module, action, info, opts=None):
     if "script" in a:
         if load_state()["modules"][module]["stages"]["tools"]["status"] != "approved": return None, "Approve the tools first."  # the test scripts
         cmd = [intake.bash()] + a["script"](module, o)
-        where = f" on {o['env']}" if o["env"] else ""
+        where = (f" on {o['env']}" if o["env"] else "") + (f" ({o['target']}{' ' + o['device'] if o['device'] else ''})" if o["target"] or o["device"] else "")
         return jobs.start(module, "script", a["title"] + (f" ({o['kind']}{', ' + o['tag'] if o['tag'] else ''})" if action == "run-tests" else "") + where,
                           cmd, task=(f"TEST_ENV={o['env']} " if o["env"] else "") + " ".join(cmd[1:]), env={"TEST_ENV": o["env"]} if o["env"] else None)
     review = (sorted(glob.glob(os.path.join("reviews", f"DESIGN-{module}-*.md")), key=os.path.getmtime) or [""])[-1].replace(os.sep, "/")
@@ -342,6 +352,7 @@ def module_info(module):
     if info["next"]["run"] == "analyse" and not info["sources"]["files"]: info["next"]["title"] = "Analyse the built product"
     info["exploration"], info["web_tools"], info["project_url"] = exploration(module), web_tools(), intake.project()["base_url"]
     info["test_login"] = intake.test_login_set()
+    info["targets"], info["browserstack_keys"] = targets.load(), targets.keys_set()
     info["jobs"], info["agents"], info["agents_missing"] = jobs.listing(module)[:15], agents_mode(), agents_missing()
     job = jobs.running(module)
     info["job"] = dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None
@@ -587,6 +598,12 @@ def get_run_file(h, q, body, module):  # a screenshot, video, log or trace kept 
 
 @api("GET", "/api/source-text", module="query")
 def get_source_text(h, q, body, module): return h.send(200, intake.source_text(module, arg(q, "name")))
+
+
+@api("GET", "/api/devices")
+def get_devices(h, q, body, module):
+    """The Android devices adb sees now (asked when the Run picker needs them: adb can take a moment)."""
+    return h.send(200, {"devices": targets.adb_devices()})
 
 
 @api("GET", "/api/exploration", module="query")

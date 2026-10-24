@@ -108,3 +108,27 @@ export function sbar(parts) {
 /* Sub-tabs inside a tab. items: [key, label, extra HTML]; the chosen key is in S[stateKey]. */
 export const subtabs = (stateKey, items) => `<div class="subtabs" role="tablist">${items.map(([k, l, x]) =>
   `<button role="tab" data-sub="${stateKey}:${k}" aria-selected="${S[stateKey] === k}" class="${S[stateKey] === k ? 'on' : ''}">${esc(l)}${x || ''}</button>`).join('')}</div>`;
+/* The Run picker's target (targets.json) and, for a local Android target, the device adb sees. ids: [kind, target, device] selects. */
+export const targetSelects = (tid, did) => `<select id="${tid}" aria-label="Where it runs"></select><select id="${did}" aria-label="Device" hidden></select>`;
+export function wireTargets(kid, tid, did) {
+  const k = $('#' + kid), t = $('#' + tid), d = $('#' + did), all = S.data.targets || {};
+  if (!k || !t) return;
+  const fill = async () => {
+    const kind = k.value === 'contract' || k.value === 'api' ? '' : k.value;
+    const names = Object.entries(all).filter(([, x]) => x.kind === kind);
+    t.hidden = !names.length;
+    t.innerHTML = `<option value="">default ${kind === 'mobile' ? 'device' : 'browser'}</option>` + names.map(([n, x]) =>
+      `<option value="${esc(n)}" ${x.where === 'browserstack' && !S.data.browserstack_keys ? 'disabled' : ''}>${esc(x.label || n)}${x.where === 'browserstack' && !S.data.browserstack_keys ? ' (add the keys to .env)' : ''}</option>`).join('');
+    d.hidden = true; d.innerHTML = '';
+  };
+  t.onchange = async () => {
+    const x = all[t.value];
+    d.hidden = true; d.innerHTML = '';
+    if (!x || x.kind !== 'mobile' || x.where !== 'local') return;
+    const r = await api('/api/devices');
+    d.innerHTML = (r.devices || []).map(v => `<option>${esc(v)}</option>`).join('') || '<option value="">no device found (adb)</option>';
+    d.hidden = false;
+  };
+  k.addEventListener('change', fill); fill();
+}
+export const targetOptions = (tid, did) => ({ target: ($('#' + tid) || {}).value || '', device: ($('#' + did) && !$('#' + did).hidden ? $('#' + did).value : '') || '' });
