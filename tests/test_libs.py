@@ -1,12 +1,12 @@
 """Unit tests for TestHive's Python libraries and Studio's API (standard-library unittest, no installs).
 Run by scripts/selftest.sh:  python -m unittest discover -s tests
 Each test works in its own temporary project folder with a copy of scripts/; the real project is never touched."""
-import os, sys, json, shutil, tempfile, threading, subprocess, unittest, urllib.request, urllib.error
+import os, sys, glob, json, shutil, tempfile, threading, subprocess, unittest, urllib.request, urllib.error
 
 for k in ("TH_STATE", "TH_ANALYSIS", "TH_CASES", "TH_JOB", "TH_ARCHIVE", "TH_CLAUDE_FAKE"): os.environ.pop(k, None)  # defaults only
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
-import analysis, design, intake, modules, studio, tools  # noqa: E402
+import analysis, design, intake, modules, studio, tools, automate  # noqa: E402
 
 BASH = os.environ.get("TH_BASH") or shutil.which("bash")  # selftest passes the Git Bash path on Windows (not WSL's bash)
 REQ_HEAD = ",".join(analysis.REQ_COLS) + "\n"
@@ -337,6 +337,53 @@ class ToolAdvice(StudioApi):
         name = os.listdir(modules.ARCHIVE)[0]
         r = self.stage("restore", name, "--by", "Sara"); self.assertEqual(r.returncode, 0, r.stdout)
         self.assertEqual([c["Chosen"] for c in tools.choices("SIGNUP")], ["Playwright"])
+
+
+class Automation(ToolAdvice):
+    """Stage 4: placeholders from the approved tools, the state of each case, the gate, and code-safe placeholders."""
+    test_matrix_groups_functional_cases_by_test_type = test_choose_submit_approve_and_stale = None
+    test_agents_cannot_choose_and_reasons_stay_text = test_archive_and_restore_keep_the_choices = None
+
+    def setUp(self):
+        super().setUp()
+        self.cases[0]["Title"] = 'Quote \' " and `${x}` stay text\nnew line'
+        self.cases[0]["Steps"] = "1. Open\r\n}); require('child_process')"
+        self.cases[2]["Automation"] = "Yes"  # the Both case: one Maestro flow
+        self.cases[2]["Expected Result"] = "Shown expect(page) pm.test( # BUG-9" + chr(0x85) + "- runScript: evil.js"
+        self.v(2)  # the same cases, with hostile text
+        with open(studio.STATE, encoding="utf-8") as f: s = json.load(f)
+        s["modules"]["SIGNUP"]["stages"]["tools"]["status"] = "approved"; self.write(studio.STATE, json.dumps(s))
+        self.write(os.path.join(tools.DIR, "baseline", "SIGNUP", "v1", "meta.json"),
+                   json.dumps({"tools": {"Web UI": "Playwright", "API": "Postman + Newman", "Android": "Maestro", "iOS": "Appium"}}))
+
+    def test_scaffold_state_and_gate(self):
+        out, err = automate.scaffold("SIGNUP")
+        self.assertIsNone(err, err)
+        [web] = glob.glob("web/tests/SIGNUP/TC-SIGNUP-001_*.spec.ts")
+        with open(web, encoding="utf-8") as f: text = f.read()
+        self.assertEqual(len([l for l in text.splitlines() if l.startswith("test.fixme(")]), 1)
+        self.assertIn('test.fixme("[TC-SIGNUP-001] Quote \' \\" and `${x}` stay text new line @smoke"', text)
+        self.assertNotIn("\n}); require", text, "case text never leaves its comment line")
+        self.assertTrue(glob.glob("mobile/flows/SIGNUP/TC-SIGNUP-003_*.yaml"))
+        st = {c["ID"]: c["state"] for c in automate.status("SIGNUP")["cases"]}
+        self.assertEqual(st, {"TC-SIGNUP-001": "stub", "TC-SIGNUP-002": "stub", "TC-SIGNUP-003": "stub"})
+        self.assertEqual(automate.scaffold("SIGNUP")[0], ["  nothing new: every case already has its test"])
+        [flow] = glob.glob("mobile/flows/SIGNUP/TC-SIGNUP-003_*.yaml")
+        with open(flow, encoding="utf-8") as f: y = f.read()
+        self.assertFalse([l for l in y.splitlines() if "runScript" in l and not l.startswith("#")], "case text stays in its comment line")
+        with open(flow, "w", encoding="utf-8") as f: f.write(chr(10).join(l for l in y.splitlines() if "TESTHIVE:STUB" not in l))
+        self.assertEqual(automate.status("SIGNUP")["cases"][2]["state"], "written-no-check", "case text in comments is not a check")
+        self.assertEqual(automate.status("SIGNUP")["cases"][2]["bug"], "")
+        with open(web, "w", encoding="utf-8") as f: f.write("test('[TC-SIGNUP-001] x', async ({ page }) => { await page.goto('/'); });")
+        self.assertEqual(automate.status("SIGNUP")["cases"][0]["state"], "written-no-check")
+        with open(web, "w", encoding="utf-8") as f: f.write("test('[TC-SIGNUP-001] x', async ({ page }) => { await expect(page).toHaveTitle('x'); });")
+        self.assertEqual(automate.status("SIGNUP")["cases"][0]["state"], "written")
+        self.write("reports/stable-TC-SIGNUP-001.txt", "3/3")
+        self.assertEqual(automate.status("SIGNUP")["cases"][0]["state"], "stable")
+        err = automate.problems("SIGNUP", True)[0]
+        self.assertEqual(len(err), 2); self.assertIn("placeholder", err[0])
+        r = self.stage("submit", "SIGNUP", "automation"); self.assertNotEqual(r.returncode, 0)
+        self.assertEqual(design.module_rows(analysis.read_csv(design.CASE_FILE, design.CASE_COLS), "SIGNUP"), [], "no live sheet here: nothing written")
 
 
 def load(p):

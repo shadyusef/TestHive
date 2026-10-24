@@ -38,7 +38,7 @@ if [ -d web/node_modules/@playwright/test ]; then
   URL2=$(sed -n 's/^STUDIO //p' "$LOG2"); [ -n "$URL2" ] || { cat "$LOG2"; echo "Studio without a project did not start"; exit 1; }
   grep -q "No project yet" "$LOG2" || { cat "$LOG2"; echo "Studio opened a project it should not have"; exit 1; }
   node web/studio-projects-smoke.mjs "$URL2" "$(cygpath -w "$W" 2>/dev/null || echo "$W")" "$SRC/demo/phase2b/output" || { echo "Project picker check failed"; exit 1; }
-  kill $S2 2>/dev/null; wait $S2 2>/dev/null; rm -rf "$E" 2>/dev/null || true
+  kill $S2 2>/dev/null; wait $S2 2>/dev/null || true; rm -rf "$E" 2>/dev/null || true
 else
   echo "(web tools not installed: skipping the browser click-through; install with setup --install --web)"
 fi

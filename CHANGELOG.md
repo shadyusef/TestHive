@@ -2,6 +2,13 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.12.0 (2026-10-24)
+- Phase 4a, automation: once the tools are approved, `scaffold <MODULE>` (or Studio) sets up the test project for Playwright, Postman + Newman and Maestro with one placeholder test per approved functional case marked Automation Yes. Each placeholder carries the case's steps, expected result, test data and tags and is skipped or fails until it is written; nothing that exists is overwritten; the case sheet's Automation Spec is filled. Case text is written as comments and string literals, never as code.
+- The engineers (Run buttons in Studio, or `/th-web`, `/th-api`, `/th-mobile`) replace the placeholders, smoke first, with page objects and a shared fixture for unique test data (`web/fixtures/testhive.ts`; `getByTestId` reads `data-qa`).
+- Run by tag: `run-web|run-api|run-mobile <MODULE> --tag smoke|sanity|regression|e2e` (and `TH_TAG` for `stable.sh`). Environments: `TEST_ENV=<name>` loads `.env.<name>` over `.env` (git-ignored).
+- The automation stage: `check-automation` lists what is missing; submit and approval need every case written with a real check and stable (3 runs in a row); approval records the tests and their checksums in `automation/baseline/<MODULE>/v<n>/`. Studio's **Automation** tab shows each case's state, runs the tests by type and tag, and shows the last run with its screenshots, videos and logs; **Submit for approval** in Approvals.
+- New demo `demo/phase4/run.sh` with a small local stand-in of the demo app: the recorded engineers' smoke tests (7 web, 4 API) run for real against it and are proven stable; `--check` drives Studio too (selftest and CI; CI installs Newman).
+
 ## 0.11.0 (2026-10-23)
 - Phase 3, tool advice for functional tests: after the design is approved, `tool-advice <MODULE>` (and Studio's new **Tools** tab) groups the functional cases marked for automation into test types (Web UI, API, Android, iOS) and scores the tools for each (Playwright, Selenium, Cypress; Postman + Newman, REST Assured; Maestro, Appium, Espresso, XCUITest) on fit, ready-made TestHive support, upkeep, running on Windows, team skills, evidence and cost. The best total is recommended; a person chooses, with a reason when it is another tool. Weights and the team's languages are set per project (`tools/settings.json`). No agent runs, so it is free.
 - The tools stage is real: it cannot be submitted or approved until every test type has a valid choice made on the current design; approval freezes `tools/baseline/<MODULE>/v<n>/`; a later design approval makes the choice stale until it is checked again. Ready for automation now needs all three approvals. Choices move with a module when it is archived and restored.

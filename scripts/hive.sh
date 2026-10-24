@@ -7,7 +7,7 @@ cd "$(dirname "$0")/.." || exit 1
 case "$(uname -s)" in MINGW*|MSYS*|CYGWIN*) WIN=1; export TH_CMD="${TH_CMD:-.\\hive}";; *) WIN=0; export TH_CMD="${TH_CMD:-bash scripts/hive.sh}";; esac
 if [ -z "$1" ]; then
   echo "Usage: hive <script> [args]   Scripts:"
-  for f in scripts/*.sh; do n=$(basename "$f" .sh); case "$n" in hive|_py) ;; *) printf '  %-16s %s\n' "$n" "$(sed -n 2p "$f" | sed 's/^# *//')";; esac; done
+  for f in scripts/*.sh; do n=$(basename "$f" .sh); case "$n" in hive|_py|_env) ;; *) printf '  %-16s %s\n' "$n" "$(sed -n 2p "$f" | sed 's/^# *//')";; esac; done
   echo "Docs: README.md, QUICKSTART.md, docs/TROUBLESHOOTING.md"
   exit 1
 fi

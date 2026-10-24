@@ -40,6 +40,7 @@ The person who sets it up reads all of it; everyone else reads their own row and
 1. **Get the latest work first:** GitHub Desktop **Fetch origin > Pull**, or `git pull` in the project folder.
    Do this before you answer, review or press Run.
 2. **Work in Studio.** Sign with your real name (top of the page asks once): answers, reviews, tool choices and approvals carry it.
+   Test addresses go in `.env` (or `.env.<name>` per environment); both stay on your PC, so each tester sets them once.
 3. **Share your work when you finish** (or before a break): GitHub Desktop **Commit to main > Push origin**, or
    ```
    git add -A

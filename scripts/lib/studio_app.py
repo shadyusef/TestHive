@@ -6,7 +6,7 @@ import sys, os, re, runpy
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 
-LIBS = {"analysis.py", "design.py", "ingest.py", "intake.py", "mask.py", "modules.py", "stage.py", "tools.py", "uiscreen.py"}  # what Studio starts with --lib
+LIBS = {"analysis.py", "design.py", "ingest.py", "intake.py", "mask.py", "modules.py", "automate.py", "stage.py", "tools.py", "uiscreen.py"}  # what Studio starts with --lib
 
 
 def main():

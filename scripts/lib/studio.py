@@ -7,7 +7,7 @@ import sys, os, re, glob, json, time, hashlib, secrets, shutil, socket, subproce
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, intake, jobs, projects, pyrun, tools
+import analysis, design, intake, jobs, projects, pyrun, tools, automate
 import modules as archive
 from analysis import read_csv, refs
 
@@ -64,6 +64,8 @@ def check(kind, module):
             err, warn = analysis.problems(module, True)[:2]
         elif kind == "tools":
             err, warn = tools.problems(module, True)
+        elif kind == "automation":
+            err, warn = automate.problems(module, True)
         else:
             err, warn = design.problems(module, True)[:2]
     except Exception as e:  # a broken file must not stop the page
@@ -136,6 +138,21 @@ def next_step(module, m, info):
                         "saving every choice submits it for approval." if n else "No functional cases are marked for automation: "
                         "submit the tools stage in the Tools tab with nothing to choose, or mark cases for automation (reopen the design).",
                         f"{RUN} tool-advice {module}")
+        if st == "automation":
+            a = info["automation"]
+            if not a: return step("The tools must be approved first.")
+            if status == "pending" or any(c["state"] == "missing" for c in a["cases"]):
+                return step("Set up the test project: TestHive writes one placeholder test per approved case to automate (free, no AI).",
+                            f"{RUN} scaffold {module}", "scaffold")
+            for kind in ("web", "api", "mobile"):
+                todo = [c for c in a["cases"] if c["kind"] == kind and c["state"] in ("stub", "written-no-check")]
+                if todo: return step(f"{len(todo)} {KIND_LABEL[kind]} tests are still placeholders: the engineer writes them, smoke first.",
+                                     ACTIONS[f"automate-{kind}"]["command"].format(m=module), f"automate-{kind}")
+            for kind in ("web", "api", "mobile"):
+                todo = [c for c in a["cases"] if c["kind"] == kind and c["state"] == "written"]
+                if todo: return step(f"{len(todo)} {KIND_LABEL[kind]} tests are written but not proven yet: run them 3 times in a row.",
+                                     f"{RUN} stable {kind} {module}", f"stable-{kind}")
+            return step("Every test is written and stable: submit the automation in the Approvals tab.")
         return step(f"Stage '{st}' comes in a later TestHive phase.")
     return step("All stages are approved.")
 
@@ -164,12 +181,29 @@ ACTIONS = {
     "design-impact": {"agent": "manual-tester", "title": "Update the cases for the new requirements", "minutes": "5-20", "command": "/th-manual update the cases of {m}",
                       "task": "Module {m} (started from TestHive Studio). Requirements changed: run bash scripts/design-impact.sh {m} --apply, update the cases marked Needs update as your rules say, add cases for new requirements, run the checks, and submit if ready."},
     "explore-web": {"title": "Explore the built product", "minutes": "1-5", "command": ""},
+    "scaffold": {"title": "Set up the test project", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/scaffold.sh", m]},
+    "run-tests": {"title": "Run the tests", "minutes": "1-15", "command": "",
+                  "script": lambda m, o: [f"scripts/run-{o['kind']}.sh", m] + (["--tag", o["tag"]] if o["tag"] else [])},
 }
+KIND_LABEL = {"web": "web", "api": "API", "mobile": "mobile"}
+ENGINEER = {"web": "web-automation-engineer", "api": "api-backend-test-engineer", "mobile": "mobile-automation-engineer"}
+WHERE = {"web": "web/tests/{m}/ (page objects in web/pages/{m}/)", "api": "api/collections/{m}.postman_collection.json", "mobile": "mobile/flows/{m}/"}
+for _k in ("web", "api", "mobile"):
+    ACTIONS[f"automate-{_k}"] = {"agent": ENGINEER[_k], "title": f"Automate the {KIND_LABEL[_k]} tests", "minutes": "20-90",
+        "command": f"/th-{'web' if _k == 'web' else 'api' if _k == 'api' else 'mobile'} automate the {KIND_LABEL[_k]} tests of {{m}}",
+        "task": f"Module {{m}} (started from TestHive Studio). Write the automated {KIND_LABEL[_k]} tests: replace every TESTHIVE:STUB placeholder in "
+                f"{WHERE[_k]} following your rules and the case steps written in each placeholder, smoke first. Run them with "
+                f"bash scripts/run-{_k}.sh {{m}} --tag smoke (then the other tags) and prove them with bash scripts/stable.sh {_k} {{m}}. "
+                "A real bug: keep the test, mark it as expected to fail with the bug ID, and report it. Do not submit."}
+    ACTIONS[f"stable-{_k}"] = {"title": f"Prove the {KIND_LABEL[_k]} tests (3 runs)", "minutes": "2-30", "command": "",
+                               "script": (lambda k: lambda m, o: ["scripts/stable.sh", k, m])(_k)}
 
 
-def start_action(module, action, info):
-    """Starts the Run button's job. Returns (job, error)."""
+def start_action(module, action, info, opts=None):
+    """Starts the Run button's job. Returns (job, error). opts: kind and tag for run-tests."""
     if action not in ACTIONS: return None, "unknown action"
+    o = {"kind": str((opts or {}).get("kind", "")), "tag": str((opts or {}).get("tag", ""))}
+    if action == "run-tests" and (o["kind"] not in ("web", "api", "mobile") or o["tag"] not in [""] + design.TAGS): return None, "unknown action"
     if agents_missing(): return None, (f"Review mode: {' and '.join(agents_missing())} {'is' if len(agents_missing()) == 1 else 'are'} not on this PC, "
                                        "so agents cannot run here. Someone with Claude Code runs the command shown; everything else works here.")
     a, mt = ACTIONS[action], info["meta"]
@@ -178,6 +212,11 @@ def start_action(module, action, info):
         if not web_tools(): return None, WEB_TOOLS_MISSING
         cmd = [intake.bash(), "scripts/explore-web.sh", module, mt["url"]] + (["--submit-valid"] if mt.get("test_env") else [])
         return jobs.start(module, "script", a["title"], cmd, task=" ".join(cmd[1:]))
+    if "script" in a:
+        if load_state()["modules"][module]["stages"]["tools"]["status"] != "approved": return None, "Approve the tools first."  # the test scripts
+        cmd = [intake.bash()] + a["script"](module, o)
+        return jobs.start(module, "script", a["title"] + (f" ({o['kind']}{', ' + o['tag'] if o['tag'] else ''})" if action == "run-tests" else ""),
+                          cmd, task=" ".join(cmd[1:]))
     review = (sorted(glob.glob(os.path.join("reviews", f"DESIGN-{module}-*.md")), key=os.path.getmtime) or [""])[-1].replace(os.sep, "/")
     if action == "design-fix" and not review: return None, "There is no pre-review to fix yet."
     task = a["task"].format(m=module, review=review, explore=(" Explore the built product too:" + explore_note(mt) + ".") if mt.get("url") or mt.get("apk") else "")
@@ -236,6 +275,11 @@ def module_info(module):
     adv = tools.advice(module)
     info["tools"] = {"version": version("tools"), "advice": adv, "choices": tools.choices(module), "criteria": tools.CRITERIA, "langs": tools.LANGS,
                      "settings": tools.settings(), "check": check("tools", module) if adv else None}
+    au = automate.status(module)
+    if au:
+        err, warn = automate.problems(module, True, au)
+        info["automation"] = dict(au, runs=last_runs(module), check={"ok": not err, "errors": err, "warnings": warn})
+    else: info["automation"] = None
     info["approvals"] = approvals(module)
     a_hist = [h for h in m["stages"]["analysis"]["history"] if h["status"] == "approved"]
     info["meta"] = intake.meta(module)
@@ -250,6 +294,27 @@ def module_info(module):
     job = jobs.running(module)
     info["job"] = dict({k: v for k, v in job.items() if not k.startswith("_")}, lines=jobs.progress(job["id"], 30)) if job else None
     return info
+
+
+RUN_ID = re.compile(r"R-\d{8}-\d{2,}")
+
+
+def last_runs(module):
+    """The latest stored run of each kind (web, api, mobile) of the module: totals, and the cases that did not pass with their evidence."""
+    base = os.environ.get("TH_RUNS", "runs")
+    out = {}
+    for d in sorted(glob.glob(os.path.join(base, "R-*")), key=lambda p: (len(os.path.basename(p)), os.path.basename(p)), reverse=True):
+        if not RUN_ID.fullmatch(os.path.basename(d)): continue
+        try:
+            with open(os.path.join(d, "meta.json"), encoding="utf-8") as f: meta = json.load(f)
+            if meta.get("module") != module or meta.get("kind") in out: continue
+            with open(os.path.join(d, "results.json"), encoding="utf-8") as f: res = json.load(f)
+        except (OSError, ValueError): continue
+        bad = [c for c in res.get("cases", []) if c.get("status") != "passed"]
+        stub = [c for c in bad if c.get("status") == "skipped" or "placeholder" in (c.get("message") or "")]  # tests not written yet
+        out[meta["kind"]] = {"run": os.path.basename(d), "at": meta.get("collected_at", ""), "env": meta.get("env", ""), "totals": meta.get("totals", {}),
+                             "placeholders": len(stub), "problems": [{k: c.get(k) for k in ("id", "name", "status", "message", "evidence")} for c in bad if c not in stub][:50]}
+    return out
 
 
 def latest_meta(folder):
@@ -465,6 +530,27 @@ def get_source_file(h, q, body, module):  # the original document (or an earlier
     return h.send(200, read_bytes(p), ctype or "application/octet-stream", extra)
 
 
+EVIDENCE = {".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".webm": "video/webm", ".mp4": "video/mp4", ".txt": "text/plain; charset=utf-8",
+            ".log": "text/plain; charset=utf-8", ".json": "text/plain; charset=utf-8", ".zip": "application/zip"}
+
+
+@api("GET", "/api/run-file", module="query")
+def get_run_file(h, q, body, module):  # a screenshot, video, log or trace kept with a stored run of this module
+    base = os.path.realpath(os.environ.get("TH_RUNS", "runs"))
+    run, name = arg(q, "run"), arg(q, "name")
+    if not RUN_ID.fullmatch(run) or not name.startswith("evidence/"): return h.send(404, {"error": "not found"})
+    d = os.path.join(base, run)
+    p = os.path.realpath(os.path.join(d, name))
+    if not p.startswith(os.path.join(os.path.realpath(d), "evidence") + os.sep) or not os.path.isfile(p): return h.send(404, {"error": "not found"})
+    try:
+        with open(os.path.join(d, "meta.json"), encoding="utf-8") as f:
+            if json.load(f).get("module") != module: return h.send(404, {"error": "not found"})
+    except (OSError, ValueError): return h.send(404, {"error": "not found"})
+    ctype = EVIDENCE.get(os.path.splitext(p)[1].lower())
+    extra = {"Content-Security-Policy": "sandbox", "Content-Disposition": f"{'inline' if ctype and ctype != 'application/zip' else 'attachment'}; filename*=UTF-8''{quote(os.path.basename(p))}"}
+    return h.send(200, read_bytes(p), ctype or "application/octet-stream", extra)
+
+
 @api("GET", "/api/source-text", module="query")
 def get_source_text(h, q, body, module): return h.send(200, intake.source_text(module, arg(q, "name")))
 
@@ -550,7 +636,7 @@ def post_module_new(h, q, body, module):
 
 @api("POST", "/api/run", module="body", lock=True)
 def post_run(h, q, body, module):  # under the lock: no save can slip in between the checks and the start
-    job, err = start_action(module, str(body.get("action", "")), module_info(module))
+    job, err = start_action(module, str(body.get("action", "")), module_info(module), body.get("options") if isinstance(body.get("options"), dict) else None)
     if err: return h.send(400 if "unknown" in err else 409, {"ok": False, "message": err})
     return h.send(200, {"ok": True, "message": f"{job['title']} started.", "job": {k: v for k, v in job.items() if not k.startswith("_")}})
 
@@ -637,7 +723,10 @@ def post_mask_lists(h, q, body, module):
 @api("POST", "/api/stage", module="body", busy_check=True)
 def post_stage(h, q, body, module):
     action, st, by, comment = body.get("action"), body.get("stage"), str(body.get("by", "")).strip(), str(body.get("comment", "")).strip()
-    if action not in ("approve", "reject", "reopen") or st not in STAGES: return h.send(400, {"error": "bad request"})
+    if action not in ("approve", "reject", "reopen", "submit") or st not in STAGES: return h.send(400, {"error": "bad request"})
+    if action == "submit":  # not a decision: the stage's own check runs, and a person still approves
+        code, out = run_stage(["submit", module, st])
+        return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out})
     if not by: return h.send(400, {"error": "your name is needed: decisions are signed"})
     if re.search(r"[\r\n|]", by + comment): return h.send(400, {"ok": False, "message": "Name and comment cannot contain line breaks or |"})
     code, out = run_stage([action, module, st, "--by", by] + (["--comment", comment] if comment else []))

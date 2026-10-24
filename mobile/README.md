@@ -11,5 +11,7 @@ mobile/
 
 Platform differences use tags (`android`, `ios`) and env variables, not copied flows.
 
-Run: `maestro test -e APP_ID=$APP_ID mobile/flows/<module>`
+`scaffold <MODULE>` (stage 4) writes one placeholder flow per case (marked `TESTHIVE:STUB`, failing until written), with the case's tags.
+
+Run: `bash scripts/run-mobile.sh <module> [--tag smoke]`, or `maestro test -e APP_ID=$APP_ID mobile/flows/<module>`
 Single device: add `--device <id>`. Report: add `--format junit --output reports/junit.xml`.

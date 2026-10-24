@@ -61,6 +61,21 @@ elif agent == "qa-reviewer":
     sh(["scripts/check-design.sh", module])
     copy(os.path.join(P2, "DESIGN-SIGNUP-1.md"), "reviews/DESIGN-SIGNUP-1.md")
     summary = "Pre-review written: reviews/DESIGN-SIGNUP-1.md. Verdict: changes required, 6 Major, 10 Minor, 4 Nit."
+elif agent in ("web-automation-engineer", "api-backend-test-engineer"):  # phase 4: the smoke tests, written against demo/phase4/app
+    kind = "web" if agent.startswith("web") else "api"
+    tool("Read", file_path=f"web/tests/{module}/" if kind == "web" else f"api/collections/{module}.postman_collection.json")
+    import io, runpy, contextlib
+    out, sys.argv = io.StringIO(), ["apply.py", kind, "."]  # in this process: inside the Studio program there is no python to start
+    with contextlib.redirect_stdout(out): runpy.run_path(os.path.join(ROOT, "demo", "phase4", "recorded", "apply.py"))
+    for f in out.getvalue().split():
+        if "/" in f and not f.endswith(":"): tool("Write", file_path=f)
+    tool("Bash", command=f"bash scripts/run-{kind}.sh {module} --tag smoke")
+    subprocess.run([BASH, f"scripts/run-{kind}.sh", module, "--tag", "smoke"], capture_output=True, env=dict(os.environ, NO_COLLECT="1"))
+    tool("Bash", command=f"TH_TAG=smoke bash scripts/stable.sh {kind} {module}")
+    r = subprocess.run([BASH, "scripts/stable.sh", kind, module], capture_output=True, text=True, env=dict(os.environ, TH_TAG="smoke", NO_COLLECT="1"))
+    n = len(re.findall(r"TC-[A-Z0-9]+-\d{3}", (re.search(r"STABLE[^\n]*", r.stdout) or [""])[0]))
+    summary = (f"Wrote the {7 if kind == 'web' else 4} smoke {kind} tests (recorded): {n} pass 3 runs in a row. "
+               "The other cases are still placeholders: the recording stops at smoke. Not submitted.")
 else:
     summary = f"No recording for {agent}."
 say(summary)

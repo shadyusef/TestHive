@@ -1,13 +1,14 @@
 #!/usr/bin/env bash
 # Runs a module's Maestro flows on a device and stores the run.
-# Usage: bash scripts/run-mobile.sh <module> [device-id]   (reads .env; every .env variable is passed to the flows)
+# Usage: bash scripts/run-mobile.sh <module> [device-id] [--tag smoke|sanity|regression|e2e]   (reads .env and .env.<TEST_ENV>; every .env variable is passed to the flows)
 #   PLATFORM=ios             use IOS_APP_ID / IOS_DEVICE_ID instead of APP_ID / ANDROID_DEVICE_ID
 #   INCLUDE_TAGS=smoke       run only flows with these tags
 #   EXCLUDE_TAGS=known-bug   skip flows with these tags
 # Then stores the run in runs/ (scripts/collect-run.sh). NO_COLLECT=1 skips that.
 set -e
-[ -f .env ] && { set -a; eval "$(tr -d '\r' < .env)"; set +a; }
-MOD="${1:?module}"; DEV="${2:-}"
+. "$(dirname "$0")/_env.sh"
+MOD="${1:?module}"; DEV="${2:-}"; [ "$DEV" = --tag ] && { INCLUDE_TAGS="$3"; DEV=""; }; [ "$3" = --tag ] && INCLUDE_TAGS="$4"
+INCLUDE_TAGS="${INCLUDE_TAGS:-$TH_TAG}"
 if [ "$PLATFORM" = ios ]; then APP_ID="${IOS_APP_ID:-$APP_ID}"; DEV="${DEV:-$IOS_DEVICE_ID}"; else DEV="${DEV:-$ANDROID_DEVICE_ID}"; fi
 ENVS=(-e "APP_ID=$APP_ID")
 if [ -f .env ]; then

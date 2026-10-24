@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.11.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines); phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single Windows program for colleagues with review mode, Excel review packs and a team guide, and phase 3, tool advice (a decision matrix per test type for the functional cases, the human's choice with a reason, approval). Still being built phase by phase: automation scaffolds, execution and HTML reports: see [docs/ROADMAP.md](docs/ROADMAP.md). TestHive targets Windows (tested on Windows 11; CI runs on Windows); the bash scripts run in Git Bash.
+> **Status (v0.12.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines); phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single Windows program for colleagues with review mode, Excel review packs and a team guide, phase 3, tool advice (a decision matrix per test type for the functional cases, the human's choice with a reason, approval) and phase 4a, automation (the test project set up for the approved tools, one placeholder per case, the engineers' tests run by tag and environment, proven stable, approved). Still being built phase by phase: contract tests and end-to-end journeys (4b), execution and HTML reports: see [docs/ROADMAP.md](docs/ROADMAP.md). TestHive targets Windows (tested on Windows 11; CI runs on Windows); the bash scripts run in Git Bash.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -58,7 +58,7 @@ Each module goes through six stages. A stage cannot start until a named person a
 | `manual-tester` | Sonnet | Designs test cases from the approved requirements (techniques, risk, tags, exact expected results); handles your review. |
 | `mobile-automation-engineer` | Sonnet | Maestro flows for Android and iOS. |
 | `api-backend-test-engineer` | Sonnet | Postman collections run with Newman. |
-| `web-automation-engineer` | Sonnet | Playwright + TypeScript. Idle until a web flow exists. |
+| `web-automation-engineer` | Sonnet | Playwright + TypeScript. Writes the web tests from the scaffold placeholders. |
 | `test-data-env-manager` | Haiku | Test users, resets, environment files. Scripts first. |
 | `defect-triage` | Sonnet | Runs on failures only: test defect, environment or real bug; writes bug reports. |
 | `qa-reviewer` | Opus | Independent audit and module sign-off; design pre-review (on Sonnet) before you see the cases. |
@@ -100,6 +100,17 @@ After the design is approved, TestHive groups the module's functional cases mark
 ```
 If the design is approved again later, the choice must be checked and saved again before the tools can be approved. In Studio this is the **Tools** tab: choose per test type, change the weights and skills, **Save the choices** (which submits the stage when every type has a tool), then approve in **Approvals**. See it: `.\hive demo/phase3/run.sh`.
 
+## Automate (stage 4)
+After the tools are approved, `scaffold` sets up the test project for Playwright (`web/`), Postman + Newman (`api/`) and Maestro (`mobile/`): one placeholder test per approved functional case marked Automation Yes (Candidate cases are not scaffolded: set them to Yes in the design first), with the case's steps, expected result and tags (`@smoke`, `@sanity`, `@regression`, `@e2e`). Placeholders are skipped or fail until written. The engineers replace them (smoke first), run them by tag and prove them with 3 runs in a row; the stage can be submitted only when every case has a written test with a real check that is stable. Other approved tools are automated by hand.
+```
+.\hive scaffold SIGNUP                         placeholders (starts the stage; never overwrites)
+.\hive run-web SIGNUP --tag smoke              also run-api, run-mobile; TEST_ENV=uat loads .env.uat over .env
+.\hive stable web SIGNUP                       3 runs in a row (TH_TAG=smoke for a subset)
+.\hive check-automation SIGNUP --for-approval  what is still missing
+.\hive stage submit SIGNUP automation; .\hive stage approve SIGNUP automation --by "<name>"   recorded in automation/baseline/
+```
+In Studio: the **Automation** tab (the state of each test, **Run** by type and tag, the last run with its evidence); the Run button starts the engineers. See it: `.\hive demo/phase4/run.sh` (a small local stand-in of the demo app, recorded engineers, real tests).
+
 ## TestHive Studio (no terminal needed)
 Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md).
 
@@ -116,6 +127,7 @@ Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TE
 - **Analysis:** answer the analyst's questions, or ask your own; the **Requirements** tab lists what the analyst wrote. Once the analysis is approved its questions and answers are read-only until it is reopened;
 - **Design:** review the test cases (**Accept**, **Change** with a comment, **Remove**), see each case's steps and expected result, see coverage and the open questions the cases rely on, add a case, or ask for more cases. Once the design is approved its cases are read-only until it is reopened. A requirement ID anywhere opens the requirement with its questions and cases;
 - **Tools:** the decision matrix per test type, with the recommended tool; choose one per type (a reason when it is not the recommended one), set the criteria weights and your team's languages, and save to submit the stage. Read-only once approved;
+- **Automation:** set up the test project, start the engineers, see each case's test (placeholder, written, stable), run the tests by type and tag, and open the last run's screenshots, videos and logs;
 - **Approvals:** see whether a stage passes its rules, then approve, reject or reopen it, signed with your name; the decision log is there too;
 - **Archive a module** added by mistake or no longer tested (bottom of Sources; you type its code and a reason): the module, its documents, questions, cases, baselines and logs move to `archive/<MODULE>-<time>/`, and **Restore** on the start page puts everything back. The same from a terminal: `.\hive stage archive <MODULE> --by "<name>" --comment "<why>"` and `.\hive stage restore <MODULE>-<time> --by "<name>"`.
 
@@ -141,10 +153,11 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `design-workbook` / `import-review` | Excel workbook for reviewing the cases, and reading your decisions, edits, new cases and requests back |
 | `design-impact` | Lists (and with `--apply` flags) the cases affected when approved requirements change |
 | `score-design` | Benchmark: how many expert test conditions the cases cover |
+| `scaffold` / `check-automation` | Stage 4: placeholders for the approved tools, and the automation gate (`--for-approval` needs every test stable) |
 | `tool-advice` | Stage 3: the decision matrix per test type, the choice (`choose`), its check (`check`) and the project's weights and team skills (`settings`) |
 | `studio` | Opens TestHive Studio in the browser (local only); `--project <folder>`, `--port N`, `--no-browser` |
 | `check-private` | Fails if a private name from your git-ignored `.private-names` list is in a file that would be published |
-| `run-mobile` / `run-api` / `run-web` | Run a module's tests; each run is stored in `runs/` |
+| `run-mobile` / `run-api` / `run-web` | Run a module's tests (`--tag smoke`; `TEST_ENV=<name>` loads `.env.<name>`); each run is stored in `runs/` |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |
 | `gate` | Definition-of-done check on the case sheet |
 | `mask` | Hides personal data in documents and screenshots before Claude sees them (Arabic + English) |
@@ -178,6 +191,7 @@ mobile/ api/ web/    test code per platform
 requirements/sources/  your input documents          analysis/  requirements and gap registers
 workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv, requests.csv, baseline/
 tools/               choices.csv, settings.json, baseline/ (the approved tool choice per module)
+automation/          baseline/ (the approved tests per module: files and their checksums)
 runs/                one folder per test run           reports/ reviews/  reports and reviews
 skills/testhive/     optional /testhive skill for the Claude app
 ```

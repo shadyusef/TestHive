@@ -12,7 +12,7 @@ jobs:
       - run: bash scripts/selftest.sh
         shell: bash
       - name: Web tools, so the Studio demos also click through the pages in a real browser
-        run: cd web && npm ci && npx playwright install --with-deps chromium
+        run: cd web && npm ci && npx playwright install --with-deps chromium && npm install -g newman
         shell: bash
       - name: Phase 1 demo (recorded agent run)
         run: bash demo/phase1/run.sh
@@ -31,6 +31,9 @@ jobs:
         shell: bash
       - name: Phase 3 demo (tool advice)
         run: bash demo/phase3/run.sh --check
+        shell: bash
+      - name: Phase 4 demo (automation; real tests against the local stand-in app)
+        run: bash demo/phase4/run.sh --check
         shell: bash
       - name: Windows launcher
         shell: pwsh

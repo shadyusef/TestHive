@@ -22,7 +22,7 @@ A reusable QA team. Claude acts as the **TestHive Lead** (the user is the owner 
 | manual-tester | Sonnet | Designs cases from the approved analysis baseline (techniques, risk, tags, requirement links) in test-cases/TestCases.csv; handles the human's Excel review. |
 | mobile-automation-engineer | Sonnet | Maestro flows, Android and iOS. |
 | api-backend-test-engineer | Sonnet | Postman collections run with Newman. |
-| web-automation-engineer | Sonnet | Playwright + TypeScript. Idle until a web flow exists. |
+| web-automation-engineer | Sonnet | Playwright + TypeScript. Writes the web tests from the scaffold placeholders. |
 | test-data-env-manager | Haiku | Test users, resets, env files. Scripts first. |
 | defect-triage | Sonnet | Failures only: test defect vs real bug, bug reports. |
 | qa-reviewer | Opus | Independent audit; design pre-review and interim reviews on Sonnet, Opus at module sign-off. |
@@ -35,7 +35,7 @@ Agent definitions live in `.claude/agents/`. In Claude Code the user can also ru
 - Never assume app behaviour; verify on the real app.
 
 ## Workflow
-Stages with a human approval after each (`scripts/stage.sh`): analysis (registers, Excel Q&A, baseline) -> design (cases, pre-review, Excel review, baseline) -> tools (decision matrix per test type, human choice, baseline) -> automation -> execution -> reporting.
+Stages with a human approval after each (`scripts/stage.sh`): analysis (registers, Excel Q&A, baseline) -> design (cases, pre-review, Excel review, baseline) -> tools (decision matrix per test type, human choice, baseline) -> automation (scaffold, placeholders per case, engineers write and prove them, gate, baseline) -> execution -> reporting.
 Plan -> analysis -> designed cases -> automate P0/P1 first -> run -> triage failures -> review -> fix -> stability run (3 passes in a row) -> final run -> bug report, final test report, brief.
 Loop until the reviewer has no open Blocker or Major finding, then sign off.
 
@@ -58,6 +58,7 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/check-intake.sh` - older projects: flags unfilled intake sections and business rules with no test case.
 - `setup` (`setup.sh` / `setup.ps1`) - prerequisites check and installer (git, node, python + requirements.txt, java 17, maestro, adb, newman, claude code; `--web` Playwright, `--ocr` Tesseract with Arabic).
 - `tool-advice` - stage 3: the decision matrix per test type for the functional cases, the human's choice (`choose`), `check`, `settings` (weights, team skills).
+- `scaffold`, `check-automation` - stage 4: placeholders for the approved tools, and the gate (every Yes case written and stable). Run scripts take `--tag smoke|sanity|regression|e2e`; `TEST_ENV=<name>` loads `.env.<name>` over `.env`.
 - `stage` - stage gates and approvals, and archive/restore of a module; `collect-run` - stores runs; `mask` - hides personal data (`suggest`/`review` are for the human only).
 - On Windows every script runs as `.\hive <name> ...`; see README and docs/TROUBLESHOOTING.md.
 - `scripts/selftest.sh` - proves the template is healthy (also runs in CI).

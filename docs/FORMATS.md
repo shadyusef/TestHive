@@ -161,6 +161,20 @@ no skills are given); the total is the weighted sum in percent and the highest i
   (`module`, `version`, `approved_by`, `approved_at`, `design_baseline`, `settings`, `tools` = test type -> chosen tool).
 Submitting or approving the tools stage needs a valid, current choice for every test type with cases.
 
+## Automation (stage 4, written by `scripts/scaffold.sh`, the engineers and `stage.sh`)
+The cases to automate are the active cases of the latest design baseline with Automation Yes (not Candidate) and a functional Type, in the test types
+of the approved tool choice. One test per case, found by its ID:
+- Playwright: `web/tests/<MODULE>/<TC-ID>_<title>.spec.ts`, titled `[TC-ID] title @tag ...`; shared fixture `web/fixtures/testhive.ts`.
+- Postman + Newman: a request named `[TC-ID] title @tag ...` in `api/collections/<MODULE>.postman_collection.json`; environment
+  `api/environments/<MODULE>.postman_environment.json` (`API_BASE_URL`, filled from `.env` at run time).
+- Maestro: `mobile/flows/<MODULE>/<TC-ID>_<title>.yaml` with `tags:`; a case on Both is one flow for Android and iOS.
+A placeholder contains `TESTHIVE:STUB` (skipped with `test.fixme` in Playwright, failing in Newman and Maestro). The state of a case:
+missing, stub, written-no-check (no assertion), written, stable (`reports/stable-<TC-ID>.txt` from `stable.sh`), by-hand (a tool without
+a TestHive setup). A known bug: `test.fail(... BUG-<n>)`, a flow's `# BUG-<n>`, or `known bug: BUG-<n>` in a request's script.
+Scaffold fills the case sheet's empty Automation Spec cells. `automation/baseline/<MODULE>/v<n>/meta.json` is written when a human
+approves the stage: `module`, `version`, `approved_by`, `approved_at`, `git_commit`, `tools`, `cases` (ID -> state), `files` (path -> SHA-256).
+Environments: `.env`, then `.env.<TEST_ENV>` over it (both git-ignored); `TEST_ENV` given on the command line wins.
+
 ## Design benchmark key (e.g. `demo/phase2/condition-key.csv`)
 Columns `Key`, `Condition`, `Requirement` (`|`-separated REQ IDs; a matching case must link one of them; empty = any case),
 `Keywords` (as in the analysis key; a number must match a whole number, so `7` does not match `17`). `scripts/score-design.sh`

@@ -1,0 +1,57 @@
+[
+  {
+    "name": "[TC-SIGNUP-072] POST /v1/signup valid request returns 201 @smoke @regression",
+    "event": [
+      { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+        "pm.variables.set('mobile', '05' + String(Date.now()).slice(-8));"
+      ] } },
+      { "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('status is 201', () => pm.response.to.have.status(201));",
+        "pm.test('signupId is not empty', () => pm.expect(pm.response.json().signupId).to.be.a('string').and.not.empty);"
+      ] } }
+    ],
+    "request": { "method": "POST", "url": "{{API_BASE_URL}}/v1/signup", "header": [{ "key": "Content-Type", "value": "application/json" }],
+      "body": { "mode": "raw", "raw": "{\"fullName\": \"Sara Test\", \"mobile\": \"{{mobile}}\", \"password\": \"Pass1234\", \"birthDate\": \"1990-01-15\", \"language\": \"en\", \"termsVersion\": 1}" } }
+  },
+  {
+    "name": "[TC-SIGNUP-087] POST /v1/signup with a registered mobile returns 409 @smoke @regression",
+    "event": [{ "listen": "test", "script": { "type": "text/javascript", "exec": [
+      "pm.test('status is 409', () => pm.response.to.have.status(409));"
+    ] } }],
+    "request": { "method": "POST", "url": "{{API_BASE_URL}}/v1/signup", "header": [{ "key": "Content-Type", "value": "application/json" }],
+      "body": { "mode": "raw", "raw": "{\"fullName\": \"Sara Test\", \"mobile\": \"0500000087\", \"password\": \"Pass1234\", \"birthDate\": \"1990-01-15\", \"language\": \"en\", \"termsVersion\": 1}" } }
+  },
+  {
+    "name": "[TC-SIGNUP-089] POST /v1/otp/verify with the correct 6-digit code returns 200 and 50 points @smoke @regression",
+    "event": [
+      { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+        "pm.sendRequest({ url: pm.variables.get('API_BASE_URL') + '/v1/signup', method: 'POST', header: { 'Content-Type': 'application/json' },",
+        "  body: { mode: 'raw', raw: JSON.stringify({ fullName: 'Sara Test', mobile: '05' + String(Date.now()).slice(-8), password: 'Pass1234', birthDate: '1990-01-15', language: 'en', termsVersion: 1 }) } },",
+        "  (err, res) => pm.variables.set('signupId', res.json().signupId));"
+      ] } },
+      { "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('status is 200', () => pm.response.to.have.status(200));",
+        "pm.test('accessToken is not empty', () => pm.expect(pm.response.json().accessToken).to.be.a('string').and.not.empty);",
+        "pm.test('points are 50', () => pm.expect(pm.response.json().points).to.eql(50));"
+      ] } }
+    ],
+    "request": { "method": "POST", "url": "{{API_BASE_URL}}/v1/otp/verify", "header": [{ "key": "Content-Type", "value": "application/json" }],
+      "body": { "mode": "raw", "raw": "{\"signupId\": \"{{signupId}}\", \"code\": \"123456\"}" } }
+  },
+  {
+    "name": "[TC-SIGNUP-098] POST /v1/otp/resend returns 202 @smoke @regression",
+    "event": [
+      { "listen": "prerequest", "script": { "type": "text/javascript", "exec": [
+        "// Precondition: more than 30 seconds since the code was sent; the demo app's test environment runs without that wait.",
+        "pm.sendRequest({ url: pm.variables.get('API_BASE_URL') + '/v1/signup', method: 'POST', header: { 'Content-Type': 'application/json' },",
+        "  body: { mode: 'raw', raw: JSON.stringify({ fullName: 'Sara Test', mobile: '05' + String(Date.now()).slice(-8), password: 'Pass1234', birthDate: '1990-01-15', language: 'en', termsVersion: 1 }) } },",
+        "  (err, res) => pm.variables.set('signupId', res.json().signupId));"
+      ] } },
+      { "listen": "test", "script": { "type": "text/javascript", "exec": [
+        "pm.test('status is 202', () => pm.response.to.have.status(202));"
+      ] } }
+    ],
+    "request": { "method": "POST", "url": "{{API_BASE_URL}}/v1/otp/resend", "header": [{ "key": "Content-Type", "value": "application/json" }],
+      "body": { "mode": "raw", "raw": "{\"signupId\": \"{{signupId}}\"}" } }
+  }
+]

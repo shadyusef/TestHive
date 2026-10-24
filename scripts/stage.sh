@@ -19,5 +19,6 @@
 # Submitting or approving "design" first runs check-design --for-approval (when test-cases/TestCases.csv exists) and then
 # freezes the module's cases as a baseline in test-cases/baseline/<MODULE>/v<n>/.
 # Submitting or approving "tools" first runs tool-advice check --for-approval and then freezes the choice in tools/baseline/<MODULE>/v<n>/.
+# Submitting or approving "automation" first runs check-automation --for-approval and then records the tests in automation/baseline/<MODULE>/v<n>/.
 . "$(dirname "$0")/_py.sh"
 exec $PY "$(dirname "$0")/lib/stage.py" "$@"

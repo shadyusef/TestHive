@@ -8,6 +8,7 @@ export default defineConfig({
   reporter: [['list'], ['junit', { outputFile: `../reports/web-${process.env.MODULE || 'all'}.xml` }]],
   use: {
     baseURL: process.env.BASE_URL,
+    testIdAttribute: process.env.TEST_ID_ATTRIBUTE || 'data-qa', // getByTestId() finds data-qa="..." (the agents' locator rule)
     trace: 'retain-on-failure',
     screenshot: 'only-on-failure',
   },
