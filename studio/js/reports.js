@@ -14,7 +14,7 @@ async function post(path, body) {
 }
 
 export function renderReports() {
-  const d = S.data, b = d.bugs, r = d.reporting, pre = S.bugPrefill || {}, off = S.agents === 'review' || !!d.job, signed = d.stages[5].status === 'approved';
+  const d = S.data, b = d.bugs, r = d.reporting, pre = S.bugPrefill || {}, off = !!d.job, signed = d.stages[5].status === 'approved';
   const rep = r && r.report, dec = r && r.decision;
   $('#tab').innerHTML = `${signed ? '<div class="msg ok">Signed off: the report and the decision are recorded in a baseline. A new release starts with a new test cycle.</div>' : ''}
     <section class="block"><div class="blockhead"><div class="grow"><h2>Test report</h2>

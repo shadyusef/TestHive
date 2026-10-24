@@ -72,7 +72,7 @@ if grep -rl -- "$KEY" runs reports "$W"/last.out 2>/dev/null; then echo "  WRONG
 
 if [ "$1" = "--check" ]; then
   step "5. Studio: the Run picker's targets and its refusals"
-  export TH_CLAUDE_FAKE="$SRC/demo/phase2d/fake-claude.py"  # the recorded agents: Run works on a PC without Claude Code (CI) instead of review mode
+  export TH_CLAUDE_FAKE="$SRC/demo/phase2d/fake-claude.py"  # the recorded agents: Run works on a PC without Claude Code (CI)
   bash scripts/studio.sh --no-browser --port 0 > "$W/studio.log" 2>&1 &
   for i in $(seq 1 150); do grep -q "^STUDIO " "$W/studio.log" 2>/dev/null && break; sleep 0.2; done
   URL=$(sed -n 's/^STUDIO //p' "$W/studio.log"); [ -n "$URL" ] || { cat "$W/studio.log"; echo "Studio did not start"; exit 1; }

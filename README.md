@@ -6,8 +6,9 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![How TestHive works](docs/testhive-diagram.png)
 
-## What's new (v0.17.0)
+## What's new (v0.17.1)
 The whole flow now works end to end, in Studio or from a terminal:
+- **One mode.** Studio runs the agents; when Claude Code or Git Bash is missing, a note at the top says what to install (**Check again**). The Studio program now finds Git Bash itself, so it works when double-clicked.
 - **Answer the agents in Studio.** When an agent started from Studio wants something its rules do not allow, the job panel shows the full request: **Allow once** or **Deny**, with a note, signed. No answer in 10 minutes is a No; the hard rules (`.env`, the approval records, blocked commands) are never asked.
 - **Explore an Android app from Studio.** Upload the APK, pick the phone or emulator, and the analyst walks the app; Studio shows each recorded screen.
 - **Reports and sign-off.** A bug register, one HTML test report of the approved test cycle (results, bugs, requirements covered, trends, failure screenshots, what the agents cost) with TestHive's Go / No-go suggestion, and the decision signed by a person.
@@ -157,7 +158,7 @@ In Studio: the **Reports** tab (the register, report a bug (also from a failed c
 Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md).
 
 - **As a program (no Python, no terminal):** `testhive-studio-windows.exe` from the Releases page (or build it: `python scripts/build-studio.py`). It opens the last project, or asks for the project folder (**Open a project**, recent projects; **Switch project** in the sidebar); `--project <folder>` opens one directly.
-- **Review mode:** on a PC without Claude Code or Git Bash the Run buttons are off and the command to hand over is shown; documents, answers, reviews, approvals and Excel work.
+- **What this PC needs:** Studio runs the agents, so it needs Claude Code (signed in) and, on Windows, Git (it finds Git Bash in the Git folder). When one is missing a note at the top says what to install, with **Check again**, and Run says the same.
 - **Explore the built product** (Sources): records each screen of the address in a hidden browser (free, no AI), logs in first with `TEST_USER` / `TEST_USER_PASSWORD` from `.env` when set, and shows what it found (**Open the report**). A module with only an address runs **Analyse the built product**. Module details save as you type.
 - **Explore the app** (Sources, after uploading the APK): the analyst installs it on the Android device you pick (a phone with USB debugging, or an emulator; adb lists them) and walks its screens; Studio shows each recorded screen and the report.
 

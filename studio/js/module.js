@@ -120,7 +120,7 @@ function showReadiness(r) {
 function headerActions(d) {
   const n = d.next, wait = d.stages.find(s => s.status === 'awaiting_approval');
   if (d.job) return '';
-  if (n.run && S.agents !== 'review') return `<button class="primary" data-run="${esc(n.run)}" data-title="${esc(n.title)}" data-min="${esc(n.minutes)}">${esc(n.title)}</button>`;
+  if (n.run) return `<button class="primary" data-run="${esc(n.run)}" data-title="${esc(n.title)}" data-min="${esc(n.minutes)}">${esc(n.title)}</button>`;
   if (wait && S.tab !== 'approvals') return `<button class="primary" data-goto="approvals">Review and approve the ${esc(STAGE_LABEL[wait.stage].toLowerCase())}</button>`;
   return '';
 }
@@ -129,7 +129,7 @@ function moduleHeader(d) {
   return `<div class="titlerow"><div class="grow">
       <h1>${esc(d.module)}${d.meta.title ? ` <span dir="auto">${esc(d.meta.title)}</span>` : ''}</h1>
       <p class="finding" dir="auto">${d.job ? `<b>${esc(d.job.title)} is working.</b> ` : ''}${esc(n.text)}</p>
-      ${n.command && !d.job ? `<p class="cmd small muted">${S.agents === 'review' ? 'Review mode: someone with Claude Code runs' : n.run ? 'Or in Claude Code:' : 'In Claude Code:'} <code>${esc(n.command)}</code> <button class="link" data-copy="${esc(n.command)}">Copy</button></p>` : ''}
+      ${n.command && !d.job ? `<p class="cmd small muted">${n.run ? 'Or in Claude Code:' : 'In Claude Code:'} <code>${esc(n.command)}</code> <button class="link" data-copy="${esc(n.command)}">Copy</button></p>` : ''}
     </div><div class="actions">${headerActions(d)}</div></div>
     <div class="track" aria-label="Stages">${d.stages.map(s => stageCell(s, now)).join('')}${readyCell(d.readiness)}</div>`;
 }

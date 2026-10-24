@@ -28,7 +28,7 @@ export async function home(opts = {}) {
         <div class="mc-counts small muted"><span><b>${m.open_gaps}</b> open questions</span><span><b>${m.cases}</b> active cases</span></div>
         <div class="mc-next small muted" dir="auto">${esc(m.next.text)}</div>
         <div class="mc-act">${m.job ? `<span class="small"><span class="pulse"></span> ${esc(m.job)} is working…</span>`
-          : m.next.run && S.agents !== 'review' ? `<button class="primary small" data-run="${esc(m.next.run)}" data-title="${esc(m.next.title)}" data-min="${esc(m.next.minutes)}">${esc(m.next.title)}</button>` : `<button class="small" data-open-mod="${esc(m.module)}">Open</button>`}</div>
+          : m.next.run ? `<button class="primary small" data-run="${esc(m.next.run)}" data-title="${esc(m.next.title)}" data-min="${esc(m.next.minutes)}">${esc(m.next.title)}</button>` : `<button class="small" data-open-mod="${esc(m.module)}">Open</button>`}</div>
       </div>`).join('')}</div>`
     : `<div class="empty"><h2>Start with your first module</h2><p class="muted">Add it, then give TestHive its requirement documents or the address of the built product. The analyst turns them into requirements and questions; the manual tester then designs the test cases.</p></div>`}
     ${archived.length ? `<details class="fold" id="archived" ${opts.archived ? 'open' : ''}><summary><b>Archived modules (${archived.length})</b> <span class="small muted">kept in the archive folder; restore puts everything back</span></summary>

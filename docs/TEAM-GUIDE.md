@@ -9,7 +9,7 @@ The person who sets it up reads all of it; everyone else reads their own row and
 |---|---|---|
 | **QA lead** (sets it up once) | Creates the project repository, describes the app, adds modules, approves stages | Everything a QA engineer needs, plus a GitHub account that can create private repositories |
 | **QA engineer** | Runs the agents (Run buttons), answers their questions (Allow once / Deny), answers, reviews, approves | Git, the Studio program, and the full TestHive setup (`.\hive setup --install`: Python, Claude Code signed in, Git Bash on Windows) |
-| **Reviewer** (QA or business, with a PC) | Answers questions, reviews and approves cases in Studio | Git and the Studio program. Without Claude Code, Studio opens in **review mode**: everything works except the Run buttons, which show the command to hand to a QA engineer |
+| **Reviewer** (QA or business, with a PC) | Answers questions, reviews and approves cases in Studio | Git and the Studio program. Studio expects Claude Code and Git Bash; without them a note at the top says what to install and Run is refused with the same words (answers, reviews and approvals still save) |
 | **Business reviewer** (Excel only) | Answers questions or reviews cases in a workbook | Excel. Nothing to install |
 
 ## Set it up once (QA lead)
@@ -77,6 +77,6 @@ The person who sets it up reads all of it; everyone else reads their own row and
   names to hide. Read documents before committing them if they contain personal data.
 - **Approved stages are read-only.** To change approved answers or cases, reopen the stage in **Approvals** and say why;
   later stages then need a new approval.
-- **Running agents uses the Claude plan** of whoever presses Run (minutes per run). Review mode and the demos cost nothing.
+- **Running agents uses the Claude plan** of whoever presses Run (minutes per run). Answering, reviewing, approving and the demos cost nothing.
 - **See it first:** `.\hive demo/phase2d/run.sh` shows the whole flow with recorded agents, free.
 - Problems: [TROUBLESHOOTING.md](TROUBLESHOOTING.md).

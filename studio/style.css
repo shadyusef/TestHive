@@ -96,6 +96,7 @@ button.link:hover { color: var(--text); text-decoration: underline; }
 .top .status { color: var(--muted); }
 .iconbtn { width: 32px; padding: 0; display: grid; place-items: center; color: var(--text); }
 .menu { display: none; }
+.work { min-width: 0; display: flex; flex-direction: column; } .work .sheet { flex: 1; } .needs { margin: 0 8px 8px 0; }
 .sheet { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sheet); margin: 0 8px 8px 0; padding: var(--pad) var(--pad) 96px; min-width: 0; }
 .grow { flex: 1; }
 
@@ -293,12 +294,13 @@ td.rev { min-width: 230px; }
   body.menu-open .side { transform: none; visibility: visible; }
   body.menu-open::after { content: ""; position: fixed; inset: 0; background: var(--scrim); z-index: 19; }
   .top { padding: 0 16px; }
-  .sheet { margin: 0 8px 8px; }
+  .sheet, .needs { margin: 0 8px 8px; }
 }
 @media (max-width: 760px) {
   .form { grid-template-columns: 1fr; } .form > span:empty { display: none; } .form label { padding-top: 0; }
   .module-card { grid-template-columns: 1fr auto; } .mc-state, .mc-counts, .mc-next { grid-column: 1 / -1; } .mc-act { grid-row: 1; grid-column: 2; }
   .top { padding: 0 12px; } .crumbs .hide-s, .top .status { display: none; }
+  .needs { margin: 0 0 8px; border-radius: 0; }
   .sheet { margin: 0; border-radius: 0; border-left: 0; border-right: 0; padding: 18px 16px 96px; }
   .side .nav, .side .add, .me { padding-top: 10px; padding-bottom: 10px; }
   .titlerow { flex-direction: column; gap: 14px; } .actions { width: 100%; } .actions button { flex: 1; height: 44px; white-space: normal; }

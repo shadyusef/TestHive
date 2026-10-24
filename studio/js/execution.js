@@ -21,7 +21,7 @@ async function run(action, options = {}) {
 }
 
 export function renderExecution() {
-  const x = S.data.execution, off = S.agents === 'review' || !!S.data.job;
+  const x = S.data.execution, off = !!S.data.job;
   if (!x) return $('#tab').innerHTML = `<div class="empty"><h2>Execution starts after the automation is approved</h2>
     <p class="muted">Then a test cycle runs every case on one environment: the automated tests from their runs, the others by hand.</p></div>`;
   if (!x.cycle) return startForm(x);

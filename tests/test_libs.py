@@ -31,6 +31,17 @@ class Project(unittest.TestCase):
         with open(path, "w", encoding="utf-8", newline="") as f: f.write(text)
 
 
+@unittest.skipUnless(os.name == "nt" and shutil.which("git"), "Windows with Git only")
+class GitBashWithoutPath(unittest.TestCase):
+    """The double-clicked Studio program: PATH has Git\\cmd but no bash; Studio still finds Git Bash."""
+    def test_found_next_to_git(self):
+        saved = dict(os.environ)
+        try:
+            os.environ.pop("TH_BASH", None); os.environ["PATH"] = os.path.dirname(shutil.which("git"))
+            b = intake.bash(); self.assertTrue(b.lower().endswith("bash.exe") and os.path.isfile(b), b)
+        finally: os.environ.clear(); os.environ.update(saved)
+
+
 class DocumentNames(unittest.TestCase):
     def test_allowed(self):
         for n in ("prd.pdf", "specs/api.yaml", "قصص المستخدم.docx", "notes (v2).txt"): self.assertEqual(intake.doc_name(n), n)
@@ -566,7 +577,7 @@ class StudioProjects(StudioApi):
 
 
 class StudioWithoutBash(StudioApi):
-    """Review mode on a PC with Python only: project setup, a module, documents, reading them and the stage rules need no bash."""
+    """A PC with Python only: project setup, a module, documents, reading them and the stage rules need no bash."""
 
     def setUp(self):
         super().setUp()
@@ -585,14 +596,14 @@ class StudioWithoutBash(StudioApi):
         code, r = self.js("/api/stage", {"module": "LOGIN", "stage": "analysis", "action": "approve", "by": "Sara", "comment": ""})
         self.assertEqual(code, 400); self.assertIn("not waiting for approval", r.get("message", "") + r.get("error", ""))
 
-    def test_review_mode(self):
+    def test_agents_missing(self):
         fake = os.environ.pop("TH_CLAUDE_FAKE", None)
         try:
             o = self.js("/api/overview")[1]
-            self.assertEqual(o["agents"], "review"); self.assertIn("Git Bash", o["agents_missing"])
+            self.assertEqual(o["agents"], "live"); self.assertIn("Git Bash", o["agents_missing"])  # one mode: Studio names what to install
             self.js("/api/project", {"project": "Demo", "app": "Demo", "platforms": ["Web"]}); self.js("/api/module-new", {"module": "LOGIN"})
             code, r = self.js("/api/run", {"module": "LOGIN", "action": "analyse"})
-            self.assertEqual(code, 409); self.assertIn("Review mode", r["message"])
+            self.assertEqual(code, 409); self.assertIn("cannot run the agents yet: Git Bash", r["message"])
         finally:
             if fake: os.environ["TH_CLAUDE_FAKE"] = fake
 
@@ -653,7 +664,7 @@ class StudioExplore(StudioApi):
 
     def test_explore_needs_the_web_tools(self):
         self.module(); self.assertFalse(self.js("/api/module?m=LOGIN")[1]["web_tools"])  # a temporary project has no web/node_modules
-        missing, studio.agents_missing = studio.agents_missing, lambda: []  # as on a PC with Claude Code (CI has none: review mode refuses first)
+        missing, studio.agents_missing = studio.agents_missing, lambda: []  # as on a PC with Claude Code (CI has none: Run is refused first)
         try: code, r = self.js("/api/run", {"module": "LOGIN", "action": "explore-web"})
         finally: studio.agents_missing = missing
         self.assertEqual(code, 409); self.assertIn("web tools", r["message"])

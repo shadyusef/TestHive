@@ -30,7 +30,7 @@ export function renderAutomation() {
         <select id="rt" aria-label="Tag"><option value="">every tag</option>${TAGS.map(t => `<option>${t}</option>`).join('')}</select>
         ${targetSelects('rtg', 'rdv')}
         <select id="re" aria-label="Environment"><option value="">the default .env</option>${(a.envs || []).map(e => `<option value="${esc(e)}">.env.${esc(e)}</option>`).join('')}</select>
-        <button class="primary" id="rgo" ${S.agents === 'review' || S.data.job ? 'disabled' : ''}>Run</button></div></section>` : ''}
+        <button class="primary" id="rgo" ${S.data.job ? 'disabled' : ''}>Run</button></div></section>` : ''}
     ${ct ? contractBlock(ct) : ''}
     ${Object.entries(a.runs).map(([k, r]) => runBlock(k, r)).join('')}
     <section class="block"><div class="blockhead"><div class="grow"><h2>Tests</h2></div></div>

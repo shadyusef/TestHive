@@ -25,8 +25,11 @@ export async function renderSide(ov, arch) {
       <span class="s">${esc(waits(m))}</span></a>`).join('') || '<p class="s none">No modules yet.</p>';
   const n = (arch.archived || []).length;
   $('#archbtn').hidden = !n; $('#archn').textContent = n;
-  $('#mode').textContent = { recorded: 'Agents: recorded runs (demo)', review: 'Review mode' }[ov.agents] || '';
-  $('#mode').title = ov.agents === 'review' ? `${ov.agents_missing.join(' and ')} not found on this PC: the Run buttons are off. Documents, answers, reviews, approvals and Excel all work.` : '';
+  $('#mode').textContent = ov.agents === 'recorded' ? 'Agents: recorded runs (demo)' : '';
+  const miss = ov.agents === 'recorded' ? [] : ov.agents_missing, how = { 'Claude Code': 'npm install -g @anthropic-ai/claude-code, then type claude once in a terminal to sign in', 'Git Bash': 'winget install --id Git.Git -e' };
+  $('#needs').hidden = !miss.length;
+  $('#needs').innerHTML = miss.length ? `<b>This PC cannot run the agents yet: ${esc(miss.join(' and '))} not found.</b> Install ${miss.map(m => `${esc(m)}: <code>${esc(how[m])}</code>`).join('; ')}. Or, in the project folder: <code>.\\hive setup --install</code>. <button class="link accent" id="recheck">Check again</button>` : '';
+  if (miss.length) $('#recheck').onclick = () => renderSide();
   document.querySelectorAll('[data-side]').forEach(a => a.onclick = e => { e.preventDefault(); closeMenu(); confirmLeave(() => openModule(a.dataset.side)); });
 }
 

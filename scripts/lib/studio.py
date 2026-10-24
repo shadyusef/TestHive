@@ -9,6 +9,7 @@ from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import analysis, design, intake, jobs, projects, pyrun, tools, automate, execute, targets, report
 import modules as archive
+os.environ["NoDefaultCurrentDirectoryInExePath"] = "1"  # Windows: which("claude"/"git"/"bash") never picks a file planted in the project
 from analysis import read_csv, refs
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
@@ -274,8 +275,8 @@ def start_action(module, action, info, opts=None):
         if load_state()["modules"][module]["stages"]["execution"]["status"] in ("approved", "awaiting_approval"):
             return None, "The cycle is submitted or approved: its results are frozen (reopen or reject it in Approvals to run more)."
         o["env"] = c["env"]
-    if agents_missing(): return None, (f"Review mode: {' and '.join(agents_missing())} {'is' if len(agents_missing()) == 1 else 'are'} not on this PC, "
-                                       "so agents cannot run here. Someone with Claude Code runs the command shown; everything else works here.")
+    if agents_missing(): return None, (f"This PC cannot run the agents yet: {' and '.join(agents_missing())} not found. "
+                                       "Install it (the note at the top of Studio says how), then press Check again.")
     a, mt = ACTIONS[action], info["meta"]
     if action == "explore-web":
         if not mt.get("url"): return None, "Give the web address of the built product first (Sources tab)."
@@ -445,9 +446,9 @@ def agents_missing():
 
 
 def agents_mode():
-    """'recorded' when the Run buttons replay recorded runs (demos, CI); 'live' when they start Claude Code for real;
-    'review' when this PC cannot run agents: everything else works (documents, answers, reviews, approvals, Excel)."""
-    return "recorded" if os.environ.get("TH_CLAUDE_FAKE") else "review" if agents_missing() else "live"
+    """'recorded' when the Run buttons replay recorded runs (demos, CI); 'live' when they start Claude Code for real
+    (refused, with what to install, while agents_missing() lists something)."""
+    return "recorded" if os.environ.get("TH_CLAUDE_FAKE") else "live"
 
 
 def busy(module):

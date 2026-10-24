@@ -20,7 +20,15 @@ SAFE_NAME = re.compile(r"^[\w\-. ()؀-ۿ]{1,120}$")
 
 
 def bash():
-    return os.environ.get("TH_BASH") or "bash"
+    """Git Bash on Windows: the usual install folders, then next to git.exe on PATH, never inside the project. The Studio
+    program is often double-clicked, and Windows' PATH has Git\\cmd but not bash. Kept in TH_BASH for the agents' hooks."""
+    if os.environ.get("TH_BASH") or os.name != "nt": return os.environ.get("TH_BASH") or "bash"
+    os.environ["NoDefaultCurrentDirectoryInExePath"] = "1"  # which() must not pick a git.exe planted in the project
+    git, here = shutil.which("git"), os.path.realpath(os.getcwd()) + os.sep
+    for b in [os.path.join(os.environ.get("ProgramFiles", ""), "Git", "bin", "bash.exe"), os.path.join(os.environ.get("LocalAppData", ""), "Programs", "Git", "bin", "bash.exe")] + (
+            [os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(git))), "bin", "bash.exe")] if git else []):
+        if os.path.isabs(b) and os.path.isfile(b) and not os.path.realpath(b).startswith(here): os.environ["TH_BASH"] = b; return b
+    return "bash"
 
 
 def run_py(lib, args):
