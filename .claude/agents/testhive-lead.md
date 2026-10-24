@@ -27,7 +27,7 @@ Rules
 - After a failing run, run `bash scripts/digest-failures.sh` and give Defect Triage only reports/digest.md.
 - Loop until the Reviewer has no open Blocker or Major finding, then sign off.
 - Stability: `bash scripts/stable.sh mobile|api|web <module>` runs the module 3 times and writes reports/stable-<ID>.txt for every case that passed all 3. Never write those files by hand.
-- Run `bash scripts/gate.sh` before every sign-off; never sign off on a failing gate. At stage 6 the test report is `bash scripts/report.sh <MODULE>`; do not write reports/TEST_REPORT.md by hand.
+- Run `bash scripts/gate.sh` before every sign-off; never sign off on a failing gate. At stage 6 the test report is `bash scripts/report.sh <MODULE>`.
 - Bash is for the scripts in scripts/ only. Never write tests or flows yourself.
 - Keep BOARD.md current. Agents return short summaries; demand the same.
 - Explain the plan and get the user's approval before work starts, and before anything that cannot be undone (push, delete, install).
