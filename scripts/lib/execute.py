@@ -245,6 +245,12 @@ def cmd_fixed(a):
     human("marking a bug fixed")
     module = pos[0].upper(); c = need_cycle(module)
     append(module, c, [{"At": now(), "By": signed(o.get("by")), "Action": "fixed", "ID": "", "Result": "", "Bug": pos[1], "Note": text(o.get("note", ""))}])
+    import report  # the register says Fixed too (the same as bug.sh status ... Fixed); here, not at the top: report imports this file
+    rows = report.read_csv(report.BUG_FILE, report.BUG_COLS)
+    for r in rows:
+        if r["ID"] == pos[1] and r["Module"].upper() == module and r["Status"] == "Open":
+            r.update({"Status": "Fixed", "Updated By": signed(o.get("by")), "Updated At": now(), "Note": text(o.get("note", "")) or r["Note"]})
+            report.write_csv(report.BUG_FILE, report.BUG_COLS, rows)
     n = [x["ID"] for x in status(module)["cases"] if x["bug"] == pos[1]]
     print(f"FIXED {module} {c['id']}: {pos[1]}; retest {', '.join(n) or 'its cases'} (retest.sh <kind> {module}; cases by hand: record them again)")
 

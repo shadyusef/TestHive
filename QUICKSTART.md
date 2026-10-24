@@ -65,6 +65,9 @@ After you approve the tools, follow **Automate** in the README: `.\hive scaffold
 ## 8b4. Execute
 After you approve the automation, follow **Execute** in the README: start a test cycle on an environment (`.\hive cycle start <MODULE> "<name>" --env <name> --by "<you>"`), run the tests, record the cases run by hand, link bugs, retest fixes, and approve when `cycle check --for-approval` passes. In Studio: the **Execution** tab. To see it first: `.\hive demo/phase5/run.sh`. To run on another browser or on real devices, see **Where the tests run (targets)** in the README: `.\hive targets`, then `.\hive run-web <MODULE> --target <name>` (BrowserStack: add your keys to `.env` first). To see it first: `.\hive demo/phase5b/run.sh`.
 
+## 8b5. Report and sign off
+After you approve the test cycle, follow **Report and sign off** in the README: `.\hive report <MODULE>` builds one HTML report with TestHive's Go / No-go suggestion; you decide (`.\hive report decide <MODULE> Go|No-go --reason "..." --by "<you>"`) and approve. In Studio: the **Reports** tab. To see it first: `.\hive demo/phase6/run.sh`.
+
 ## 8c. Prefer a browser to a terminal?
 After steps 1 to 3, `.\hive studio` opens TestHive Studio instead of steps 5 to 8: the first page asks for the project details, then **New module**, drop the documents in **Sources**, **Read the documents**, and press **Run** (the button next to what to do next at the top of the module; or copy the command shown there into Claude Code). Answer the questions, review the cases, choose the tools, start the automation, run the tests and approve the stages in Studio too. Once a stage is approved its answers or cases are read-only until you reopen it in **Approvals**. Studio also runs as one program that needs no Python (see docs/TEAM-GUIDE.md); on a PC without Claude Code it opens in review mode (Run buttons off, everything else works). **Explore the built product** logs in with `TEST_USER` / `TEST_USER_PASSWORD` from `.env` if you set them. See it first with `.\hive demo/phase2d/run.sh` (Run buttons, recorded agents, free) or `.\hive demo/phase2c/run.sh` (an empty project). Claude Code must be installed and signed in once (`claude` in a terminal) for real runs. Documents can be opened, removed and brought back from **Sources** (nothing is deleted); a module added by mistake can be archived and restored. See README, "TestHive Studio".
 
@@ -93,4 +96,6 @@ Repeat steps 7 to 8b with a new module. Each module gets its own stages, case ID
 .\hive digest-failures                failures only -> reports/digest.md
 .\hive stable mobile <module>         3 runs in a row -> reports/stable-<ID>.txt
 .\hive gate                           definition of done
+.\hive bug list <module>              the bugs in reports/bugs.csv
+.\hive report <module>                HTML test report -> reports/<MODULE>-report.html
 ```

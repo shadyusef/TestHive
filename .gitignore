@@ -6,6 +6,7 @@ reports/*
 !reports/.gitkeep
 !reports/stable-*.txt
 !reports/BUG_REPORT.md
+!reports/bugs.csv
 !reports/TEST_REPORT.md
 test-results/
 playwright-report/

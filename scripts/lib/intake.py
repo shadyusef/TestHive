@@ -40,7 +40,7 @@ def init_project(name):
              "workflow/BOARD.md": lambda: read("templates/BOARD.md"), "test-cases/TestCases.csv": lambda: first_line("templates/TestCases.csv"),
              "test-cases/requests.csv": lambda: read("templates/requests.csv"), ".env": lambda: read("templates/env.example"),
              "CONTEXT.md": lambda: read("templates/CONTEXT.md"), "analysis/requirements.csv": lambda: first_line("templates/requirements.csv"),
-             "analysis/gaps.csv": lambda: first_line("templates/gaps.csv")}
+             "analysis/gaps.csv": lambda: first_line("templates/gaps.csv"), "reports/bugs.csv": lambda: first_line("templates/bugs.csv")}
     for path, text in files.items():
         if not os.path.exists(path): write(path, text())
     h = os.environ.get("TH_CMD", "bash scripts/hive.sh")

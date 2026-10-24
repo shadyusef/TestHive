@@ -35,8 +35,8 @@ jobs:
       - name: Phase 4 demo (automation; real tests against the local stand-in app)
         run: bash demo/phase4/run.sh --check
         shell: bash
-      - name: Phase 5 demo (execution; a test cycle with a planted bug, a fix and a flaky test)
-        run: bash demo/phase5/run.sh --check
+      - name: Phase 5 and 6 demo (a test cycle with a planted bug, a fix and a flaky test; then the report and the sign-off)
+        run: bash demo/phase6/run.sh --check
         shell: bash
       - name: Phase 5b demo (run targets; BrowserStack played by local stand-ins, made-up keys)
         run: bash demo/phase5b/run.sh --check

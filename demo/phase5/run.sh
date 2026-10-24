@@ -59,7 +59,10 @@ sed -n 1,30p runs/$APIRUN/evidence/*TC-SIGNUP-072*.txt | grep -v -e "^User-Agent
 expect '"password": "\*\*\*"' "the password in the request body is masked"
 
 step "4. The tester triages: the web failure is a bug; the resend passes on a rerun, so it is flaky and quarantined"
-show bash scripts/cycle.sh bug SIGNUP $S-051 BUG-SIGNUP-301 --by "Sara (QA lead)"
+SHOT=$(cd runs && ls $WEBRUN/evidence/*051*/*.png 2>/dev/null | head -1)
+show bash scripts/bug.sh add SIGNUP --title "A wrong code shows Invalid code instead of The code is incorrect." --severity Major --cases $S-051   --steps "1. Sign up; 2. Enter 654321 on the OTP page" --expected "The code is incorrect." --actual "Invalid code" --evidence "$SHOT" --by "Sara (QA lead)"
+expect "BUG BUG-SIGNUP-001 (Major)" "the bug is in the register (reports/bugs.csv)"
+expect "linked in cycle C1 to $S-051" "and linked to the failed test in the cycle"
 show bash scripts/run-api.sh SIGNUP
 show bash scripts/cycle.sh status SIGNUP
 expect "$S-098 *api *passed .*flaky" "TC-SIGNUP-098 failed, then passed: flaky"
@@ -68,16 +71,17 @@ show bash scripts/cycle.sh quarantine SIGNUP $S-098 --reason "503 on the first r
 step "5. The cases run by hand are recorded (one failed with its bug, one blocked)"
 MAN=$(bash scripts/cycle.sh status SIGNUP | awk '$2 == "manual" && $3 == "not-run" {print $1}' | grep -v -e "$S-044" -e "$S-062" | paste -sd, -)
 bash scripts/cycle.sh result SIGNUP "$MAN" Passed --by "Lina (tester)" | sed 's/^/  /'
-show bash scripts/cycle.sh result SIGNUP $S-044 Failed --bug BUG-SIGNUP-302 --note "Arabic page still shows English labels" --by "Lina (tester)"
+bash scripts/bug.sh add SIGNUP --title "The Arabic sign-up page still shows English labels" --severity Minor --cases $S-044 --by "Lina (tester)" | sed 's/^/  /'
+show bash scripts/cycle.sh result SIGNUP $S-044 Failed --bug BUG-SIGNUP-002 --note "Arabic page still shows English labels" --by "Lina (tester)"
 show bash scripts/cycle.sh result SIGNUP $S-062 Blocked --note "needs a clock that can be set forward 5 minutes in the demo environment" --by "Lina (tester)"
 show bash scripts/cycle.sh check SIGNUP --for-approval
 expect "EXECUTION OK" "every case has its result; failures carry a bug"
 
-step "6. Build 1.0.1 fixes BUG-SIGNUP-301: the failures are retested, then the cycle is approved"
+step "6. Build 1.0.1 fixes BUG-SIGNUP-001: the failures are retested, then the cycle is approved"
 app
-show bash scripts/cycle.sh fixed SIGNUP BUG-SIGNUP-301 --note "build 1.0.1" --by "Sara (QA lead)"
+show bash scripts/bug.sh status SIGNUP BUG-SIGNUP-001 Fixed --note "build 1.0.1" --by "Sara (QA lead)"
 show bash scripts/cycle.sh check SIGNUP --for-approval
-expect "BUG-SIGNUP-301 is fixed: retest it" "a fixed bug needs its retest"
+expect "BUG-SIGNUP-001 is fixed: retest it" "a fixed bug needs its retest"
 show bash scripts/retest.sh web SIGNUP
 expect "RETEST SIGNUP web: $S-051" "only the failed web test is retested"
 expect "1 passed" "and it passes now"
@@ -88,6 +92,7 @@ bash scripts/stage.sh approve SIGNUP execution --by "Omar (QA manager)" | tee "$
 expect "EXECUTION BASELINE SIGNUP v1" "approval records the cycle's results in execution/baseline/"
 mkdir -p "$SRC/demo/phase5/output"; bash scripts/cycle.sh status SIGNUP > "$SRC/demo/phase5/output/cycle-status.txt"
 
+[ -n "$TH_DEMO_NEXT" ] && . "$TH_DEMO_NEXT"   # phase 6 goes on from here (demo/phase6/run.sh)
 if [ "$1" = "--check" ]; then
   step "7. Studio: the Execution data and its refusals"
   bash scripts/studio.sh --no-browser --port 0 > "$W/studio.log" 2>&1 &

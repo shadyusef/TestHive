@@ -36,7 +36,7 @@ Agent definitions live in `.claude/agents/`. In Claude Code the user can also ru
 
 ## Workflow
 Stages with a human approval after each (`scripts/stage.sh`): analysis (registers, Excel Q&A, baseline) -> design (cases, pre-review, Excel review, baseline) -> tools (decision matrix per test type, human choice, baseline) -> automation (scaffold, placeholders per case, engineers write and prove them, gate, baseline) -> execution (test cycle on one environment: results from the runs and by hand, bugs, retest, quarantine, gate, baseline) -> reporting.
-Plan -> analysis -> designed cases -> automate P0/P1 first -> run -> triage failures -> review -> fix -> stability run (3 passes in a row) -> final run -> bug report, final test report, brief.
+Plan -> analysis -> designed cases -> automate P0/P1 first -> run -> triage failures -> review -> fix -> stability run (3 passes in a row) -> final run -> bug register, test report (`report`), brief.
 Loop until the reviewer has no open Blocker or Major finding, then sign off.
 
 ## Standards
@@ -45,7 +45,7 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - iOS needs a Mac or a device farm; start Android-first on Windows.
 - API: Postman + Newman, requests named `[TC-ID] title`, no secrets in the repo; case definitions stay in the CSV so the framework can change later.
 - Web: Playwright + TypeScript, Page Objects with no assertions, web-first assertions, no waitForTimeout.
-- Real app bugs are reported in `reports/BUG_REPORT.md` (`BUG-<NNN>`); the test keeps its assertion and gets the tag `known-bug` with the bug ID. Never weaken an assertion.
+- Real app bugs are reported in `reports/bugs.csv` (`BUG-<MODULE>-<NNN>`; `bug add`, or the defect-triage agent); the test keeps its assertion and gets the tag `known-bug` with the bug ID. Never weaken an assertion.
 
 ## Scripts (use instead of agent runs)
 - `scripts/digest-failures.sh` - trims junit/Newman output to failures only (`reports/digest.md`) before triage.
@@ -58,6 +58,7 @@ Loop until the reviewer has no open Blocker or Major finding, then sign off.
 - `scripts/check-intake.sh` - older projects: flags unfilled intake sections and business rules with no test case.
 - `setup` (`setup.sh` / `setup.ps1`) - prerequisites check and installer (git, node, python + requirements.txt, java 17, maestro, adb, newman, claude code; `--web` Playwright, `--ocr` Tesseract with Arabic).
 - `tool-advice` - stage 3: the decision matrix per test type for the functional cases, the human's choice (`choose`), `check`, `settings` (weights, team skills).
+- `bug`, `report` - stage 6: the bug register; the HTML test report with a Go / No-go suggestion, and the signed decision (`report decide`).
 - `targets` - where tests run (targets.json: local browsers and Android devices, BrowserStack browsers and devices); `run-web` / `run-mobile --target <name>`.
 - `cycle`, `retest` - stage 5: a test cycle on one environment (results by hand and from the runs, bugs, fixed, quarantine of flaky tests, the gate); `retest web|api` reruns the failures.
 - `scaffold`, `check-automation` - stage 4: placeholders for the approved tools, and the gate (every Yes case written and stable). `contract` builds contract tests from the OpenAPI spec (`run-api <M> --contract`); @e2e journeys use the web fixture's `api`. Run scripts take `--tag smoke|sanity|regression|e2e`; `TEST_ENV=<name>` loads `.env.<name>` over `.env`.

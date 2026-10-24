@@ -6,7 +6,7 @@ import os, sys, re, glob, json, time, shutil, tempfile, threading, subprocess, u
 for k in ("TH_STATE", "TH_ANALYSIS", "TH_CASES", "TH_JOB", "TH_ARCHIVE", "TH_CLAUDE_FAKE"): os.environ.pop(k, None)  # defaults only
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 sys.path.insert(0, os.path.join(ROOT, "scripts", "lib"))
-import analysis, design, intake, modules, studio, tools, automate, contract, execute, targets  # noqa: E402
+import analysis, design, intake, modules, studio, tools, automate, contract, execute, targets, report  # noqa: E402
 
 BASH = os.environ.get("TH_BASH") or shutil.which("bash")  # selftest passes the Git Bash path on Windows (not WSL's bash)
 REQ_HEAD = ",".join(analysis.REQ_COLS) + "\n"
@@ -482,6 +482,37 @@ class Execution(Automation):
         r = self.stage("approve", "SIGNUP", "execution", "--by", "Omar"); self.assertEqual(r.returncode, 0, r.stdout)
         meta = load(os.path.join(execute.DIR, "baseline", "SIGNUP", "v1", "meta.json"))
         self.assertEqual((meta["cycle"]["id"], meta["cases"]["TC-SIGNUP-002"]["quarantine"], len(meta["runs"])), ("C1", "timing", 5))
+
+
+class Reporting(Execution):
+    """Stage 6: the bug register, the HTML report (escaped), the Go / No-go decision and when it goes stale, and the sign-off."""
+    test_cycle_results_bugs_flaky_and_retest = None
+
+    def rep(self, *a, env=None):
+        return subprocess.run([sys.executable, "scripts/lib/report.py", *a], capture_output=True, text=True, encoding="utf-8", env=dict(os.environ, **(env or {})))
+
+    def test_bugs_report_and_decision(self):
+        self.ex("start", "SIGNUP", "1.0", "--env", "uat", "--by", "Sara")
+        self.run_of("web", [("TC-SIGNUP-001", "failed")]); self.run_of("api", [("TC-SIGNUP-002", "passed")]); self.run_of("mobile", [("TC-SIGNUP-003", "passed")])
+        r = self.rep("bug-add", "SIGNUP", "--title", "<script>alert(1)</script> & co", "--severity", "Blocker", "--cases", "TC-SIGNUP-001", "--by", "Sara")
+        self.assertIn("BUG BUG-SIGNUP-001 (Blocker)", r.stdout); self.assertIn("linked in cycle C1 to TC-SIGNUP-001", r.stdout)
+        self.assertNotEqual(self.rep("bug-add", "SIGNUP", "--title", "x", "--severity", "Huge", "--cases", "TC-SIGNUP-001", "--by", "Sara").returncode, 0)
+        self.assertNotEqual(self.rep("bug-add", "SIGNUP", "--title", "x", "--severity", "Minor", "--cases", "TC-SIGNUP-404", "--by", "Sara").returncode, 0)
+        self.ex("result", "SIGNUP", "TC-SIGNUP-005", "Passed", "--by", "Lina")
+        self.assertEqual(self.errors(), "")
+        for a in (("submit", "SIGNUP", "execution"), ("approve", "SIGNUP", "execution", "--by", "Omar")): self.assertEqual(self.stage(*a).returncode, 0)
+        self.assertIn("no report yet", " ".join(report.problems("SIGNUP")[0]))
+        r = self.rep("build", "SIGNUP"); self.assertIn("TestHive suggests No-go", r.stdout, r.stdout + r.stderr)
+        with open(report.report_path("SIGNUP"), encoding="utf-8") as f: page = f.read()
+        self.assertIn("&lt;script&gt;alert(1)&lt;/script&gt; &amp; co", page); self.assertNotIn("<script>alert(1)", page, "bug text is escaped")
+        self.assertNotEqual(self.rep("decide", "SIGNUP", "No-go", "--reason", "x", "--by", "A", env={"TH_JOB": "x"}).returncode, 0, "an agent cannot decide")
+        r = self.rep("decide", "SIGNUP", "Go", "--reason", "ship it", "--by", "Mona"); self.assertNotEqual(r.returncode, 0, "Go with an open Blocker"); self.assertIn("Blocker", r.stdout)
+        self.assertEqual(self.rep("decide", "SIGNUP", "No-go", "--reason", "the Blocker", "--by", "Mona").returncode, 0)
+        self.assertEqual(report.problems("SIGNUP", True)[0], [])
+        self.assertEqual(self.rep("bug-status", "SIGNUP", "BUG-SIGNUP-001", "Won't fix", "--by", "Mona").returncode, 0)
+        err = " ".join(report.problems("SIGNUP", True)[0]); self.assertIn("build it again", err); self.assertIn("decide again", err)
+        rows = analysis.read_csv(report.BUG_FILE, report.BUG_COLS); rows.append(dict(rows[0], ID="BUG-9", Severity="Huge")); analysis.write_csv(report.BUG_FILE, report.BUG_COLS, rows)
+        self.assertEqual(len(report.bug_problems("SIGNUP")), 2, "an ID out of pattern and a severity out of the list (an agent may write the file)")
 
 
 class Targets(unittest.TestCase):

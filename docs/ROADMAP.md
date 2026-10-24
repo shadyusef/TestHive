@@ -25,7 +25,8 @@ Each phase ends with a runnable demo in `demo/phase<N>/` and selftest coverage.
 | 5a | Execution: test cycles per environment, results by hand and from the runs, run picker (type, suite, environment), video, screenshots and traces, API request/response logs, retest after a fix, flaky quarantine, gate and baseline; Execution tab | Done (v0.14.0) |
 | 5b | Run targets: local browsers and Android devices, BrowserStack browsers (Playwright) and real devices (Maestro), picked per run and recorded with it | Done (v0.15.0) |
 | 5c | BrowserStack Local (a tunnel to test environments that are not on the internet), several targets in one run | Planned |
-| 6 | Reporting: interactive HTML bug and test reports, management summary, trends, cost per stage, write-back to Jira / Azure | Planned |
+| 6a | Reporting: bug register, one HTML test report (management summary with a Go / No-go suggestion, results, requirements covered, trends, cost per stage), the signed decision, gate and baseline; Reports tab | Done (v0.16.0) |
+| 6b | Write-back to Jira / Azure DevOps: bugs become issues, their status comes back | Next |
 | 7 | More Studio: answer agent permission prompts from the browser (Claude Agent SDK), Android exploration from Studio | Planned |
 | 8 | Scale: scheduled CI runs, team roles, notifications, device farms, iOS on a Mac | Planned |
 

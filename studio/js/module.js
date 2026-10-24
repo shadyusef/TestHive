@@ -8,6 +8,7 @@ import { renderDesign } from './design.js';
 import { renderTools } from './tools.js';
 import { renderAutomation } from './automation.js';
 import { renderExecution } from './execution.js';
+import { renderReports } from './reports.js';
 import { renderApprovals } from './approvals.js';
 
 /* ---------- Page address: #/MODULE/tab, so a refresh or a bookmark opens the same place ---------- */
@@ -31,7 +32,7 @@ export async function openModule(mod, keepTab) {
   if (!keepTab) { S.tab = d.stages[0].status === 'pending' ? 'sources' : 'analysis'; S.open.clear(); }
   render(); setHash(push); renderSide();
 }
-export const TABS = [['sources', 'Sources'], ['analysis', 'Analysis'], ['design', 'Design'], ['tools', 'Tools'], ['automation', 'Automation'], ['execution', 'Execution'], ['approvals', 'Approvals'], ['activity', 'Activity']];
+export const TABS = [['sources', 'Sources'], ['analysis', 'Analysis'], ['design', 'Design'], ['tools', 'Tools'], ['automation', 'Automation'], ['execution', 'Execution'], ['reports', 'Reports'], ['approvals', 'Approvals'], ['activity', 'Activity']];
 let POLL = null;
 export function jobCard(j) {
   if (!j) return '';
@@ -77,8 +78,8 @@ export function renderActivity() {
   });
 }
 /* ---------- The module header: title, what to do next with its one action, and the stage track ---------- */
-const PHASE = { reporting: 6 };  // stages built in later TestHive phases
-const STAGE_TAB = { analysis: 'analysis', design: 'design', tools: 'tools', automation: 'automation', execution: 'execution' };
+const PHASE = {};  // stages built in later TestHive phases (none now)
+const STAGE_TAB = { analysis: 'analysis', design: 'design', tools: 'tools', automation: 'automation', execution: 'execution', reporting: 'reports' };
 const day = iso => { const t = new Date(iso + 'T12:00:00'); return isNaN(t) ? iso : t.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); };
 function stageCell(s, now) {
   const v = s.status === 'approved' ? `Approved${s.by ? ' by ' + s.by : ''}${s.at ? ', ' + day(s.at) : ''}` : s.status === 'awaiting_approval' ? 'Waits for your approval'
@@ -119,6 +120,7 @@ function tabLabel(t, l, d) {
     analysis: open ? `<span class="q">${open} open</span>` : '', design: cases ? `<span class="c">${cases}</span>` : '',
     tools: d.tools.advice ? `<span class="c">${d.tools.choices.length}/${d.tools.advice.types.length}</span>` : '',
     automation: d.automation ? `<span class="c">${d.automation.cases.filter(c => c.state === 'stable').length}/${d.automation.cases.length}</span>` : '',
+    reports: d.bugs.rows.some(b => b.Status === 'Open') ? `<span class="q">${d.bugs.rows.filter(b => b.Status === 'Open').length} open</span>` : '',
     execution: d.execution && d.execution.cycle ? `<span class="c">${d.execution.cases.filter(c => c.result !== 'not-run').length}/${d.execution.cases.length}</span>` : '' }[t] || '';
   return `<button role="tab" data-tab="${t}" aria-selected="${S.tab === t}" class="${S.tab === t ? 'on' : ''}">${l}${extra}</button>`;
 }
@@ -132,7 +134,7 @@ export function render() {
   document.querySelectorAll('[data-tab]').forEach(b => b.onclick = () => go(b.dataset.tab));
   document.querySelectorAll('[data-goto]').forEach(b => b.onclick = () => go(b.dataset.goto));
   $('#readybtn').onclick = () => showReadiness(d.readiness);
-  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, tools: renderTools, automation: renderAutomation, execution: renderExecution, approvals: renderApprovals, activity: renderActivity })[S.tab]();
+  ({ sources: renderSources, analysis: renderAnalysis, design: renderDesign, tools: renderTools, automation: renderAutomation, execution: renderExecution, reports: renderReports, approvals: renderApprovals, activity: renderActivity })[S.tab]();
   updateSavebar(); bindStop(); watchJob();
 }
 

@@ -6,7 +6,7 @@ Everything lives as plain files in your project folder, so the work is visible, 
 
 ![The TestHive team](docs/testhive-diagram.png)
 
-> **Status (v0.15.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines); phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single Windows program for colleagues with review mode, Excel review packs and a team guide, phase 3, tool advice (a decision matrix per test type for the functional cases, the human's choice with a reason, approval), phase 4, automation (the test project set up for the approved tools, one placeholder per case, the engineers' tests run by tag and environment, proven stable, approved; contract tests built from the OpenAPI spec; end-to-end journeys across web and API) and phase 5a, execution (test cycles per environment, results by hand and from the runs, bugs, retest after a fix, flaky tests quarantined, evidence per failure) and phase 5b, run targets (local browsers and devices, BrowserStack browsers and real devices). Still being built phase by phase: HTML reports: see [docs/ROADMAP.md](docs/ROADMAP.md). TestHive targets Windows (tested on Windows 11; CI runs on Windows); the bash scripts run in Git Bash.
+> **Status (v0.16.0).** Working today: the agent team and scripts, the phase 0 foundations (stage gates, approval log, run storage, masking), phase 1, business analysis (documents, API specs, designs, or exploring a built web/Android app; requirement and gap registers; Excel questions and answers; approval and baselines); phase 2, test design (cases traced to the approved requirements, design techniques, risk-based priority, tags, AI pre-review, Excel review, change impact) and TestHive Studio, a local web page that takes a person who does not use a terminal from an empty project to approved test cases, running the agents with a button, also as a single Windows program for colleagues with review mode, Excel review packs and a team guide, phase 3, tool advice (a decision matrix per test type for the functional cases, the human's choice with a reason, approval), phase 4, automation (the test project set up for the approved tools, one placeholder per case, the engineers' tests run by tag and environment, proven stable, approved; contract tests built from the OpenAPI spec; end-to-end journeys across web and API) and phase 5a, execution (test cycles per environment, results by hand and from the runs, bugs, retest after a fix, flaky tests quarantined, evidence per failure) phase 5b, run targets (local browsers and devices, BrowserStack browsers and real devices) and phase 6a, reporting (bug register, one HTML test report with a Go / No-go suggestion, trends and cost, a signed decision). Still being built phase by phase: write-back to Jira / Azure DevOps (6b): see [docs/ROADMAP.md](docs/ROADMAP.md). TestHive targets Windows (tested on Windows 11; CI runs on Windows); the bash scripts run in Git Bash.
 
 ## What you need
 | Need | Why | Who provides it |
@@ -43,7 +43,7 @@ Each module goes through six stages. A stage cannot start until a named person a
 | 3. Tools | Compares tools for your product | Decision matrix | Choose |
 | 4. Automation | Writes the test project | Scripts, tagged smoke/sanity/regression/E2E | Review |
 | 5. Execution | Runs a test cycle on one environment, keeps evidence | Results per case, bugs, retests, videos, API logs | Record results by hand, quarantine, approve |
-| 6. Reporting | Writes bug and test reports | HTML reports for testers and managers | Sign off |
+| 6. Reporting | Keeps the bug register, builds the test report | One HTML report with a Go / No-go suggestion, trends and cost | Decide Go or No-go, sign off |
 
 ```
 .\hive stage status SIGNUP
@@ -60,7 +60,7 @@ Each module goes through six stages. A stage cannot start until a named person a
 | `api-backend-test-engineer` | Sonnet | Postman collections run with Newman. |
 | `web-automation-engineer` | Sonnet | Playwright + TypeScript. Writes the web tests from the scaffold placeholders. |
 | `test-data-env-manager` | Haiku | Test users, resets, environment files. Scripts first. |
-| `defect-triage` | Sonnet | Runs on failures only: test defect, environment or real bug; writes bug reports. |
+| `defect-triage` | Sonnet | Runs on failures only: test defect, environment or real bug; writes real bugs to the register (reports/bugs.csv). |
 | `qa-reviewer` | Opus | Independent audit and module sign-off; design pre-review (on Sonnet) before you see the cases. |
 
 Call one agent directly inside Claude Code with `/th-lead`, `/th-analyst`, `/th-manual`, `/th-mobile`, `/th-api`, `/th-web`, `/th-data`, `/th-triage`, `/th-review` followed by the task, or from a terminal with `.\hive th mobile "automate TC-SIGNUP-001"`. `/th-lead` makes the current session act as the Lead (a subagent cannot start other agents); for a full module `claude --agent testhive-lead` is the better start.
@@ -114,14 +114,14 @@ An endpoint that answers differently from the spec blocks the approval until it 
 In Studio: the **Automation** tab (the state of each test, the contract tests, **Run** by type, tag, environment and target (and the Android device), the last run with its evidence); the Run button starts the engineers. See it: `.\hive demo/phase4/run.sh` (a small local stand-in of the demo app, recorded engineers, real tests; the contract tests find two responses the spec does not list, and a second environment shows a wrong field type caught).
 
 ## Execute (stage 5)
-After the automation is approved, a **test cycle** runs every functional case of the approved design once on one environment (for example "1.4 UAT" on `.env.uat`). Every run of the module on that environment after the cycle starts counts in it: the automated cases take their result from the runs, the others are run by hand and recorded with the tester's name. A failure needs a bug ID; a test that both passed and failed with no fix in between is **flaky** and blocks the cycle until it is fixed or **quarantined** with a reason (it still runs). When a bug is marked fixed its cases must be retested: `retest` reruns only those. The stage is approved on the cycle's results, recorded in `execution/baseline/`.
+After the automation is approved, a **test cycle** runs every functional case of the approved design once on one environment (for example "1.4 UAT" on `.env.uat`). Every run of the module on that environment after the cycle starts counts in it: the automated cases take their result from the runs, the others are run by hand and recorded with the tester's name. A failure needs a bug ID; a test that both passed and failed with no fix in between is **flaky** and blocks the cycle until it is fixed or **quarantined** with a reason (it still runs). When a bug is marked Fixed (`bug status`, or the Reports tab: the register and the cycle agree) its cases must be retested: `retest` reruns only those. The stage is approved on the cycle's results, recorded in `execution/baseline/`.
 ```
 .\hive cycle start SIGNUP "1.4 UAT" --env uat --by "<name>"    starts the stage; runs on .env.uat count from now on
 .\hive run-web SIGNUP; .\hive run-api SIGNUP; .\hive run-api SIGNUP --contract    (TEST_ENV=uat, or set it in .env)
-.\hive cycle result SIGNUP TC-SIGNUP-044 Failed --bug BUG-12 --by "<name>"           cases run by hand: Passed, Failed (with its bug), Blocked (with a note)
-.\hive cycle bug SIGNUP TC-SIGNUP-051 BUG-13 --by "<name>"                          the bug of a failed automated test
+.\hive cycle result SIGNUP TC-SIGNUP-044 Failed --bug BUG-SIGNUP-002 --by "<name>"           cases run by hand: Passed, Failed (with its bug), Blocked (with a note)
+.\hive cycle bug SIGNUP TC-SIGNUP-051 BUG-SIGNUP-001 --by "<name>"                          the bug of a failed automated test
 .\hive cycle quarantine SIGNUP TC-SIGNUP-098 --reason "<why>" --by "<name>"         a flaky test stops blocking
-.\hive cycle fixed SIGNUP BUG-13 --by "<name>"; .\hive retest web SIGNUP           retest the cases of a fixed bug
+.\hive bug status SIGNUP BUG-SIGNUP-001 Fixed --by "<name>"; .\hive retest web SIGNUP   the register says Fixed and the cases are retested
 .\hive cycle check SIGNUP --for-approval; .\hive stage submit SIGNUP execution; .\hive stage approve SIGNUP execution --by "<name>"
 ```
 Each run keeps its evidence: a failed web test its video, screenshot and Playwright trace (every step), an API test each request and response with Authorization, cookies and secret-looking fields masked. In Studio: the **Execution** tab (start a cycle, run its tests and retests, record the cases run by hand, link bugs, mark them fixed, quarantine flaky tests); the Automation tab's **Run** also picks the environment. See it: `.\hive demo/phase5/run.sh` (build 1.0 of the stand-in app has a planted bug and a flaky resend; build 1.0.1 fixes the bug).
@@ -133,6 +133,16 @@ Each run keeps its evidence: a failed web test its video, screenshot and Playwri
 .\hive run-mobile SIGNUP --target bs-pixel7          (or a local device: --target android <device-id>)
 ```
 Your test environment must be reachable from the internet for BrowserStack (BrowserStack Local, the tunnel, is not set up by TestHive yet). See it: `.\hive demo/phase5b/run.sh` (local stand-ins play BrowserStack; nothing is sent to it).
+
+## Report and sign off (stage 6)
+Bugs live in one register, `reports/bugs.csv` (`BUG-<MODULE>-<NNN>`, severity Blocker, Major or Minor, status Open, Fixed, Verified or Won't fix, the cases, where it was found, steps, expected, actual, evidence). A person's report links the bug to the failed tests in the open cycle; marking it Fixed asks for their retest. After the test cycle is approved, `report` builds one HTML file from it: TestHive's Go / No-go suggestion with its reasons (open Blocker bugs, open Major bugs or failures on P0/P1 cases, cases not run) and the risks to accept (quarantined or blocked tests, other open bugs), the results, the bugs, which requirements passed or fail, the pass rate per cycle and per run, and what the agents cost per stage. It opens offline, prints to PDF and embeds small failure screenshots. A named person then decides Go or No-go with the reason (Go is refused while a Blocker is open); the decision goes stale if the bugs or the cycle change. Approval freezes the report, the register and the decision in `reporting/baseline/`.
+```
+.\hive bug add SIGNUP --title "..." --severity Major --cases TC-SIGNUP-051 --steps "..." --expected "..." --actual "..." --by "<name>"
+.\hive bug status SIGNUP BUG-SIGNUP-001 Fixed --note "build 1.0.1" --by "<name>"
+.\hive report SIGNUP                                     reports/SIGNUP-report.html
+.\hive report decide SIGNUP Go --reason "<why>" --by "<name>"; .\hive stage submit SIGNUP reporting; .\hive stage approve SIGNUP reporting --by "<name>"
+```
+In Studio: the **Reports** tab (the register, report a bug (also from a failed case in the Execution tab), change its status, build and open the report, record the decision). See it: `.\hive demo/phase6/run.sh` (the phase 5 cycle, then the report: TestHive suggests No-go, the product owner decides Go with the reason).
 
 ## TestHive Studio (no terminal needed)
 Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TEAM-GUIDE.md).
@@ -151,6 +161,7 @@ Working as a team, or handing it to colleagues? See [docs/TEAM-GUIDE.md](docs/TE
 - **Design:** review the test cases (**Accept**, **Change** with a comment, **Remove**), see each case's steps and expected result, see coverage and the open questions the cases rely on, add a case, or ask for more cases. Once the design is approved its cases are read-only until it is reopened. A requirement ID anywhere opens the requirement with its questions and cases;
 - **Tools:** the decision matrix per test type, with the recommended tool; choose one per type (a reason when it is not the recommended one), set the criteria weights and your team's languages, and save to submit the stage. Read-only once approved;
 - **Automation:** set up the test project, start the engineers, see each case's test (placeholder, written, stable), see the contract tests (up to date, stale or missing, and the endpoints that answer differently from the spec), run the tests by type and tag (**Contract tests** is one of the types), and open the last run's screenshots, videos and logs;
+- **Reports:** the bug register (report a bug, change its status), build and open the test report with TestHive's Go / No-go suggestion, and record the decision, signed;
 - **Execution:** start a test cycle on an environment, run its tests and retest the failures, record the cases run by hand, link bugs and mark them fixed, quarantine flaky tests with a reason; failed tests open their video, screenshots, trace or API log;
 - **Approvals:** see whether a stage passes its rules, then approve, reject or reopen it, signed with your name; the decision log is there too;
 - **Archive a module** added by mistake or no longer tested (bottom of Sources; you type its code and a reason): the module, its documents, questions, cases, baselines and logs move to `archive/<MODULE>-<time>/`, and **Restore** on the start page puts everything back. The same from a terminal: `.\hive stage archive <MODULE> --by "<name>" --comment "<why>"` and `.\hive stage restore <MODULE>-<time> --by "<name>"`.
@@ -183,6 +194,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 | `studio` | Opens TestHive Studio in the browser (local only); `--project <folder>`, `--port N`, `--no-browser` |
 | `check-private` | Fails if a private name from your git-ignored `.private-names` list is in a file that would be published |
 | `run-mobile` / `run-api` / `run-web` | Run a module's tests (`--tag smoke`; `--ids` for web and API; `--target <name>` for web and mobile, see `targets`; `run-mobile --app <apk|ipa>` for BrowserStack; `run-api --contract`; `TEST_ENV=<name>` loads `.env.<name>`); each run is stored in `runs/` with its evidence and target |
+| `bug` / `report` | Stage 6: the bug register (add, status, list); the HTML test report, the Go / No-go decision (`decide`) and its check |
 | `targets` | Where the tests can run (targets.json), the Android devices adb sees, and whether the BrowserStack keys are set |
 | `cycle` / `retest` | Stage 5: the test cycle (start, status, results by hand, bugs, fixed, quarantine, check), and rerunning its failures (`retest` takes `--target`) |
 | `stable` | Runs a module 3 times; only cases that pass every time count as done |
@@ -193,7 +205,7 @@ Run `.\hive` with no arguments for the full list with one-line descriptions. The
 ## Privacy and safety
 - `.env` holds your app ids and URLs; it is git-ignored and the agents are blocked from reading it (`.claude/settings.json`).
 - Agents cannot `git push`; you publish.
-- Two Claude Code hooks (`.claude/settings.json`): every file Claude edits is checked at once (shell, Python, JSON, JavaScript, PowerShell syntax; no Windows line endings where they break things), and Claude cannot edit the approval records (`workflow/APPROVALS.md`, `workflow/state.json`, the baselines, the test cycles in `execution/`): only `stage` and `cycle` write them.
+- Two Claude Code hooks (`.claude/settings.json`): every file Claude edits is checked at once (shell, Python, JSON, JavaScript, PowerShell syntax; no Windows line endings where they break things), and Claude cannot edit the approval records (`workflow/APPROVALS.md`, `workflow/state.json`, the baselines, the test cycles in `execution/`, the decisions and baselines in `reporting/`, the bug register): only `stage`, `cycle`, `bug` and `report` write them.
 - Before sending business documents to Claude, mask them: `.\hive mask suggest <file>` (find names), `.\hive mask review <file>` (check every match), `.\hive mask mask <file> <out>`. The token map stays on your PC (`.mask-map.json`, git-ignored). `suggest` and `review` show real data, so only you run them.
 - Use made-up test data in test environments, so screenshots never show real people.
 
@@ -219,6 +231,7 @@ requirements/sources/  your input documents          analysis/  requirements and
 workflow/            state.json, APPROVALS.md, BOARD.md, intake/     test-cases/  TestCases.csv, requests.csv, baseline/
 tools/               choices.csv, settings.json, baseline/ (the approved tool choice per module)
 automation/          baseline/ (the approved tests per module: files and their checksums)
+reporting/           <MODULE>/decision.json (Go / No-go), baseline/ (the signed-off report and bug register)
 execution/           <MODULE>/C<n>/ (a test cycle: cycle.json, log.csv), baseline/ (the approved cycle's results)
 runs/                one folder per test run           reports/ reviews/  reports and reviews
 skills/testhive/     optional /testhive skill for the Claude app

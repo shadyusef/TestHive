@@ -27,7 +27,7 @@ n = lambda r: sum(1 for c in cs if c["result"] == r)
 step(f"Execution tab: cycle {x['cycle']['id']} \"{x['cycle']['name']}\" on {x['cycle']['env']}, {len(cs)} cases, {n('passed')} passed, "
      f"{n('failed')} failed, {n('blocked')} blocked, {n('not-run')} not run", x["cycle"]["id"] == "C1" and n("not-run") == 0 and n("failed") == 1 and n("blocked") == 1)
 q = [c["ID"] for c in cs if c["quarantine"]]
-step(f"quarantined: {q}; fixed bugs: {sorted(x['fixed'])}; ready: {x['check']['ok']}", q == ["TC-SIGNUP-098"] and list(x["fixed"]) == ["BUG-SIGNUP-301"] and x["check"]["ok"])
+step(f"quarantined: {q}; fixed bugs: {sorted(x['fixed'])}; ready: {x['check']['ok']}", q == ["TC-SIGNUP-098"] and list(x["fixed"]) == ["BUG-SIGNUP-001"] and x["check"]["ok"])
 step(f"environments offered: {x['envs']} (names only)", x["envs"] == ["demo"])
 step(f"the stage is {d['stages'][4]['status']}; next: {d['next']['text']}", d["stages"][4]["status"] == "approved")
 code, r = call("/api/execution", {"module": "SIGNUP", "action": "result", "ids": ["TC-SIGNUP-062"], "result": "Passed", "by": "Sara"})

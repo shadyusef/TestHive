@@ -2,6 +2,13 @@
 
 Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 
+## 0.16.0 (2026-10-24)
+- Phase 6a, reporting: one bug register for the project, `reports/bugs.csv` (`bug add | status | list`, or Studio's new **Reports** tab; **Report a bug** on a failed case in the Execution tab fills it in). A person's report links the bug to the failed tests of the open cycle; marking it Fixed asks for their retest. The defect-triage agent writes its bugs there instead of `reports/BUG_REPORT.md`.
+- `report <MODULE>`: one self-contained HTML test report of the approved test cycle (opens offline, prints to PDF): TestHive's Go / No-go suggestion with its reasons and the risks to accept, the results, the bugs, the requirements that passed or fail, the pass rate per cycle and per run, small failure screenshots, and the agents' cost per stage. Studio opens it sandboxed.
+- The reporting stage: a named person decides Go or No-go with the reason (`report decide`; Go is refused with an open Blocker); the decision goes stale when the bugs or the cycle change; approval freezes the report, the register and the decision in `reporting/baseline/<MODULE>/v<n>/`. Every stage of a module can now be approved.
+- New demo `demo/phase6/run.sh`: the phase 5 cycle (its bugs now in the register), then the report (TestHive suggests No-go), a late change that makes it stale, the product owner's Go with the reason, and the sign-off (also in the selftest and CI, where it replaces the phase 5 step).
+- `init-project` creates the empty register; the `guard_records` hook protects `reporting/`, `reports/bugs.csv` and the reports (only the scripts write them; the report's checksum is kept in `reporting/<MODULE>/built.json`, and its one script is the only one its CSP allows); `bug add` accepts only cases of the approved design; `cycle fixed` (and Studio's Mark fixed) also marks the register's bug Fixed.
+
 ## 0.15.0 (2026-10-24)
 - Phase 5b, run targets: `targets.json` (default `templates/targets.json`) names where tests run: local Edge or Chrome, an Android device on this PC, BrowserStack browsers and BrowserStack real Android and iOS devices. `run-web` and `run-mobile` take `--target <name>` (and a local device ID); each run records its target; Studio's Run picker offers the targets and the Android devices adb sees; `targets` lists them.
 - BrowserStack web: the Playwright tests connect to BrowserStack's browsers as they are (no SDK, nothing installed); the session link is kept with each test. BrowserStack mobile: `scripts/lib/browserstack.py` uploads the app and the module's flows, starts the build on the device, waits and writes the results as junit with each flow's video link, so cycles and the gate work as before.

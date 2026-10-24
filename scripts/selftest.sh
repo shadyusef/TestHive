@@ -247,7 +247,7 @@ printf 'echo "unclosed\n' > "$H/bad.sh"; printf 'x = (\n' > "$H/bad.py"; printf 
 P=$(cygpath -m "$PWD" 2>/dev/null || echo "$PWD")   # Claude Code passes native paths; so does this test
 hook() { local r=0; printf '{"tool_input":{"file_path":"%s"}}' "$2" | CLAUDE_PROJECT_DIR="$P" bash scripts/hooks/run.sh "$1" 2>/dev/null || r=$?; echo $r; }
 HK="$(hook check_edit "$HW/bad.sh")$(hook check_edit "$HW/bad.py")$(hook check_edit "$HW/cr.py")$(hook check_edit "$HW/good.sh")"; [ "$HK" = "2220" ] || { echo "the edit-check hook is wrong: exit codes $HK for bad.sh bad.py cr.py good.sh (expected 2220)"; printf '{"tool_input":{"file_path":"%s"}}' "$HW/good.sh" | bash scripts/hooks/run.sh check_edit; exit 1; }
-[ "$(hook guard_records "$P/workflow/APPROVALS.md")$(hook guard_records "$P/test-cases/baseline/X/v1/TestCases.csv")$(hook guard_records "$P/analysis/gaps.csv")$(hook guard_records "$P/tools/choices.csv")$(hook guard_records "$P/automation/baseline/X/v1/meta.json")$(hook guard_records "$P/execution/X/C1/log.csv")" = "220222" ] || { echo "the approval-records guard is wrong"; exit 1; }
+[ "$(hook guard_records "$P/workflow/APPROVALS.md")$(hook guard_records "$P/test-cases/baseline/X/v1/TestCases.csv")$(hook guard_records "$P/analysis/gaps.csv")$(hook guard_records "$P/tools/choices.csv")$(hook guard_records "$P/automation/baseline/X/v1/meta.json")$(hook guard_records "$P/execution/X/C1/log.csv")$(hook guard_records "$P/reporting/X/decision.json")$(hook guard_records "$P/reports/bugs.csv")$(hook guard_records "$P/reports/X-report.html")" = "220222222" ] || { echo "the approval-records guard is wrong"; exit 1; }
 bash scripts/check-private.sh >/dev/null || { bash scripts/check-private.sh; exit 1; }
 PR=$(tmpd); mkdir -p "$PR/scripts"; cp scripts/check-private.sh scripts/_py.sh "$PR/scripts/"   # a planted name must fail
 (cd "$PR" && git init -q && printf 'Acme-Secret\n' > .private-names && printf 'see acme-secret here\n' > notes.txt && printf '.private-names\n' > .gitignore)
@@ -257,11 +257,11 @@ D_OUT=$(bash demo/phase2d/run.sh --check 2>&1) && echo "$D_OUT" | grep -q "STUDI
 C_OUT=$(bash demo/phase2c/run.sh --check 2>&1) && echo "$C_OUT" | grep -q "STUDIO INTAKE CHECK PASS" || { echo "$C_OUT" | tail -25; echo "studio intake check failed"; exit 1; }
 if [ -d web/node_modules/@playwright/test ] && command -v newman >/dev/null 2>&1; then  # phase 4 runs real tests: needs the web tools and Newman
   A_OUT=$(bash demo/phase4/run.sh --check 2>&1) && echo "$A_OUT" | grep -q "PHASE 4 CHECK PASS" || { echo "$A_OUT" | grep -E "WRONG|Error|NOT STABLE" | head; echo "phase 4 automation check failed"; exit 1; }
-  X_OUT=$(bash demo/phase5/run.sh --check 2>&1) && echo "$X_OUT" | grep -q "PHASE 5 CHECK PASS" || { echo "$X_OUT" | grep -E "WRONG|Error" | head; echo "phase 5 execution check failed"; exit 1; }
+  X_OUT=$(bash demo/phase6/run.sh --check 2>&1) && echo "$X_OUT" | grep -q "PHASE 6 CHECK PASS" || { echo "$X_OUT" | grep -E "WRONG|Error" | head; echo "phase 5 and 6 (execution, reporting) check failed"; exit 1; }  # phase 6 runs the phase 5 demo first
   T_OUT=$(bash demo/phase5b/run.sh --check 2>&1) && echo "$T_OUT" | grep -q "PHASE 5B CHECK PASS" || { echo "$T_OUT" | grep -E "WRONG|Error" | head; echo "phase 5b targets check failed"; exit 1; }
-else echo "(web tools or Newman not installed: skipping the phase 4 automation and phase 5 execution checks)"; fi
+else echo "(web tools or Newman not installed: skipping the phase 4, 5, 5b and 6 demo checks)"; fi
 T_OUT=$(bash demo/phase3/run.sh --check 2>&1 || true); echo "$T_OUT" | grep -q "PHASE 3 CHECK PASS" || { echo "$T_OUT" | grep -E "WRONG|Error|Traceback" | head; echo "phase 3 tool advice check failed"; exit 1; }
-$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py scripts/lib/tools.py scripts/lib/automate.py scripts/lib/contract.py scripts/lib/execute.py scripts/lib/api_evidence.py scripts/lib/targets.py scripts/lib/browserstack.py
+$PY -m py_compile scripts/lib/analysis.py scripts/lib/ingest.py scripts/lib/uiscreen.py scripts/lib/design.py scripts/lib/studio.py scripts/lib/intake.py scripts/lib/jobs.py scripts/lib/tools.py scripts/lib/automate.py scripts/lib/contract.py scripts/lib/execute.py scripts/lib/api_evidence.py scripts/lib/targets.py scripts/lib/browserstack.py scripts/lib/report.py
 # Windows: every PowerShell script must parse (CI checks this too, but catch it before pushing)
 if command -v powershell.exe >/dev/null 2>&1; then
   for f in scripts/*.ps1; do

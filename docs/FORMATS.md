@@ -199,6 +199,19 @@ every failure with a bug, no flaky case unless quarantined, no retest left, and 
 endpoint listed. `execution/baseline/<MODULE>/v<n>/meta.json`: `module`, `version`, `approved_by`, `approved_at`, `git_commit`, `cycle`,
 `runs`, `contract`, `cases` (ID -> kind, result, bug, flaky, quarantine).
 
+## Reporting (stage 6, written by `scripts/bug.sh`, `report.sh`, the defect-triage agent, Studio and `stage.sh`)
+- `reports/bugs.csv` (committed; one register for every module): `ID` (`BUG-<MODULE>-<NNN>`), `Module`, `Title`, `Severity` (Blocker, Major,
+  Minor), `Status` (Open, Fixed, Verified, Won't fix), `Cases` (`;`-separated TC-IDs of the approved design), `Cycle`, `Env`, `Target`, `Steps`,
+  `Expected`, `Actual`, `Evidence` (`R-<run>/evidence/<file>`), `Reported By`, `Reported At`, `Updated By`, `Updated At`, `Note`, `External`
+  (the Jira or Azure key, later). One line per field; a leading `= + - @` gets a `'`. `bug.sh list` and `report.sh check` report rows that break these rules.
+- `reports/<MODULE>-report.html` (git-ignored, built again at will): one self-contained page; its first comment `<!-- testhive-report {...} -->`
+  holds `module`, `execution` (the execution baseline), `bugs_sha` (SHA-256 of bugs.csv), `built_at`, `suggestion` (Go, Go with risks, No-go).
+- `reporting/<MODULE>/built.json`: `sha` (SHA-256 of the report report.sh last built) and `built_at`; a report that does not match is ignored.
+- `reporting/<MODULE>/decision.json`: `decision` (Go, No-go), `reason`, `by`, `at`, and what it was decided on (`execution`, `bugs_sha`, `suggestion`).
+- `reporting/baseline/<MODULE>/v<n>/`: `report.html`, `bugs.csv` and `meta.json` (`approved_by`, `approved_at`, `decision`, `report`, `files` path -> SHA-256).
+The gate needs the execution approved, a valid register, a report of the current cycle and register, and a decision made on them;
+Go is refused while a Blocker bug is open.
+
 ## Run targets: `targets.json` (or `templates/targets.json`)
 `{"targets": {<name>: {kind, where, ...}}}`. `name`: lower case letters, digits, `. _ -`. `kind` web or mobile; `where` local or browserstack.
 Local web: `channel` (msedge, chrome, chromium). Local mobile: `platform` android. BrowserStack web: `browser`, `os`, `os_version`

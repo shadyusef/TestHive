@@ -7,7 +7,7 @@ import sys, os, re, glob, json, time, hashlib, secrets, shutil, socket, subproce
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, quote
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-import analysis, design, intake, jobs, projects, pyrun, tools, automate, execute, targets
+import analysis, design, intake, jobs, projects, pyrun, tools, automate, execute, targets, report
 import modules as archive
 from analysis import read_csv, refs
 
@@ -177,6 +177,14 @@ def next_step(module, m, info):
             if todo: return step(f"{len(todo)} cases are run by hand: record each result in the Execution tab (Passed, Failed with its bug, or Blocked).")
             if x["check"]["errors"]: return step(f"{len(x['check']['errors'])} things to settle in the Execution tab (failures without a bug, flaky tests): see the list there.")
             return step("Every case has its result: submit the execution in the Approvals tab.")
+        if st == "reporting":
+            r = info["reporting"]
+            if not r or not r["report"] or any("build it again" in e or "no report yet" in e for e in r["check"]["errors"]):
+                return step("Build the test report from the approved cycle: one page to share, with TestHive's Go / No-go suggestion (free, no AI).", f"{RUN} report {module}", "report")
+            if not r["decision"] or any("decide again" in e for e in r["check"]["errors"]):
+                return step(f"TestHive suggests {r['report']['suggestion']}: decide Go or No-go in the Reports tab, with your reason (signed).")
+            if r["check"]["errors"]: return step(f"{len(r['check']['errors'])} things to settle in the Reports tab.")
+            return step("The report and the decision are ready: submit the reporting in the Approvals tab (the sign-off).")
         return step(f"Stage '{st}' comes in a later TestHive phase.")
     return step("All stages are approved.")
 
@@ -209,6 +217,7 @@ ACTIONS = {
     "run-tests": {"title": "Run the tests", "minutes": "1-15", "command": "",
                   "script": lambda m, o: run_cmd(o["kind"], m, o)},
     "run-contract": {"title": "Run the contract tests", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/run-api.sh", m, "--contract"]},
+    "report": {"title": "Build the test report", "minutes": "1", "command": "", "script": lambda m, o: ["scripts/report.sh", m]},
 }
 for _k in ("web", "api", "contract", "mobile"):  # the test cycle's runs: on the cycle's environment
     ACTIONS[f"cycle-{_k}"] = {"title": f"Run the {dict(api='API').get(_k, _k)} tests of the cycle",
@@ -342,6 +351,12 @@ def module_info(module):
         info["execution"] = dict(ex, check={"ok": not err, "errors": err, "warnings": warn}, envs=envs())
     else: info["execution"] = {"cycle": None, "envs": envs()} if m["stages"]["automation"]["status"] == "approved" else None
     if info["automation"]: info["automation"]["envs"] = envs()
+    info["bugs"] = {"rows": report.bugs(module), "problems": report.bug_problems(module), "severity": report.SEVERITY, "status": report.STATUS}
+    if m["stages"]["execution"]["status"] == "approved":
+        err, warn = report.problems(module, True)
+        info["reporting"] = {"report": report.report_meta(report.report_path(module), module), "decision": report.read_json(os.path.join(report.DIR, module, "decision.json")),
+                             "check": {"ok": not err, "errors": err, "warnings": warn}}
+    else: info["reporting"] = None
     info["approvals"] = approvals(module)
     a_hist = [h for h in m["stages"]["analysis"]["history"] if h["status"] == "approved"]
     info["meta"] = intake.meta(module)
@@ -786,6 +801,39 @@ def post_execution(h, q, body, module):
     if not by: return h.send(400, {"ok": False, "message": "your name is needed: results are signed"})
     code, out = intake.run_py("execute.py", [action] + args() + ["--by", by])
     return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out.strip()})
+
+
+@api("POST", "/api/bugs", module="body", busy_check=True)
+def post_bugs(h, q, body, module):
+    """The bug register: report a bug (from a failed case: its steps and evidence), or change a bug's status. The rules are report.py's."""
+    s = lambda k: str(body.get(k, "")).strip()
+    if body.get("action") == "add":
+        args = ["bug-add", module] + [x for k in ("title", "severity", "cases", "steps", "expected", "actual", "evidence", "target") if s(k) for x in (f"--{k}", s(k))]
+    elif body.get("action") == "status": args = ["bug-status", module, s("id"), s("status")] + (["--note", s("note")] if s("note") else [])
+    else: return h.send(400, {"error": "bad request"})
+    if not s("by"): return h.send(400, {"ok": False, "message": "your name is needed: bugs are signed"})
+    if any(v.startswith("-") for v in (s(k) for k in ("title", "cases", "steps", "expected", "actual", "evidence", "target", "id", "status", "note")) if v):
+        return h.send(400, {"ok": False, "message": "A value cannot start with -"})
+    code, out = intake.run_py("report.py", args + ["--by", s("by")])
+    return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out.strip()})
+
+
+@api("POST", "/api/report-decision", module="body", busy_check=True)
+def post_decision(h, q, body, module):
+    s = lambda k: str(body.get(k, "")).strip()
+    if s("decision") not in ("Go", "No-go"): return h.send(400, {"error": "bad request"})
+    if not s("by") or not s("reason"): return h.send(400, {"ok": False, "message": "your name and the reason are needed: the decision is signed"})
+    if s("reason").startswith("-"): return h.send(400, {"ok": False, "message": "A value cannot start with -"})
+    code, out = intake.run_py("report.py", ["decide", module, s("decision"), "--reason", s("reason"), "--by", s("by")])
+    return h.send(200 if code == 0 else 400, {"ok": code == 0, "message": out.strip()})
+
+
+@api("GET", "/api/report-file", module="query")
+def get_report_file(h, q, body, module):
+    """The module's HTML report, sandboxed (its own scripts run, nothing else; no requests leave it)."""
+    p = report.report_path(module)
+    if not os.path.isfile(p): return h.send(404, {"error": "not found"})
+    return h.send(200, read_bytes(p), "text/html; charset=utf-8", {"Content-Security-Policy": "sandbox allow-scripts; " + report.CSP})
 
 
 @api("POST", "/api/stage", module="body", busy_check=True)

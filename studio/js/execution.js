@@ -1,7 +1,7 @@
 // Execution tab (stage 5): the test cycle. Its runs on one environment, the result of every case (from the runs, or recorded by
 // hand), bugs and their fixes, retests, and flaky tests to quarantine. The rules are execute.py's (the same as scripts/cycle.sh).
 import { S, $, esc, api, toast, ask, me, askName, strip, filterBar, bindFilters, matches, targetSelects, wireTargets, targetOptions } from './core.js';
-import { openModule } from './module.js';
+import { openModule, render, setHash } from './module.js';
 
 const RESULT = { passed: ['Passed', 'ok'], 'known-bug': ['Known bug', 'Medium'], failed: ['Failed', 'High'], blocked: ['Blocked', 'Medium'], 'not-run': ['Not run', 'Low'] };
 const KIND = { web: 'Web', api: 'API', mobile: 'Mobile', manual: 'By hand', contract: 'Contract' };
@@ -82,6 +82,11 @@ export function renderExecution() {
     send('quarantine', { id: b.dataset.quar, reason });
   });
   document.querySelectorAll('[data-unquar]').forEach(b => b.onclick = () => send('unquarantine', { id: b.dataset.unquar }));
+  document.querySelectorAll('[data-report]').forEach(b => b.onclick = () => {  // the Reports tab's form, filled from the case
+    const r = cs.find(x => x.ID === b.dataset.report);
+    S.bugPrefill = { cases: r.ID, title: r.Title };
+    S.tab = 'reports'; render(); setHash(false);
+  });
 }
 
 function row(r) {
@@ -91,7 +96,8 @@ function row(r) {
   if (r.kind === 'manual') rec = `<select id="xr-${id}" aria-label="Result of ${id}">${['Passed', 'Failed', 'Blocked'].map(o => `<option ${RESULT[r.result][0] === o ? 'selected' : ''}>${o}</option>`).join('')}</select>
     <input id="xb-${id}" placeholder="BUG-…" value="${esc(r.bug)}" aria-label="Bug of ${id}" size="9"><input id="xn-${id}" placeholder="Note" value="${esc(r.note)}" aria-label="Note on ${id}" size="12">
     <button class="small" data-save="${id}">Save</button>`;
-  else if (r.result === 'failed' && !r.bug) rec = `<input id="xb-${id}" placeholder="BUG-…" aria-label="Bug of ${id}" size="9"><button class="small" data-link="${id}">Link bug</button>`;
+  else if (r.result === 'failed' && !r.bug) rec = `<input id="xb-${id}" placeholder="BUG-…" aria-label="Bug of ${id}" size="9"><button class="small" data-link="${id}">Link bug</button>
+    <button class="small" data-report="${id}">Report a bug</button>`;
   if (r.flaky && !r.quarantine) rec += ` <input id="xq-${id}" placeholder="Why quarantine" aria-label="Quarantine reason for ${id}" size="14"><button class="small" data-quar="${id}">Quarantine</button>`;
   if (r.quarantine) rec += ` <button class="small" data-unquar="${id}">Release</button>`;
   return `<tr><td class="id">${id}</td><td class="p">${esc(r.Priority)}</td><td dir="auto">${esc(r.Title)}<div class="meta">${esc(r.Type)}${r.history.length ? ' · runs ' + esc(r.history.join('')) : ''}${r.note ? ' · ' + esc(r.note) : ''}</div></td>

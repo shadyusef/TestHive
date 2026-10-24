@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Retests the failures of the current test cycle: failed tests, and tests of bugs marked fixed (cycle.sh fixed).
+# Retests the failures of the current test cycle: failed tests, and tests of bugs marked fixed (bug.sh status ... Fixed, or cycle.sh fixed).
 # Usage: bash scripts/retest.sh web|api <MODULE> [--target <name>]   (mobile: run-mobile.sh runs the whole module)
 . "$(dirname "$0")/_py.sh"
 K="${1:?web|api}"; MOD="${2:?module}"

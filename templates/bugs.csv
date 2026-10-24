@@ -1,0 +1,2 @@
+ID,Module,Title,Severity,Status,Cases,Cycle,Env,Target,Steps,Expected,Actual,Evidence,Reported By,Reported At,Updated By,Updated At,Note,External
+BUG-LOGIN-001,LOGIN,Wrong password shows no message,Major,Open,TC-LOGIN-004,C1,uat,edge,1. Open login; 2. Enter a wrong password; 3. Press Log in,The message "Wrong email or password",Nothing is shown,R-20260101-01/evidence/TC-LOGIN-004/test-failed-1.png,defect-triage,2026-01-01T10:00:00Z,,,,
