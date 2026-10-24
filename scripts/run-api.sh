@@ -24,7 +24,7 @@ if [ -n "$TEST_API_TOKEN" ]; then  # a file, not the command line: other process
   TEST_API_TOKEN="$TEST_API_TOKEN" $PY -c "import json,os,sys; json.dump({'values': [{'key': 'TEST_API_TOKEN', 'value': os.environ['TEST_API_TOKEN'], 'enabled': True}]}, open(sys.argv[1],'w'))" "$G"
   EF+=(-g "$G")
 fi
-newman run "$COL" "${EF[@]}" ${API_BASE_URL:+--env-var "API_BASE_URL=$API_BASE_URL"} ${TEST_API_TOKEN:+--env-var "TEST_API_TOKEN=$TEST_API_TOKEN"} \
+newman run "$COL" "${EF[@]}" ${API_BASE_URL:+--env-var "API_BASE_URL=$API_BASE_URL"} \
   --reporters cli,junit --reporter-junit-export reports/"$KIND"-"$MOD".xml; RC=$?
 [ -n "$NO_COLLECT" ] || [ ! -f reports/"$KIND"-"$MOD".xml ] || bash "$(dirname "$0")/collect-run.sh" "$KIND" "$MOD" --env "${TEST_ENV:-}"
 exit $RC

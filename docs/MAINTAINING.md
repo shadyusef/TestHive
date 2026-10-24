@@ -84,7 +84,6 @@ You do not need the original author or any chat history; everything is in this r
 | `TH_BROWSER_CHANNEL` | `explore-web`, web tests | `msedge` (Windows default), `chrome` or `chromium` |
 | `TH_BASH` | `studio` (set by `studio.sh`), the hooks | The bash that runs scripts started from Studio (Explore, the agents' scripts) and the edit-check hook; approvals need no bash |
 | `TH_STUDIO_CONFIG` | `studio` | Per-user settings file with the recent projects (default `%APPDATA%\TestHive\studio.json`); tests and demos set it so they leave your list alone |
-| `TEST_API_TOKEN` | `run-api --contract` | Bearer token the contract requests send to endpoints the spec protects |
 | `TH_LOGIN_USER`, `TH_LOGIN_PASSWORD` | `explore-web` (set by the script from `.env` `TEST_USER`, `TEST_USER_PASSWORD`) | The test login Explore uses; never written to any file |
 | `TH_CLAUDE_FAKE` | `studio` | A stand-in for Claude Code (`demo/phase2d/fake-claude.py`): Run buttons replay recordings |
 | `TH_FAKE_DELAY` | `fake-claude.py` | Seconds between recorded events (default 0.3) |
