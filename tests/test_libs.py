@@ -603,7 +603,7 @@ class StudioWithoutBash(StudioApi):
             self.assertEqual(o["agents"], "live"); self.assertIn("Git Bash", o["agents_missing"])  # one mode: Studio names what to install
             self.js("/api/project", {"project": "Demo", "app": "Demo", "platforms": ["Web"]}); self.js("/api/module-new", {"module": "LOGIN"})
             code, r = self.js("/api/run", {"module": "LOGIN", "action": "analyse"})
-            self.assertEqual(code, 409); self.assertIn("cannot run the agents yet: Git Bash", r["message"])
+            self.assertEqual(code, 409); self.assertRegex(r["message"], r"cannot run the agents yet: .*Git Bash not found")  # CI lacks Claude Code too
         finally:
             if fake: os.environ["TH_CLAUDE_FAKE"] = fake
 
