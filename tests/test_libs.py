@@ -661,6 +661,11 @@ class StudioExplore(StudioApi):
         self.assertFalse(self.js("/api/module?m=LOGIN")[1]["test_login"], "the template's change-me is not a login")
         with open(".env", "a", encoding="utf-8") as f: f.write("TEST_USER=tester\nTEST_USER_PASSWORD=Secret-123\n")
         d = self.js("/api/module?m=LOGIN")[1]; self.assertTrue(d["test_login"]); self.assertNotIn("Secret-123", json.dumps(d))
+        saved = studio.agents_missing, studio.jobs.claude_command, studio.jobs.start
+        studio.agents_missing, studio.jobs.claude_command = lambda: [], lambda *a: ["claude"]
+        studio.jobs.start = lambda m, kind, title, *a, **k: ({"title": title}, None)
+        try: self.assertEqual(studio.start_action("LOGIN", "analyse", studio.module_info("LOGIN"))[0]["title"], "Analyse the built product")  # the job list says what the button said
+        finally: studio.agents_missing, studio.jobs.claude_command, studio.jobs.start = saved
 
     def test_explore_needs_the_web_tools(self):
         self.module(); self.assertFalse(self.js("/api/module?m=LOGIN")[1]["web_tools"])  # a temporary project has no web/node_modules

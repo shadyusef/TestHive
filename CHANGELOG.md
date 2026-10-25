@@ -5,6 +5,7 @@ Versions follow `MAJOR.MINOR.PATCH`. The current version is in `VERSION`.
 ## 0.17.1 (2026-10-24)
 - Studio has one mode: Review mode is gone. The Run and Explore buttons always show; when Claude Code or Git Bash is missing, a note at the top names it with the install command and **Check again**, and Run is refused with the same words.
 - Fix: the Studio program, double-clicked, opened in Review mode on PCs with Git installed, because Windows' PATH has `Git\cmd` but not `bash`. Studio now finds Git Bash as `hive.cmd` does (next to `git.exe`, then `Program Files\Git`, then `LocalAppData\Programs\Git`) and passes it to the agents' hooks (`TH_BASH`).
+- Fix: a module with only a web address or APK showed "Analyse the documents" in the job list while its button said "Analyse the built product"; both now say "Analyse the built product".
 
 ## 0.17.0 (2026-10-24)
 - Phase 7a, the agents' questions in Studio: an agent started from Studio no longer just fails when it wants something its rules do not allow. Claude Code asks TestHive (`--permission-prompt-tool`, served by `scripts/lib/ask.py`, a small MCP server; nothing installed), and the job panel shows the question with the full command or file: **Allow once** or **Deny**, with a note to the agent, signed. No answer in 10 minutes (`TH_ASK_MINUTES`) is a No. Deny rules, the hooks and the blocked commands still apply before any question; agents cannot write the answers (the hook protects `runs/agents/`). Questions and answers are kept in the job's folder and its log.

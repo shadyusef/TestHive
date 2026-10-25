@@ -306,7 +306,8 @@ def start_action(module, action, info, opts=None):
                 "Draft the requirements as observed behaviour and the questions, and produce the registers and the workbook as your rules say.")
     cmd = jobs.claude_command(a["agent"], task, a.get("model"))
     if not cmd: return None, "Claude Code is not installed here. Run setup --install, then type claude once in a terminal to sign in."
-    return jobs.start(module, "agent", a["title"], cmd, task=task, agent=a["agent"])
+    title = "Analyse the built product" if action == "analyse" and not info["sources"]["files"] else a["title"]  # as the button says
+    return jobs.start(module, "agent", title, cmd, task=task, agent=a["agent"])
 
 
 WEB_TOOLS_MISSING = ("Explore needs the web tools on this PC. Someone at a terminal runs, once: "
